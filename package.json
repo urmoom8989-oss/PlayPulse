@@ -10,6 +10,7 @@
     "typecheck": "next typegen && tsc --noEmit",
     "smoke": "node scripts/smoke.mjs",
     "demo": "node scripts/demo.mjs",
+    "package:html": "node scripts/package-html.mjs",
     "db:migrations": "node scripts/db-migrations.mjs",
     "secrets:history": "node scripts/check-secrets.mjs --history",
     "test": "node --test tests/"

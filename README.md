@@ -71,6 +71,21 @@ npm run build
 npm run demo                 # http://localhost:3470
 ```
 
+To capture the actual rendered home page as one self-contained HTML file, build
+the app first and then run:
+
+```bash
+npm run build
+npm run package:html         # creates dist/sloptube.html
+```
+
+Open `dist/sloptube.html` directly in a browser. It contains the real home page
+rendered by the production build, with its styles and fonts embedded. This is a
+static snapshot, not the full application: Next.js needs a server for page
+navigation, client interactions and API routes, and database, account and video
+features need their configured services. The snapshot does not invent demo
+content; without a database it shows the app's normal disconnected state.
+
 The full setup, with your own database, uploads and a server, is below in
 [Run it yourself](#run-it-yourself).
 
