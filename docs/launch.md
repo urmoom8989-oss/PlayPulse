@@ -80,6 +80,8 @@ again. See [`supabase/migrations/README.md`](../supabase/migrations/README.md).
 - [ ] `020_flag_panel.sql`
 - [ ] `021_upload_size.sql` (raises the maximum video size to 5 GiB)
 - [ ] `022_upload_categories_publish.sql` (categories, thumbnails and explicit publishing)
+- [ ] `023_open_uploads_usernames.sql` (no daily upload limit, usernames with any characters but emoji)
+- [ ] `024_player_extras.sql` (the `player_extras` flag: chapters, autoplay, end screens, captions)
 
 Then make yourself an admin (sign up on the site first):
 

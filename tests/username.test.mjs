@@ -54,7 +54,7 @@ test("normalizes spaces and a leading @, keeps case", () => {
 });
 
 test("the database uses the same emoji and invisible character ranges", () => {
-  const sql = readFileSync(new URL("../supabase/migrations/021_open_uploads_usernames.sql", import.meta.url), "utf8");
+  const sql = readFileSync(new URL("../supabase/migrations/023_open_uploads_usernames.sql", import.meta.url), "utf8");
   const esc = (n) => (n > 0xffff ? `\\U${n.toString(16).padStart(8, "0")}` : `\\u${n.toString(16).padStart(4, "0")}`);
   const cls = (ranges) => `[${ranges.map(([a, b]) => (a === b ? esc(a) : `${esc(a)}-${esc(b)}`)).join("")}]`;
   assert.ok(sql.includes(`name !~ '${cls(EMOJI_RANGES)}'`), "the emoji ranges differ from username_is_valid()");

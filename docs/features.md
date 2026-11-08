@@ -276,7 +276,7 @@ stacked under the player.
 
 ### Player extras
 
-Behind the `player_extras` flag (`022_player_extras.sql`, off at first), all in
+Behind the `player_extras` flag (`024_player_extras.sql`, off at first), all in
 the browser:
 
 - **Chapters.** A list of timestamps in the description becomes chapters, with

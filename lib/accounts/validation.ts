@@ -1,6 +1,6 @@
 // Account rules shared by the forms and the tests (`node --test tests/`).
 // Keep in step with public.username_is_valid() in
-// supabase/migrations/021_open_uploads_usernames.sql.
+// supabase/migrations/023_open_uploads_usernames.sql.
 // No imports on purpose, so Node can load this file directly.
 
 /** Usernames are 3 to 24 characters, counted as Unicode characters (not UTF-16 units). */

@@ -1,10 +1,10 @@
--- 021_open_uploads_usernames.sql
+-- 023_open_uploads_usernames.sql
 -- Two rules made looser.
 --
--- - Uploads: no daily limit. create_upload() no longer counts the uploads of the
---   last 24 hours, so daily_limit is never raised. Every other check (signed in,
---   the upload flag, finished sign up, 13 or older, a channel, title, size and
---   type) stays as it was in 005_videos.sql.
+-- - Uploads: no daily limit. create_upload() no longer raises daily_limit.
+--   Every other check (signed in, the upload flag, finished sign up, 13 or
+--   older, a channel, title, the 5 GiB size limit from 021_upload_size.sql and
+--   type) stays exactly as it is in the database.
 -- - Usernames: 3 to 24 characters of anything except emoji and invisible
 --   characters, no spaces at either end, kept in the case people type.
 --   Whether a name is taken still ignores case (profiles_username_lower_key).
@@ -15,7 +15,7 @@
 -- Keep in step with lib/upload/rules.ts and lib/accounts/validation.ts (the
 -- emoji and invisible character ranges are the same lists; a test compares them).
 --
--- Run after 020_flag_panel.sql. Safe to run more than once.
+-- Run after 022_upload_categories_publish.sql. Safe to run more than once.
 
 -- Usernames ---------------------------------------------------------------------
 
@@ -148,65 +148,36 @@ grant execute on function public.complete_signup(text, date) to authenticated;
 
 -- Uploads ---------------------------------------------------------------------------
 
--- Starts an upload for the signed in person and returns the new video id and
--- the R2 object key the file must be uploaded to:
---   uploads/<owner id>/<video id>/source.<ext>
--- Errors (the message is the code the app shows a friendly text for):
---   not_signed_in, upload_off, not_onboarded, too_young, no_channel,
---   title_invalid, file_empty, file_too_big, bad_type
-create or replace function public.create_upload(title text, bytes bigint, mime text)
-returns table (video_id uuid, source_key text)
-language plpgsql
-security definer
-set search_path = ''
-as $$
+-- create_upload() as it is now (005, with 021_upload_size.sql's 5 GiB limit and
+-- whatever later files added), minus the daily limit: each public function
+-- that raises daily_limit is read back with that one statement made a no-op,
+-- and runs again otherwise unchanged. Nothing happens once it is gone, so this
+-- is safe to run more than once.
+do $$
 declare
-  me uuid := auth.uid();
-  me_profile public.profiles;
-  my_channel uuid;
-  clean_title text := trim(both from coalesce(create_upload.title, ''));
-  ext text := public.video_extension_for(create_upload.mime);
-  new_id uuid := gen_random_uuid();
-  new_key text;
+  fn record;
+  def text;
+  fixed text;
 begin
-  if me is null then
-    raise exception 'not_signed_in' using errcode = 'P0001';
-  end if;
-  if not public.upload_flag_on(me) then
-    raise exception 'upload_off' using errcode = 'P0001';
-  end if;
-
-  select * into me_profile from public.profiles p where p.id = me;
-  if me_profile.id is null or not me_profile.onboarded or me_profile.birthdate is null then
-    raise exception 'not_onboarded' using errcode = 'P0001';
-  end if;
-  if public.age_on(me_profile.birthdate) < 13 then
-    raise exception 'too_young' using errcode = 'P0001';
-  end if;
-
-  select c.id into my_channel from public.channels c where c.owner_id = me;
-  if my_channel is null then
-    raise exception 'no_channel' using errcode = 'P0001';
-  end if;
-
-  if char_length(clean_title) not between 1 and 100 then
-    raise exception 'title_invalid' using errcode = 'P0001';
-  end if;
-  if create_upload.bytes is null or create_upload.bytes < 1 then
-    raise exception 'file_empty' using errcode = 'P0001';
-  end if;
-  if create_upload.bytes > 2147483648 then
-    raise exception 'file_too_big' using errcode = 'P0001';
-  end if;
-  if ext is null then
-    raise exception 'bad_type' using errcode = 'P0001';
-  end if;
-
-  new_key := 'uploads/' || me::text || '/' || new_id::text || '/source.' || ext;
-  insert into public.videos (id, channel_id, owner_id, title, source_key, source_bytes, source_mime)
-  values (new_id, my_channel, me, clean_title, new_key, create_upload.bytes, create_upload.mime);
-
-  return query select new_id, new_key;
+  for fn in
+    select p.oid
+      from pg_proc p
+      join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public'
+       and p.prokind = 'f'
+       and pg_get_functiondef(p.oid) like '%daily_limit%'
+  loop
+    def := pg_get_functiondef(fn.oid);
+    fixed := regexp_replace(
+      def,
+      'raise\s+exception\s+[^;]*''daily_limit''[^;]*;',
+      'null; /* no daily upload limit (023_open_uploads_usernames.sql) */',
+      'gi'
+    );
+    if fixed <> def then
+      execute fixed;
+    end if;
+  end loop;
 end;
 $$;
 
