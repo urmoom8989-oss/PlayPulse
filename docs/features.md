@@ -283,6 +283,19 @@ the browser:
   down, Cancel and a play button to go at once. With autoplay off, or after
   Cancel, the end screen is a 3 by 3 wall of nine videos from Up next. Loop
   stops a video from ending, so it never autoplays.
+- **Captions.** The encoder writes auto-generated captions with a speech model
+  (see "Auto-generated captions" in `ops/encoder/README.md`) and lists them in
+  `master.m3u8`. The player reads that list itself, so the CC button lights up
+  only for videos that have them (it is dimmed, "unavailable", for the rest).
+  CC or `c` turns them on in the viewer's language, and the track's name shows
+  for a moment. **Settings, Subtitles/CC** picks a track or Off, and its
+  **Options** set the font family, font color, font size (50% to 400%),
+  background color and opacity, font opacity and character edge style, with
+  Reset. `+` and `-` make the words bigger or smaller. The player draws the
+  words itself, one box per line near the bottom, above the controls while they
+  show, so they look the same in every browser; the browser remembers on or off,
+  the language and the look. On phones the picture in picture button makes room
+  for CC.
 
 ### How the player gets the video
 

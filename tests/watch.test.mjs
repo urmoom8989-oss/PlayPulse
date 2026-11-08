@@ -114,6 +114,8 @@ test("keyboard map", () => {
   assert.deepEqual(k("i"), { type: "pip" });
   assert.deepEqual(k("c"), { type: "captions" });
   assert.deepEqual(k("C"), { type: "captions" });
+  assert.deepEqual(k("+"), { type: "caption-size", step: 1 });
+  assert.deepEqual(k("-"), { type: "caption-size", step: -1 });
   assert.deepEqual(k("0"), { type: "seek-percent", percent: 0 });
   assert.deepEqual(k("7"), { type: "seek-percent", percent: 70 });
   assert.deepEqual(k("9"), { type: "seek-percent", percent: 90 });

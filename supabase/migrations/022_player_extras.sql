@@ -6,7 +6,10 @@
 -- URL at current time, Stats for nerds), double tap to skip 10 seconds on
 -- phones, and autoplay: Up next's switch works (remembered in the browser),
 -- an "Up next" countdown plays the next video, and with autoplay off a wall
--- of nine videos shows at the end. Nothing is stored: this file only adds the
+-- of nine videos shows at the end. And captions: the CC button and the
+-- Subtitles/CC menu show the auto-generated captions the encoder adds to the
+-- master playlist, with options for their font, colors and size (remembered
+-- in the browser). Nothing is stored in the database: this file only adds the
 -- flag, off until the owner switches it on.
 --
 -- Run after 021_open_uploads_usernames.sql. Safe to run more than once.
@@ -15,7 +18,7 @@ insert into public.feature_flags (key, label, description, mode)
 values (
   'player_extras',
   'Player extras',
-  'Chapters from the description, clickable timestamps in descriptions and comments, the right-click menu (Loop, Copy video URL, Copy video URL at current time, Stats for nerds), double tap to skip 10 seconds on phones, and autoplay with an end screen of nine videos when it is off.',
+  'Chapters from the description, clickable timestamps in descriptions and comments, the right-click menu (Loop, Copy video URL, Copy video URL at current time, Stats for nerds), double tap to skip 10 seconds on phones, autoplay with an end screen of nine videos when it is off, and captions (the CC button, Subtitles/CC and caption options).',
   'off'
 )
 on conflict (key) do nothing;

@@ -22,6 +22,7 @@ import {
   PlayIcon,
   ReplayIcon,
   SettingsIcon,
+  SubtitlesIcon,
   TheaterIcon,
   VolumeDownIcon,
   VolumeOffIcon,
@@ -33,6 +34,18 @@ import { useWatchPings } from "@/lib/engagement/useWatchPings";
 import { useRouter } from "next/navigation";
 import { useFlag } from "@/lib/store/session";
 import { useWatch } from "@/lib/store/watch";
+import {
+  activeCues,
+  CAPTION_SETTINGS,
+  captionChoices,
+  captionValueLabel,
+  DEFAULT_CAPTION_STYLE,
+  pickTrack,
+  setCaptionSetting,
+  stepCaptionSize,
+  type CaptionSetting,
+  type CaptionTrack,
+} from "@/lib/watch/captions";
 import { chapterAt, parseChapters } from "@/lib/watch/chapters";
 import { endChoice, endScreenVideos, nextVideo } from "@/lib/watch/endscreen";
 import { formatTime } from "@/lib/watch/format";
@@ -44,9 +57,11 @@ import { DOUBLE_TAP_MS, nextTap, tapSide, tapTotal, type TapSide, type TapState 
 import type { UpNextVideo } from "@/lib/watch/types";
 import { cueAt, parseSpriteVtt, type SpriteCue } from "@/lib/watch/vtt";
 import { ChapterTrack } from "./ChapterTrack";
+import { CaptionOverlay } from "./CaptionOverlay";
 import { AutoplayCountdown, EndScreenWall } from "./EndScreen";
 import { PlayerContextMenu } from "./PlayerContextMenu";
 import { StatsForNerds } from "./StatsForNerds";
+import { useCaptions } from "./useCaptions";
 
 type Props = {
   videoId: string;
@@ -74,7 +89,7 @@ type Props = {
   channelName?: string;
 };
 
-type Menu = null | "main" | "quality" | "speed";
+type Menu = null | "main" | "quality" | "speed" | "subtitles" | "caption-options" | `caption-${CaptionSetting}`;
 
 /** Controls fade out after this long without the mouse moving, while playing. */
 const IDLE_MS = 2500;
@@ -84,6 +99,8 @@ const RESUME_EVERY_S = 5;
 const NOTE_MS = 1200;
 /** The "Resumed" note stays this long after playback starts. */
 const RESUMED_MS = 3000;
+/** After captions go on, the track's name shows this long (until the first words). */
+const CAPTION_HINT_MS = 3000;
 
 /** Safari (desktop and iOS) plays HLS itself; everybody else gets hls.js. */
 function preferNative(video: HTMLVideoElement): boolean {
@@ -95,8 +112,8 @@ function preferNative(video: HTMLVideoElement): boolean {
 /**
  * The video player, in the 2019 YouTube style: red progress bar with sprite
  * previews on hover, a big play button while paused, and a bottom bar with
- * play, volume, time, the settings gear (speed and quality), theater, picture
- * in picture and fullscreen. hls.js everywhere except Safari, which plays
+ * play, volume, time, CC (player extras), the settings gear (speed,
+ * Subtitles/CC and quality), theater, picture in picture and fullscreen. hls.js everywhere except Safari, which plays
  * HLS natively (and then picks the quality itself).
  */
 export function Player({
@@ -189,6 +206,12 @@ export function Player({
   const [ending, setEnding] = useState<"countdown" | "wall" | null>(null);
   const wall = useMemo(() => endScreenVideos(upNext, videoId), [upNext, videoId]);
   const next = useMemo(() => nextVideo(upNext, videoId), [upNext, videoId]);
+
+  // Captions (player extras): the tracks the encoder made, drawn in the viewer's style.
+  const captions = useCaptions(src, extras);
+  const [captionHint, setCaptionHint] = useState<string | null>(null);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [playerH, setPlayerH] = useState(0);
 
   // The server only hands engagement over when the flag is on for this
   // viewer, so this is known from the first render and the stream loads once.
@@ -334,6 +357,43 @@ export function Player({
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
+  // The browser's own captions stay off (Safari may turn them on by itself):
+  // with player extras the player draws them.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !extras || !video.textTracks) return;
+    const tracks = video.textTracks;
+    const off = () => {
+      for (const t of Array.from(tracks)) if ((t.kind === "subtitles" || t.kind === "captions") && t.mode === "showing") t.mode = "disabled";
+    };
+    off();
+    tracks.addEventListener("addtrack", off);
+    tracks.addEventListener("change", off);
+    return () => {
+      tracks.removeEventListener("addtrack", off);
+      tracks.removeEventListener("change", off);
+    };
+  }, [extras]);
+
+  // The player's height, for the caption size and the settings menu.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const measure = () => setPlayerH(wrap.getBoundingClientRect().height);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (hintTimer.current) clearTimeout(hintTimer.current);
+    },
+    [],
+  );
+
   // Actions ---------------------------------------------------------------------------
 
   const poke = useCallback(() => {
@@ -375,22 +435,37 @@ export function Player({
     else void video.requestPictureInPicture().catch(() => {});
   }, []);
 
-  /** c: subtitles on or off, from hls.js or the video's own text tracks; a note when the video has none. */
+  /** A caption track on, or null for off. Turning one on names it for a moment. */
+  const { choose: chooseCaptions } = captions;
+  const showCaptions = useCallback(
+    (track: CaptionTrack | null) => {
+      chooseCaptions(track);
+      if (hintTimer.current) clearTimeout(hintTimer.current);
+      setCaptionHint(track ? track.name : null);
+      if (track) hintTimer.current = setTimeout(() => setCaptionHint(null), CAPTION_HINT_MS);
+    },
+    [chooseCaptions],
+  );
+
+  /** c and the CC button: captions on or off, in the viewer's language; a note when the video has none. */
   const toggleCaptions = useCallback(() => {
-    const video = videoRef.current;
-    const hls = hlsRef.current;
-    if (hls && hls.subtitleTracks.length > 0) {
-      const on = hls.subtitleTrack >= 0 && hls.subtitleDisplay;
-      hls.subtitleDisplay = !on;
-      hls.subtitleTrack = on ? -1 : 0;
-      return flash(on ? "Subtitles off" : "Subtitles on");
-    }
-    const tracks = video ? Array.from(video.textTracks).filter((t) => t.kind === "subtitles" || t.kind === "captions") : [];
-    if (tracks.length === 0) return flash("No subtitles for this video");
-    const on = tracks.some((t) => t.mode === "showing");
-    tracks.forEach((t, i) => (t.mode = !on && i === 0 ? "showing" : "disabled"));
-    flash(on ? "Subtitles off" : "Subtitles on");
-  }, [flash]);
+    if (!extras || captions.tracks.length === 0) return flash("No subtitles for this video");
+    const track = captions.track ? null : pickTrack(captions.tracks, captions.lang);
+    showCaptions(track);
+    flash(track ? track.name : "Subtitles off");
+  }, [extras, captions.tracks, captions.track, captions.lang, showCaptions, flash]);
+
+  /** + and -: bigger or smaller captions, while they are on. */
+  const { style: captionStyle, setStyle: setCaptionStyle } = captions;
+  const stepCaptions = useCallback(
+    (step: 1 | -1) => {
+      if (!captions.track) return;
+      const size = stepCaptionSize(captionStyle.size, step);
+      setCaptionStyle({ ...captionStyle, size });
+      flash(`Font size ${size}%`);
+    },
+    [captions.track, captionStyle, setCaptionStyle, flash],
+  );
 
   const run = useCallback(
     (action: PlayerAction) => {
@@ -420,9 +495,11 @@ export function Player({
           return togglePip();
         case "captions":
           return toggleCaptions();
+        case "caption-size":
+          return stepCaptions(action.step);
       }
     },
-    [duration, embed, flash, seekTo, toggleCaptions, toggleFullscreen, togglePip, togglePlay, toggleTheater],
+    [duration, embed, flash, seekTo, stepCaptions, toggleCaptions, toggleFullscreen, togglePip, togglePlay, toggleTheater],
   );
 
   // Keyboard shortcuts, page wide like YouTube, but never while typing or in a dialog.
@@ -613,6 +690,8 @@ export function Player({
   // Rendering -------------------------------------------------------------------------
 
   const summary = qualitySummary(options, chosen, playingLevel);
+  const captionTrack = extras ? captions.track : null;
+  const shownCues = captionTrack ? activeCues(captions.cues, time) : [];
   const playingOpt = options.find((o) => o.level === (chosen === AUTO ? playingLevel : chosen));
   const hd = playingOpt?.hd ?? false;
   const showChrome = !playing || active || menu !== null || scrubbing || volumeDrag;
@@ -783,6 +862,16 @@ export function Player({
       )}
       {ending === "wall" && <EndScreenWall videos={wall} channelName={channelName} />}
 
+      {captionTrack && ending === null && !error && (
+        <CaptionOverlay
+          cues={shownCues}
+          hint={captionHint}
+          style={captions.style}
+          playerHeight={playerH}
+          raised={showChrome}
+        />
+      )}
+
       {/* The bottom chrome. */}
       <div
         className={`absolute inset-x-0 bottom-0 transition-opacity duration-200 ${
@@ -925,6 +1014,19 @@ export function Player({
           )}
 
           <div className="ml-auto flex items-center">
+            {extras && (
+              <CtrlButton
+                label={captions.tracks.length ? "Subtitles/closed captions (c)" : "Subtitles/closed captions unavailable"}
+                onClick={toggleCaptions}
+                aria-pressed={captionTrack !== null}
+                data-captions-button={captionTrack ? "on" : captions.tracks.length ? "off" : "none"}
+              >
+                <SubtitlesIcon className={`h-6 w-6 ${captions.tracks.length ? "" : "opacity-50"}`} />
+                {captionTrack && (
+                  <span aria-hidden className="absolute bottom-[5px] left-1/2 h-[3px] w-[22px] -translate-x-1/2 rounded-[1px] bg-[var(--mark)]" />
+                )}
+              </CtrlButton>
+            )}
             <div className="relative">
               <CtrlButton
                 ref={gearRef}
@@ -952,7 +1054,8 @@ export function Player({
               </CtrlButton>
             )}
             {pipOk && (
-              <CtrlButton label="Picture in picture (i)" onClick={togglePip} data-pip>
+              // Phones have no room for it next to CC (and their browsers offer it themselves).
+              <CtrlButton label="Picture in picture (i)" onClick={togglePip} className={extras ? "max-sm:hidden" : ""} data-pip>
                 <PipIcon className="h-[22px] w-[22px]" />
               </CtrlButton>
             )}
@@ -969,14 +1072,110 @@ export function Player({
           ref={menuRef}
           role="menu"
           data-settings-menu={menu}
-          className="absolute bottom-[49px] right-3 z-20 min-w-[251px] rounded-[2px] bg-[rgba(28,28,28,0.9)] py-2 text-[13px] font-medium text-[#eeeeee] [text-shadow:0_0_2px_rgba(0,0,0,.5)]"
+          className="absolute bottom-[49px] right-3 z-20 min-w-[251px] overflow-y-auto rounded-[2px] bg-[rgba(28,28,28,0.9)] py-2 text-[13px] font-medium text-[#eeeeee] [text-shadow:0_0_2px_rgba(0,0,0,.5)]"
+          style={playerH > 0 ? { maxHeight: Math.max(140, playerH - 60) } : undefined}
         >
           {menu === "main" && (
             <>
               <MenuRow onClick={() => setMenu("speed")} label="Playback speed" value={speedLabel(rate)} />
+              {extras && captions.tracks.length > 0 && (
+                <MenuRow
+                  onClick={() => setMenu("subtitles")}
+                  label={`Subtitles/CC (${captions.tracks.length})`}
+                  value={captionTrack ? captionTrack.name : "Off"}
+                  data-menu-subtitles
+                />
+              )}
               <MenuRow onClick={() => setMenu("quality")} label="Quality" value={summary} />
             </>
           )}
+          {menu === "subtitles" && (
+            <>
+              <MenuBack
+                onClick={() => setMenu("main")}
+                label="Subtitles/CC"
+                extra={
+                  <button
+                    type="button"
+                    onClick={() => setMenu("caption-options")}
+                    data-caption-options
+                    className="ml-auto h-full px-3 text-[13px] font-medium hover:bg-white/10"
+                  >
+                    Options
+                  </button>
+                }
+              />
+              <MenuChoice
+                checked={captionTrack === null}
+                onClick={() => {
+                  showCaptions(null);
+                  setMenu(null);
+                }}
+                data-caption-track="off"
+              >
+                Off
+              </MenuChoice>
+              {captions.tracks.map((t) => (
+                <MenuChoice
+                  key={t.id}
+                  checked={captionTrack?.id === t.id}
+                  onClick={() => {
+                    showCaptions(t);
+                    setMenu(null);
+                  }}
+                  data-caption-track={t.lang || t.name}
+                >
+                  {t.name}
+                </MenuChoice>
+              ))}
+            </>
+          )}
+          {menu === "caption-options" && (
+            <>
+              <MenuBack onClick={() => setMenu("subtitles")} label="Options" />
+              {CAPTION_SETTINGS.map(({ key, label }) => (
+                <MenuRow
+                  key={key}
+                  onClick={() => setMenu(`caption-${key}`)}
+                  label={label}
+                  value={captionValueLabel(captions.style, key)}
+                  data-caption-setting={key}
+                />
+              ))}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => captions.setStyle(DEFAULT_CAPTION_STYLE)}
+                data-caption-reset
+                className="flex h-10 w-full items-center px-4 hover:bg-white/10"
+              >
+                Reset
+              </button>
+            </>
+          )}
+          {menu?.startsWith("caption-") && menu !== "caption-options" && (() => {
+            const key = menu.slice("caption-".length) as CaptionSetting;
+            const setting = CAPTION_SETTINGS.find((c) => c.key === key);
+            if (!setting) return null;
+            return (
+              <>
+                <MenuBack onClick={() => setMenu("caption-options")} label={setting.label} />
+                {captionChoices(key).map((c) => (
+                  <MenuChoice
+                    key={c.value}
+                    checked={captions.style[key] === c.value}
+                    onClick={() => {
+                      captions.setStyle(setCaptionSetting(captions.style, key, c.value));
+                      setMenu("caption-options");
+                    }}
+                    data-caption-choice={c.value}
+                  >
+                    {c.label}
+                  </MenuChoice>
+                ))}
+              </>
+            );
+          })()}
           {menu === "speed" && (
             <>
               <MenuBack onClick={() => setMenu("main")} label="Playback speed" />
@@ -1066,6 +1265,7 @@ function CtrlButton({
   ref?: React.Ref<HTMLButtonElement>;
   onClick?: () => void;
   "aria-expanded"?: boolean;
+  "aria-pressed"?: boolean;
 } & Record<`data-${string}`, unknown>) {
   return (
     <button
@@ -1081,9 +1281,14 @@ function CtrlButton({
   );
 }
 
-function MenuRow({ label, value, onClick }: { label: string; value: string; onClick: () => void }) {
+function MenuRow({
+  label,
+  value,
+  onClick,
+  ...rest
+}: { label: string; value: string; onClick: () => void } & Record<`data-${string}`, unknown>) {
   return (
-    <button type="button" role="menuitem" onClick={onClick} className="flex h-10 w-full items-center px-4 hover:bg-white/10">
+    <button type="button" role="menuitem" onClick={onClick} className="flex h-10 w-full items-center px-4 hover:bg-white/10" {...rest}>
       <span className="mr-6 flex-1 text-left">{label}</span>
       <span className="text-right font-normal">{value}</span>
       <ChevronRightIcon className="-mr-1.5 ml-1 h-5 w-5" />
@@ -1091,17 +1296,19 @@ function MenuRow({ label, value, onClick }: { label: string; value: string; onCl
   );
 }
 
-function MenuBack({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
+function MenuBack({ label, onClick, extra = null }: { label: string; onClick: () => void; extra?: React.ReactNode }) {
+  const back = (
     <button
       type="button"
       onClick={onClick}
-      className="mb-2 flex h-12 w-full items-center border-b border-white/20 px-2 text-[15px] hover:bg-white/10"
+      className={`flex h-12 items-center px-2 text-[15px] hover:bg-white/10 ${extra ? "" : "w-full"}`}
     >
       <ChevronLeftIcon className="mr-2 h-6 w-6" />
       {label}
     </button>
   );
+  // With something on the right (Options, in Subtitles/CC) the header is a row of two buttons.
+  return <div className="mb-2 flex h-12 items-center border-b border-white/20">{back}{extra}</div>;
 }
 
 function MenuChoice({

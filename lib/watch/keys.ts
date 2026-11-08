@@ -10,7 +10,8 @@ export type PlayerAction =
   | { type: "fullscreen" }
   | { type: "theater" }
   | { type: "pip" }
-  | { type: "captions" };
+  | { type: "captions" }
+  | { type: "caption-size"; step: 1 | -1 };
 
 export type KeyInput = {
   key: string;
@@ -46,6 +47,7 @@ function isTyping(e: KeyInput): boolean {
  *   t               theater mode
  *   i               picture in picture
  *   c               subtitles and closed captions on or off
+ *   + and -         captions bigger or smaller
  *   0 to 9          jump to 0% to 90%
  * Returns null for any other key, and when a modifier is held (so browser
  * shortcuts like Ctrl+L keep working) or the person is typing. Space on a
@@ -82,6 +84,12 @@ export function keyAction(e: KeyInput): PlayerAction | null {
       return { type: "pip" };
     case "c":
       return { type: "captions" };
+    case "+":
+    case "=":
+      return { type: "caption-size", step: 1 };
+    case "-":
+    case "_":
+      return { type: "caption-size", step: -1 };
   }
   if (/^[0-9]$/.test(key)) return { type: "seek-percent", percent: Number(key) * 10 };
   return null;
