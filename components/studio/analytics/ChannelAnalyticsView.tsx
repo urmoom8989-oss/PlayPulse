@@ -85,7 +85,7 @@ export function ChannelAnalyticsView({ data, realtime, live }: { data: ChannelAn
                           <img src={v.thumbnail} alt="" className="h-full w-full object-cover" />
                         )}
                         {v.durationS ? (
-                          <span className="absolute bottom-0.5 right-0.5 rounded-[2px] bg-black/80 px-1 text-[11px] text-white">{clock(v.durationS)}</span>
+                          <span className="absolute bottom-0.5 right-0.5 bg-black/80 px-1 text-[11px] text-white">{clock(v.durationS)}</span>
                         ) : null}
                       </span>
                       <span className="flex min-w-0 items-center gap-1 text-[13px] leading-[18px] text-text">

@@ -64,7 +64,7 @@ function Thumb({ v }: { v: StudioRow }) {
         </span>
       )}
       {v.durationS ? (
-        <span className="absolute bottom-1 right-1 rounded-[2px] bg-black/80 px-1 text-[11px] font-medium leading-4 text-white">
+        <span className="absolute bottom-1 right-1 bg-black/80 px-1 text-[11px] font-medium leading-4 text-white">
           {formatTime(v.durationS)}
         </span>
       ) : null}

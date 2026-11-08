@@ -45,7 +45,7 @@ export function VideoCard({
           </span>
         )}
         {video.durationS !== null && (
-          <span className="absolute bottom-1 right-1 rounded-sm bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 tracking-[0.5px] text-white">
+          <span className="absolute bottom-1 right-1 bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 tracking-[0.5px] text-white">
             {formatTime(video.durationS)}
           </span>
         )}

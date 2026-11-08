@@ -14,7 +14,7 @@ function Card({ video, channel }: { video: UpNextVideo; channel: WatchChannel })
       <Link href={href} className="relative block aspect-video w-[168px] shrink-0 overflow-hidden bg-skeleton" tabIndex={-1} aria-hidden>
         {video.thumbnail && <Thumb src={video.thumbnail} alt={video.title} sizes="168px" />}
         {video.durationS !== null && (
-          <span className="absolute bottom-1 right-1 rounded-sm bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 text-white">
+          <span className="absolute bottom-1 right-1 bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 text-white">
             {formatTime(video.durationS)}
           </span>
         )}

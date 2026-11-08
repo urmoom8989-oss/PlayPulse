@@ -47,7 +47,7 @@ export function VideoAnalyticsView({ data, realtime, live }: { data: VideoAnalyt
             <img src={video.thumbnail} alt="" className="h-full w-full object-cover" />
           )}
           {video.durationS ? (
-            <span className="absolute bottom-0.5 right-0.5 rounded-[2px] bg-black/80 px-1 text-[11px] text-white">{clock(video.durationS)}</span>
+            <span className="absolute bottom-0.5 right-0.5 bg-black/80 px-1 text-[11px] text-white">{clock(video.durationS)}</span>
           ) : null}
         </span>
         <div className="min-w-0">

@@ -410,7 +410,7 @@ export function VideoEditor({
                 </div>
               )}
               {video.durationS ? (
-                <span className="absolute bottom-2 right-2 rounded-[2px] bg-black/80 px-1 text-[12px] font-medium text-white">
+                <span className="absolute bottom-2 right-2 bg-black/80 px-1 text-[12px] font-medium text-white">
                   {formatTime(video.durationS)}
                 </span>
               ) : null}
