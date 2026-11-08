@@ -94,7 +94,7 @@ export function accountErrorText(code: string): string {
     username_taken: "That username is taken. Try another.",
     birthdate_required: "Enter your birthday.",
     invalid_birthdate: "Enter a real birthday.",
-    too_young: `You must be ${MIN_AGE} or older to use sloptube.`,
+    too_young: `You must be ${MIN_AGE} or older to use PlayPulse.`,
     already_complete: "Your account is already set up.",
   };
   for (const key of Object.keys(known)) {

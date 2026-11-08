@@ -59,7 +59,7 @@ export function VideoAnalyticsView({ data, realtime, live }: { data: VideoAnalyt
               Details
             </Link>
             <Link href={video.isShort ? `/shorts/${video.id}` : `/watch?v=${video.id}`} className="font-medium uppercase text-[var(--studio-accent)] hover:underline">
-              View on sloptube
+              View on PlayPulse
             </Link>
           </p>
         </div>

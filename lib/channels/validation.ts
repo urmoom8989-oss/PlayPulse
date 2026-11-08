@@ -194,5 +194,5 @@ export function channelTitle(segment: string, tab?: string): string {
     // keep the raw segment
   }
   handle = normalizeHandle(handle).replace(/[^a-z0-9_.]/g, "").slice(0, HANDLE_MAX);
-  return `${tab ? `${tab} | ` : ""}@${handle || "channel"} | sloptube`;
+  return `${tab ? `${tab} | ` : ""}@${handle || "channel"} | PlayPulse`;
 }

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { HistorySkeleton, HistoryView } from "@/components/history/HistoryView";
 
-export const metadata = { title: "History | sloptube" };
+export const metadata = { title: "History | PlayPulse" };
 
 // /feed/history, the 2019 address (/history sends you here).
 export default function HistoryPage() {

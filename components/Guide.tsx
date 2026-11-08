@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, Suspense, useContext, type ComponentType } from "react";
@@ -18,10 +19,23 @@ import {
   SnipsIcon,
   SubscriptionsIcon,
   TrendingIcon,
+  SettingsIcon,
+  ChannelIcon,
+  AddIcon,
 } from "./icons";
 import { Logo } from "./Logo";
 
 type Item = { href: string; label: string; Icon: ComponentType<{ className?: string }> };
+const TOPICS = [
+  { label: "Music", icon: "music.jpg" },
+  { label: "Sports", icon: "sports.jpg" },
+  { label: "Gaming", icon: "gaming.jpg" },
+  { label: "Movies and TV", icon: "movies.jpg" },
+  { label: "Learning", icon: "learning.jpg" },
+  { label: "Fashion", icon: "fashion.jpg" },
+  { label: "Live", icon: "live.jpg" },
+  { label: "News", icon: "news.jpg" },
+];
 
 // Every link the guide can show. Which ones do show comes from lib/guide.ts
 // (feature 18): each appears when its feature's flag goes on.
@@ -69,22 +83,75 @@ function Section({ children }: { children: React.ReactNode }) {
   return <div className="border-b border-divider py-3">{children}</div>;
 }
 
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <h2 className="mb-1 px-6 pt-2 text-[12px] font-medium uppercase leading-4 tracking-[0.3px] text-text-2">
+      {children}
+    </h2>
+  );
+}
+
 /** The full 240 px guide content, shared by the docked guide and the drawer. */
 function GuideContent({ onNavigate }: { onNavigate?: () => void }) {
   const user = useSession((s) => s.user);
   const loaded = useSession((s) => s.loaded);
   const accounts = useFlag("accounts");
   const flags = useShellFlags();
+  const channels = useFlag("channels");
+  const search = useFlag("search");
   const subscriptions = flags.subscriptions;
   const you = youGuide(flags);
+  const main = mainGuide(flags).filter((key) => key !== "shorts");
 
   return (
     <>
       <Section>
-        {mainGuide(flags).map((key) => (
+        {main.map((key) => (
           <GuideLink key={key} item={ITEMS[key]} onClick={onNavigate} />
         ))}
       </Section>
+      {flags.shorts && (
+        <Section>
+          <SectionTitle>Explore</SectionTitle>
+          <GuideLink item={ITEMS.shorts} onClick={onNavigate} />
+        </Section>
+      )}
+      {(search || channels) && (
+        <Section>
+          {search && (
+            <>
+              <SectionTitle>Best of PlayPulse</SectionTitle>
+              {TOPICS.map(({ label, icon }) => (
+                <Link
+                  key={label}
+                  href={`/results?search_query=${encodeURIComponent(label)}`}
+                  onClick={onNavigate}
+                  className="flex h-9 items-center px-6 text-[14px] hover:bg-hover"
+                >
+                  <Image
+                    src={`/topic-icons/${icon}`}
+                    alt=""
+                    width={24}
+                    height={24}
+                    className="mr-6 h-6 w-6 shrink-0 rounded-full object-cover"
+                  />
+                  {label}
+                </Link>
+              ))}
+            </>
+          )}
+          {channels && (
+            <Link
+              href="/channels"
+              onClick={onNavigate}
+              className="flex h-10 items-center px-6 text-[14px] hover:bg-hover"
+            >
+              <AddIcon className="mr-6 h-6 w-6 shrink-0 text-icon" />
+              <span>Browse channels</span>
+            </Link>
+          )}
+        </Section>
+      )}
       {you.length > 0 && (
         <Section>
           {you.map((key) => (
@@ -113,13 +180,29 @@ function GuideContent({ onNavigate }: { onNavigate?: () => void }) {
 
       {user && subscriptions && (
         <Section>
+          <SectionTitle>Subscriptions</SectionTitle>
           <GuideSubscriptions onNavigate={onNavigate} />
         </Section>
       )}
 
+      {(channels && user?.channelHandle) || (accounts && user) ? (
+        <Section>
+          <SectionTitle>More from PlayPulse</SectionTitle>
+          {channels && user?.channelHandle && (
+            <GuideLink
+              item={{ href: `/@${user.channelHandle}`, label: "Your channel", Icon: ChannelIcon }}
+              onClick={onNavigate}
+            />
+          )}
+          {accounts && user && (
+            <GuideLink item={{ href: "/settings", label: "Settings", Icon: SettingsIcon }} onClick={onNavigate} />
+          )}
+        </Section>
+      ) : null}
+
       <GuideFooterLinks />
       <p className="px-6 py-4 text-[12px] leading-[18px] text-text-3">
-        sloptube is built in the open.{" "}
+        PlayPulse is built in the open.{" "}
         <a href="https://github.com/myfilehero/sloptube" className="hover:underline">
           Source on GitHub
         </a>

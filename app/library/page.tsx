@@ -1,6 +1,6 @@
 import { EmptyState } from "@/components/EmptyState";
 
-export const metadata = { title: "Library | sloptube" };
+export const metadata = { title: "Library | PlayPulse" };
 
 export default function Library() {
   return (

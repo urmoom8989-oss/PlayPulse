@@ -6,7 +6,7 @@ import { PreviewNotice, StudioNoDb, StudioOff, StudioPage, StudioSkeleton } from
 import { parseRange, statsErrorMessage } from "@/lib/stats/rules";
 import { channelAnalytics } from "@/lib/stats/server";
 
-export const metadata = { title: "Channel analytics | sloptube" };
+export const metadata = { title: "Channel analytics | PlayPulse" };
 
 async function AnalyticsGate({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const range = parseRange((await searchParams).range);

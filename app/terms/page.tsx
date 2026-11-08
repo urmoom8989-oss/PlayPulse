@@ -3,8 +3,8 @@ import { ContactEmail, Owner, PublicPage, Section } from "@/components/launch/Pu
 import { siteConfig } from "@/site.config";
 
 export const metadata = {
-  title: "Terms of Service | sloptube",
-  description: "The rules for using this copy of sloptube.",
+  title: "Terms of Service | PlayPulse",
+  description: "The rules for using this copy of PlayPulse.",
   alternates: { canonical: "/terms" },
 };
 
@@ -21,7 +21,7 @@ export default function TermsPage() {
       updated
       intro={
         <p>
-          These terms are between you and {owner}, who runs this copy of sloptube. By using the site you agree to them.
+          These terms are between you and {owner}, who runs this copy of PlayPulse. By using the site you agree to them.
         </p>
       }
     >
@@ -61,12 +61,12 @@ export default function TermsPage() {
       </Section>
       <Section title="The service">
         <p>
-          sloptube is provided as it is, without any promise that it will always be available or free of mistakes. {owner}{" "}
+          PlayPulse is provided as it is, without any promise that it will always be available or free of mistakes. {owner}{" "}
           may change or stop the service. As far as the law allows, {owner} is not liable for indirect losses from using
           the site.
         </p>
         <p>
-          The sloptube software itself is open source under the MIT license; these terms are about using this copy of the
+          The PlayPulse software itself is open source under the MIT license; these terms are about using this copy of the
           site, not the code.
         </p>
       </Section>

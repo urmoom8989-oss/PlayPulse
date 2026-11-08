@@ -106,6 +106,6 @@ test("subscriber counts read like 2019", () => {
 });
 
 test("tab titles only use handle characters", () => {
-  assert.equal(channelTitle("Antic"), "@antic | sloptube");
-  assert.equal(channelTitle("%3Cscript%3E", "About"), "About | @script | sloptube");
+  assert.equal(channelTitle("Antic"), "@antic | PlayPulse");
+  assert.equal(channelTitle("%3Cscript%3E", "About"), "About | @script | PlayPulse");
 });

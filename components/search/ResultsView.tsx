@@ -62,7 +62,7 @@ export async function ResultsView({ searchParams }: { searchParams: PageProps<"/
     case "empty-query":
       return (
         <div className={frame} data-search-state="empty-query">
-          <Message state="empty-query" title="Search sloptube" hint="Type what you are looking for in the box at the top." />
+          <Message state="empty-query" title="Search PlayPulse" hint="Type what you are looking for in the box at the top." />
         </div>
       );
     case "rate-limited":

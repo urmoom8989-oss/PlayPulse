@@ -5,7 +5,7 @@ import { studioOn } from "@/lib/studio/server";
 import { yapinErrorText } from "@/lib/yapin/rules";
 import { announcements, yapinOn } from "@/lib/yapin/server";
 
-export const metadata = { title: "Settings | sloptube" };
+export const metadata = { title: "Settings | PlayPulse" };
 
 async function SettingsGate() {
   if (!(await studioOn())) return <StudioOff />;

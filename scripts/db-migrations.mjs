@@ -21,8 +21,9 @@
 import { spawnSync } from "node:child_process";
 import { readFileSync, readdirSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const dir = resolve(new URL("../supabase/migrations", import.meta.url).pathname);
+const dir = resolve(fileURLToPath(new URL("../supabase/migrations", import.meta.url)));
 
 /** The migration files in run order: 000_x.sql, 001_y.sql, ... */
 export function migrationFiles(folder = dir) {
@@ -73,4 +74,6 @@ function main(argv) {
   return 0;
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) process.exitCode = main(process.argv.slice(2));
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  process.exitCode = main(process.argv.slice(2));
+}

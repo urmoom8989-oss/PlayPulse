@@ -1,4 +1,4 @@
-// The sloptube mark: one drawing everywhere, and nothing borrowed from YouTube.
+// The PlayPulse mark: one drawing everywhere, and nothing borrowed from another platform.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
@@ -8,15 +8,15 @@ import { maintenanceHtml } from "../lib/launch/maintenance.ts";
 const read = (p) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
 
 test("the maintenance page draws the same mark as lib/brand.ts", () => {
-  const html = maintenanceHtml("sloptube");
+  const html = maintenanceHtml("PlayPulse");
   assert.ok(html.includes(MARK_BLOB), "blob path in step");
   assert.ok(html.includes(MARK_WAVE), "wave path in step");
-  assert.ok(html.includes(BRAND.mark), "brand green in step");
+  assert.ok(html.includes(BRAND.mark), "brand teal in step");
 });
 
 test("the press kit SVGs are the ones lib/brand.ts draws", () => {
-  assert.equal(read("public/press/sloptube-logo.svg").trim(), logoSvg());
-  assert.equal(read("public/press/sloptube-mark.svg").trim(), markSvg(240));
+  assert.equal(read("public/press/playpulse-logo.svg").trim(), logoSvg());
+  assert.equal(read("public/press/playpulse-mark.svg").trim(), markSvg(240));
 });
 
 test("globals.css uses the brand colors for the mark and the word", () => {

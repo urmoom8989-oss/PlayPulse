@@ -1,6 +1,6 @@
 import { ErrorPage } from "@/components/launch/ErrorPage";
 
-export const metadata = { title: "404 Not Found | sloptube", robots: { index: false } };
+export const metadata = { title: "404 Not Found | PlayPulse", robots: { index: false } };
 
 /** The 2019 "This page isn't available", with a real 404 status. */
 export default function NotFound() {

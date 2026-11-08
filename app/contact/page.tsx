@@ -3,8 +3,8 @@ import { ContactEmail, PublicPage } from "@/components/launch/PublicPage";
 import { CONTACT_PER_DAY } from "@/lib/launch/rules";
 
 export const metadata = {
-  title: "Contact us | sloptube",
-  description: "Send a message to the people who run this copy of sloptube.",
+  title: "Contact us | PlayPulse",
+  description: "Send a message to the people who run this copy of PlayPulse.",
   alternates: { canonical: "/contact" },
 };
 

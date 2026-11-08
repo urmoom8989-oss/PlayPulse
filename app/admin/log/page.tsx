@@ -4,7 +4,7 @@ import { AdminLog } from "@/components/admin/AdminLog";
 import { AdminError, AdminShell } from "@/components/admin/AdminShell";
 import { adminGate, adminLog } from "@/lib/moderation/server";
 
-export const metadata = { title: "Mod log | sloptube admin", robots: { index: false } };
+export const metadata = { title: "Mod log | PlayPulse admin", robots: { index: false } };
 
 async function LogGate({ searchParams }: { searchParams: PageProps<"/admin/log">["searchParams"] }) {
   const gate = await adminGate();

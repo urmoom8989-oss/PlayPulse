@@ -6,7 +6,7 @@ import { launchErrorMessage } from "@/lib/launch/rules";
 import { adminMessages } from "@/lib/launch/server";
 import { serverNow } from "@/lib/moderation/server";
 
-export const metadata = { title: "Messages | sloptube admin", robots: { index: false } };
+export const metadata = { title: "Messages | PlayPulse admin", robots: { index: false } };
 
 async function MessagesGate({ searchParams }: { searchParams: PageProps<"/admin/messages">["searchParams"] }) {
   const all = (await searchParams).all === "1";

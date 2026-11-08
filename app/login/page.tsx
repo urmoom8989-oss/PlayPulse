@@ -7,7 +7,7 @@ import { accountsState } from "@/lib/accounts/server";
 import { yapinNote } from "@/lib/yapin/rules";
 import { yapinSignIn } from "@/lib/yapin/server";
 
-export const metadata = { title: "Sign in | sloptube" };
+export const metadata = { title: "Sign in | PlayPulse" };
 
 const callbackError = "Sign in did not finish. Try again.";
 /** proxy.ts sends a banned account here once it has signed it out (feature 14). */
@@ -33,7 +33,7 @@ async function LoginGate({ searchParams }: { searchParams: PageProps<"/login">["
 
 export default function LoginPage({ searchParams }: PageProps<"/login">) {
   return (
-    <AuthCard title="Sign in" subtitle="to continue to sloptube">
+    <AuthCard title="Sign in" subtitle="to continue to PlayPulse">
       <Suspense fallback={<FormSkeleton />}>
         <LoginGate searchParams={searchParams} />
       </Suspense>

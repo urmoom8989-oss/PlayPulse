@@ -3,8 +3,8 @@ import { ContactEmail, Owner, PublicPage, Section } from "@/components/launch/Pu
 import { siteConfig } from "@/site.config";
 
 export const metadata = {
-  title: "Privacy | sloptube",
-  description: "What this copy of sloptube stores about you, why, and how to get it removed.",
+  title: "Privacy | PlayPulse",
+  description: "What this copy of PlayPulse stores about you, why, and how to get it removed.",
   alternates: { canonical: "/privacy" },
 };
 
@@ -17,7 +17,7 @@ export default function PrivacyPage() {
       updated
       intro={
         <p>
-          This page says what this copy of sloptube, run by <Owner value={siteConfig.ownerName} />, stores about you and
+          This page says what this copy of PlayPulse, run by <Owner value={siteConfig.ownerName} />, stores about you and
           why. There are no ads and no third party trackers.
         </p>
       }
@@ -54,15 +54,15 @@ export default function PrivacyPage() {
       </Section>
       <Section title="Cookies">
         <p>
-          sloptube uses cookies only to keep you signed in. Your theme and player settings (volume, quality) are kept in
+          PlayPulse uses cookies only to keep you signed in. Your theme and player settings (volume, quality) are kept in
           your own browser.
         </p>
       </Section>
       <Section title="Who else sees it">
         <p>
           The site runs on rented servers and services that store data on our behalf: the database and sign in (Supabase),
-          video files (Cloudflare R2) and the network in front of the site (Cloudflare). Nothing is sold or shared for
-          advertising.
+          video files (the configured object-storage provider) and the network in front of the site (Cloudflare). Nothing
+          is sold or shared for advertising.
         </p>
       </Section>
       <Section title="Your choices">

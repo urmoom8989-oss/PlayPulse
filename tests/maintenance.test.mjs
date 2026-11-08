@@ -4,7 +4,7 @@ import { test } from "node:test";
 import { maintenanceHtml, maintenanceOpen, RETRY_AFTER_S } from "../lib/launch/maintenance.ts";
 
 test("the maintenance page is one static document", () => {
-  const html = maintenanceHtml("sloptube");
+  const html = maintenanceHtml("PlayPulse");
   assert.match(html, /^<!doctype html>/);
   assert.ok(html.includes('<meta name="robots" content="noindex">'));
   assert.ok(html.includes("We're doing some maintenance."));

@@ -8,7 +8,7 @@ import { parseRange, statsErrorMessage } from "@/lib/stats/rules";
 import { videoAnalytics } from "@/lib/stats/server";
 import { UUID } from "@/lib/studio/http";
 
-export const metadata = { title: "Video analytics | sloptube" };
+export const metadata = { title: "Video analytics | PlayPulse" };
 
 async function VideoAnalyticsGate({
   params,

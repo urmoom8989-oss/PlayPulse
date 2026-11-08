@@ -86,7 +86,7 @@ export function PublicPage({
       <Gate page={page}>
         <div className="min-h-[calc(100dvh-56px)] bg-page">
           <div className={`mx-auto px-0 py-0 sm:px-6 sm:py-6 ${wide ? "max-w-[1100px]" : "max-w-[860px]"}`}>
-            <nav aria-label="About sloptube" className="flex overflow-x-auto border-b border-divider bg-surface sm:rounded-t-[2px]">
+            <nav aria-label="About PlayPulse" className="flex overflow-x-auto border-b border-divider bg-surface sm:rounded-t-[2px]">
               {PUBLIC_LINKS.map((l) => (
                 <Link
                   key={l.href}

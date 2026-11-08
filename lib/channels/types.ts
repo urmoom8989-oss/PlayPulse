@@ -67,7 +67,7 @@ export function previewChannel(handle: string): Channel {
     name: handle.replace(/[._]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase()) || "Your channel",
     description:
       "This is a preview of a channel page. Connect the database to see real channels.\n\nChannel owners write their description in the studio.",
-    links: [{ title: "Source on GitHub", url: "https://github.com/myfilehero/sloptube" }],
+    links: [{ title: "PlayPulse source on GitHub", url: "https://github.com/myfilehero/sloptube" }],
     avatarUrl: null,
     bannerUrl: "/sample-banner.svg",
     handleChangedAt: null,

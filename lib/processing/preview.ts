@@ -6,6 +6,7 @@ import type { StudioVideo } from "@/lib/upload/server";
 const base = {
   description: "",
   visibility: "public",
+  category: "Other",
   sourceBytes: 734003200,
   thumbnailUrl: null,
   error: null,

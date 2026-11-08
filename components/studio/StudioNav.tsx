@@ -88,7 +88,7 @@ function NavBody({ channel, active, statsOn }: { channel: NavChannel; active: st
       >
         <div className="flex flex-col items-center px-6 pb-4 pt-6 text-center">
           {channel.handle ? (
-            <Link href={`/@${channel.handle}`} title="View channel on sloptube">
+            <Link href={`/@${channel.handle}`} title="View channel on PlayPulse">
               <Avatar name={channel.name} url={channel.avatarUrl} size={112} />
             </Link>
           ) : (

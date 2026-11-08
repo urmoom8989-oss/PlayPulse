@@ -5,18 +5,18 @@ import { PRESS_SHOTS } from "@/lib/launch/press";
 import { siteConfig } from "@/site.config";
 
 export const metadata = {
-  title: "Press | sloptube",
-  description: "The sloptube logo, a short description and screenshots to use in articles and videos.",
+  title: "Press | PlayPulse",
+  description: "The PlayPulse logo, a short description and screenshots to use in articles and videos.",
   alternates: { canonical: "/press" },
 };
 
 /** /press: the logo, a short description and screenshots (public/press, made by scripts/press-kit.mjs). */
 export default function PressPage() {
   return (
-    <PublicPage page="press" title="Press" wide intro={<p>Writing about sloptube? Everything on this page is free to use.</p>}>
+    <PublicPage page="press" title="Press" wide intro={<p>Writing about PlayPulse? Everything on this page is free to use.</p>}>
       <Section title="In one paragraph">
         <p>
-          sloptube is an open source video platform in the style of 2019 and 2020 video sites, built in the open one feature
+          PlayPulse is an open source video platform in the style of 2019 and 2020 video sites, built in the open one feature
           at a time and filmed as a video series. It has channels, uploads with HLS playback, a home feed, subscriptions,
           search, likes, comments, Snips, a creator studio with analytics, and moderation. The code is MIT licensed and
           anyone can run their own copy. This copy is run by <Owner value={siteConfig.ownerName} />.
@@ -24,16 +24,16 @@ export default function PressPage() {
       </Section>
       <Section title="Logo">
         <div className="mt-3 flex flex-wrap items-center gap-6">
-          <a href="/press/sloptube-logo.svg" download className="grid h-[120px] w-[280px] place-items-center rounded-[2px] bg-white ring-1 ring-divider">
-            <Image src="/press/sloptube-logo.svg" alt="The sloptube logo: a green blob of slop with two drips and the word sloptube" width={224} height={48} unoptimized />
+          <a href="/press/playpulse-logo.svg" download className="grid h-[120px] w-[280px] place-items-center rounded-[2px] bg-white ring-1 ring-divider">
+            <Image src="/press/playpulse-logo.svg" alt="The PlayPulse logo in teal" width={224} height={48} unoptimized />
           </a>
-          <a href="/press/sloptube-mark.svg" download className="grid h-[120px] w-[160px] place-items-center rounded-[2px] bg-[#202020]">
-            <Image src="/press/sloptube-mark.svg" alt="The sloptube mark on its own" width={72} height={72} unoptimized />
+          <a href="/press/playpulse-mark.svg" download className="grid h-[120px] w-[160px] place-items-center rounded-[2px] bg-[#202020]">
+            <Image src="/press/playpulse-mark.svg" alt="The PlayPulse mark on its own" width={72} height={72} unoptimized />
           </a>
         </div>
         <p className="mt-3">
-          Click a logo to download the SVG. Keep the green as it is (#16a34a for the mark, #15803d for the word slop) and leave some space around it.
-          sloptube is not affiliated with YouTube or Google.
+          Click a logo to download the SVG. Keep the teal as it is (#0f766e for the mark and word) and leave some space around it.
+          PlayPulse is not affiliated with YouTube or Google.
         </p>
       </Section>
       <Section title="Screenshots">

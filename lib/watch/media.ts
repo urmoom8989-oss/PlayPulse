@@ -1,10 +1,10 @@
 // The logic behind GET /api/media/[video]/[...path]. The route file only wires
-// in Supabase, the flag and R2, so the tests run this with fakes.
+// in Supabase, the flag and object storage, so the tests run this with fakes.
 // Only relative imports, so Node can load this file directly.
 
 import { mediaBase, rewritePlaylist } from "./playlist.ts";
 
-/** How long the presigned R2 links the route redirects to work, in seconds. */
+/** How long presigned object links the route redirects to work, in seconds. */
 export const MEDIA_URL_TTL_S = 10 * 60;
 
 /** What watch_video() says about the video, as far as the route cares. */
@@ -13,7 +13,7 @@ export type MediaVideo = { status: string; is_owner: boolean | null; hls_key: st
 export type MediaStorage = {
   /** The object as text, or null when it does not exist. */
   getText(key: string): Promise<string | null>;
-  /** A presigned GET link to the object. Made locally, no request to R2. */
+  /** A presigned GET link to the object. Made locally, no storage request. */
   presign(key: string, expiresIn: number): Promise<string>;
 };
 
@@ -22,7 +22,7 @@ export type MediaContext = {
   db: { watchVideo(id: string): Promise<MediaVideo | null> } | null;
   /** Is the watch flag on for the person asking? */
   flagOn: () => Promise<boolean>;
-  /** null when the R2 settings are missing. */
+  /** null when object-storage settings are missing. */
   storage: MediaStorage | null;
 };
 
@@ -36,8 +36,9 @@ const PROXIED: Record<string, string> = {
   m3u8: "application/vnd.apple.mpegurl",
   vtt: "text/vtt; charset=utf-8",
 };
-/** Files the route redirects to R2 for. */
-const REDIRECTED = new Set(["m4s", "mp4", "webp", "jpg"]);
+/** Files the route redirects to the object store for. */
+const REDIRECTED = new Set(["m4s", "mp4", "webp", "jpg", "png"]);
+const CUSTOM_THUMBNAIL = /^custom-[a-z0-9]{12,32}\.(?:jpg|png|webp)$/;
 
 function fail(status: number, error: string): MediaResult {
   return {
@@ -76,7 +77,15 @@ export async function serveMedia(videoId: string, parts: string[], ctx: MediaCon
 
   const id = videoId.toLowerCase();
   const video = await ctx.db.watchVideo(id);
-  const folder = video?.hls_key ? folderOf(video.hls_key) : null;
+  const customOwnerThumbnail =
+    video?.is_owner === true &&
+    parts.length === 1 &&
+    CUSTOM_THUMBNAIL.test(parts[0]);
+  const folder = video?.hls_key
+    ? folderOf(video.hls_key)
+    : customOwnerThumbnail
+      ? `hls/${id}`
+      : null;
   if (!video || !folder) return fail(404, "not_found");
   if (!ctx.storage) return fail(503, "media_not_configured");
 

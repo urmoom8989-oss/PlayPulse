@@ -3,7 +3,7 @@ import { Suspense } from "react";
 import { ChannelMissing, ChannelSkeleton, ChannelsNotSetUp, ChannelsOff } from "@/components/channel/ChannelNotices";
 import { handleForChannelId } from "@/lib/channels/server";
 
-export const metadata = { title: "Channel | sloptube" };
+export const metadata = { title: "Channel | PlayPulse" };
 
 /** /channel/<id> always sends people on to the channel's /@handle. */
 async function ChannelRedirect({ params }: { params: Promise<{ id: string }> }) {

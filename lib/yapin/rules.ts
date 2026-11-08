@@ -55,7 +55,7 @@ const MESSAGES: Record<string, string> = {
   not_signed_in: "Sign in first.",
   no_channel: "Make your channel first.",
   bad_webhook: "Paste the webhook URL from your Yapin' channel settings. It looks like https://www.yapin.gg/api/webhooks/...",
-  yapin_taken: "That Yapin' account is linked to another sloptube account.",
+  yapin_taken: "That Yapin' account is linked to another PlayPulse account.",
   rate_limited: "Too many changes for now. Try again in a minute.",
   needs_email: "Add an email address under Account first: Yapin' is the only way into this account.",
   failed: "Something went wrong. Try again.",

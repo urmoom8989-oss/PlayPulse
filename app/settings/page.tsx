@@ -7,7 +7,7 @@ import { SettingsForm, type SettingsProfile } from "@/components/settings/Settin
 import { accountsState } from "@/lib/accounts/server";
 import { connectionState } from "@/lib/yapin/server";
 
-export const metadata = { title: "Settings | sloptube" };
+export const metadata = { title: "Settings | PlayPulse" };
 
 const preview: SettingsProfile = {
   id: "preview",
@@ -68,7 +68,7 @@ export default function SettingsPage() {
     <div className="mx-auto max-w-[1000px] px-4 py-6 sm:px-6">
       <div className="bg-surface px-4 py-6 sm:px-8">
         <h1 className="text-[24px] font-normal leading-8 text-text">Settings</h1>
-        <p className="mb-4 mt-1 text-[14px] text-text-2">Choose how you appear on sloptube.</p>
+        <p className="mb-4 mt-1 text-[14px] text-text-2">Choose how you appear on PlayPulse.</p>
         <Suspense fallback={<FormSkeleton />}>
           <SettingsGate />
         </Suspense>

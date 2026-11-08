@@ -3,7 +3,7 @@ import { connection } from "next/server";
 import { Suspense } from "react";
 import { getFlags } from "@/lib/flags";
 
-export const metadata = { title: "Feature flags | sloptube" };
+export const metadata = { title: "Feature flags | PlayPulse" };
 
 const DASHBOARD = "https://supabase.com/dashboard/project/_/editor";
 

@@ -57,7 +57,7 @@ export function WelcomeForm({ suggested, next }: { suggested: string; next: stri
   if (refused) {
     return (
       <div role="alert" className="space-y-3 text-[14px] leading-5 text-text">
-        <p className="font-medium">You must be 13 or older to use sloptube.</p>
+        <p className="font-medium">You must be 13 or older to use PlayPulse.</p>
         <p className="text-text-2">Your account has been deleted. You can still watch videos without one.</p>
       </div>
     );

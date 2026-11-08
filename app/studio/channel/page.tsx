@@ -6,7 +6,7 @@ import { ChannelEditor } from "@/components/studio/ChannelEditor";
 import { myChannel } from "@/lib/channels/server";
 import { previewChannel } from "@/lib/channels/types";
 
-export const metadata = { title: "Channel customization | sloptube" };
+export const metadata = { title: "Channel customization | PlayPulse" };
 
 async function StudioGate() {
   const state = await myChannel();

@@ -54,7 +54,7 @@ export function Dashboard({ overview }: { overview: Overview }) {
                 Edit video
               </Link>
               <Link href={`/watch?v=${latest.id}`} className={linkButton}>
-                View on sloptube
+                View on PlayPulse
               </Link>
             </div>
           }

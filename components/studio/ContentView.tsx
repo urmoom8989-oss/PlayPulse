@@ -308,7 +308,7 @@ export function ContentView({
                   }
                 >
                   {(close) =>
-                    (["public", "unlisted", "private"] as Visibility[]).map((v) => {
+                    (["unlisted", "private"] as Visibility[]).map((v) => {
                       const { label, Icon } = VIS[v];
                       return (
                         <MenuItem
@@ -475,7 +475,7 @@ export function ContentView({
                                 <AnalyticsIcon className="h-5 w-5" />
                               </IconLink>
                             )}
-                            <IconLink href={watchHref} label="View on sloptube">
+                            <IconLink href={watchHref} label="View on PlayPulse">
                               <PlayIcon className="h-5 w-5" />
                             </IconLink>
                             <IconButton onClick={() => setConfirm([v.id])} label="Delete" disabled={busy}>

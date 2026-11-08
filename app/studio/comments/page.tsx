@@ -4,7 +4,7 @@ import { ChannelMessage } from "@/components/channel/ChannelNotices";
 import { StudioComments } from "@/components/comments/StudioComments";
 import { studioComments } from "@/lib/comments/server";
 
-export const metadata = { title: "Channel comments | sloptube" };
+export const metadata = { title: "Channel comments | PlayPulse" };
 
 async function CommentsGate() {
   const state = await studioComments();

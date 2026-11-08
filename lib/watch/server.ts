@@ -7,10 +7,10 @@ import { jobsFor } from "@/lib/processing/server";
 import { progressFor, type LiveStatus } from "@/lib/processing/status";
 import { readSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
-import { readR2Config } from "@/lib/upload/env";
-import { createR2Client } from "@/lib/upload/r2";
+import { readStorageConfig } from "@/lib/upload/env";
+import { createS3Client } from "@/lib/upload/s3";
 import { playbackUrls, readPublicBase, type MediaContext, type MediaVideo } from "./media";
-import { createMediaStorage } from "./r2";
+import { createMediaStorage } from "./s3";
 import type { UpNextVideo, WatchRendition, WatchVideo } from "./types";
 import { relatedCards } from "@/lib/feed/server";
 import { engagementFor } from "@/lib/engagement/server";
@@ -26,10 +26,10 @@ export function mediaPublicBase(): string | null {
   return readPublicBase(process.env.MEDIA_PUBLIC_URL);
 }
 
-/** The real Supabase, flag and R2 for /api/media/[video]/[...path]. */
+/** The real Supabase, flag and object storage for /api/media/[video]/[...path]. */
 export async function mediaContext(): Promise<MediaContext> {
   const supabase = await createClient();
-  const r2 = readR2Config();
+  const storage = readStorageConfig();
   return {
     db: supabase
       ? {
@@ -41,7 +41,7 @@ export async function mediaContext(): Promise<MediaContext> {
         }
       : null,
     flagOn: () => flagOn("watch"),
-    storage: r2 ? createMediaStorage(createR2Client(r2), r2.bucket) : null,
+    storage: storage ? createMediaStorage(createS3Client(storage), storage.bucket) : null,
   };
 }
 

@@ -286,7 +286,7 @@ export function SearchBox({ initialQuery = "" }: { initialQuery?: string }) {
           type="button"
           aria-label="Search with your voice"
           disabled
-          title="Voice search is not part of sloptube yet"
+          title="Voice search is not part of PlayPulse yet"
           className="ml-2 grid h-10 w-10 shrink-0 place-items-center rounded-full text-icon"
         >
           <MicIcon className="h-6 w-6" />

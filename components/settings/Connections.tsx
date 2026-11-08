@@ -33,7 +33,7 @@ export function Connections({ linked, username, needsEmail = false }: { linked: 
   return (
     <section data-connections className="mt-8 border-t border-divider pt-6">
       <h2 className="text-[16px] font-medium text-text">Connections</h2>
-      <p className="mt-1 text-[14px] text-text-2">Accounts you can use to sign in to sloptube.</p>
+      <p className="mt-1 text-[14px] text-text-2">Accounts you can use to sign in to PlayPulse.</p>
       <div data-yapin-connection={linked ? "linked" : "unlinked"} className="mt-4 flex flex-wrap items-center gap-4 rounded-[2px] border border-divider px-4 py-3">
         <YapinIcon className="h-8 w-8 shrink-0" />
         <div className="min-w-0 flex-1">

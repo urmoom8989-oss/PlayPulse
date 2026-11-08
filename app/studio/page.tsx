@@ -13,7 +13,7 @@ import {
 } from "@/components/studio/StudioNotices";
 import { studioOverview } from "@/lib/studio/server";
 
-export const metadata = { title: "Channel dashboard | sloptube" };
+export const metadata = { title: "Channel dashboard | PlayPulse" };
 
 async function DashboardGate() {
   const state = await studioOverview();

@@ -100,18 +100,27 @@ To set it up, run `supabase/migrations/004_channels.sql` in the
 to `test` or `everyone` to show channel pages and the "Your channel" menu item.
 While it is off, `/@handle` says "Channels aren't on yet".
 
-## Uploads (R2)
+## Uploads (S3-compatible storage)
 
-Signed in people upload videos at `/upload`: drag and drop or pick a file, fill in
-the title, description and visibility while it uploads, and see it land in
-`/studio/videos`. Video files go straight from the browser to a Cloudflare R2
+Signed in people upload videos at `/upload`: drag and drop or pick a file, add a
+title, description, category and optional custom thumbnail while it uploads, and
+see it land in `/studio/videos` and their own channel. Video files go straight from the browser to an S3-compatible
 bucket with presigned URLs, in 16 MB parts, so the app server never touches the
 bytes. Processing (feature 4) turns it into HLS and the watch page (feature 5)
-plays it.
+plays it. Railway Buckets are supported; Cloudflare R2 remains supported for
+existing installs.
 
-- MP4, MOV, WebM or MKV, up to 2 GB per file, 10 uploads a day per person.
+- MP4, MOV, WebM or MKV, up to 5 GiB (5,368,709,120 bytes) per video, 10 uploads
+  a day per person. Files are stored as objects in one shared bucket; no separate
+  5 GiB bucket is created or reserved for each video.
 - Uploading needs a finished sign up (13 or older) and a channel.
-- New videos are private unless the uploader picks unlisted or public.
+- New videos stay private and appear only to their owner until they press
+  **Publish**. Public videos appear on the channel and in feeds after processing.
+- Categories: Music, Sports, Gaming, Movies and TV, News, Live or Other.
+- Custom thumbnails can be JPG, PNG or WebP up to 2 MB; they can be selected
+  during upload or changed later in Studio.
+- A 5 GiB application limit does not guarantee storage capacity or pricing: check
+  the bucket provider's current plan, quotas and bandwidth charges.
 
 ### 1. Run the migration
 
@@ -120,29 +129,36 @@ Run `supabase/migrations/005_videos.sql` in the
 (after 001 to 004). It adds the `videos` table, the upload functions and an
 `upload` flag that starts `off`. Switch the flag to `test` or `everyone` to show
 the upload icon in the top bar, `/upload` and `/studio/videos`.
+Apply `supabase/migrations/021_upload_size.sql` after `020_flag_panel.sql` to
+raise the database limit to 5 GiB. Then apply
+`supabase/migrations/022_upload_categories_publish.sql` for categories,
+pre-processing custom thumbnails and the explicit Publish action. On an existing
+install, run only migrations 021 and 022 if they have not already been applied.
+Without 021, the older 2 GiB database limit still applies.
 
-### 2. Create the bucket
+### 2. Create a Railway Bucket
 
-1. Open [R2 > Create bucket](https://dash.cloudflare.com/?to=/:account/r2/new).
-2. Pick a name, for example `sloptube-videos`, and create it. Leave public
-   access off: nothing in it is served straight to viewers.
+For Railway, create a Bucket in the Railway project, then use its S3 endpoint,
+bucket name, region and access keys. Railway Buckets use
+`https://t3.storageapi.dev` and virtual-hosted URLs (`S3_FORCE_PATH_STYLE=false`).
+Use the same bucket and credentials for the app and encoder, with read/write
+access limited to that bucket.
 
-### 3. Make an API token
+Keep public access off: the app serves viewer requests through signed URLs.
 
-1. On the R2 overview page, open **Manage R2 API Tokens** (or
-   [this link](https://dash.cloudflare.com/?to=/:account/r2/api-tokens)) and click
-   **Create API token**.
-2. Permissions: **Object Read & Write**.
-3. Under **Specify bucket(s)**, pick only your video bucket.
-4. Create it and copy the **Access Key ID** and the **Secret Access Key**. The
-   secret is shown once.
-5. The **Account ID** is on the R2 overview page.
+### Legacy Cloudflare R2
+
+R2 remains supported for existing installs. Create an R2 bucket, then create an
+API token with **Object Read & Write** limited to that bucket. Copy the Access
+Key ID, Secret Access Key and Account ID. When using R2, leave all `S3_*` values
+empty and use the `R2_*` settings below.
 
 ### 4. Allow uploads from the site (CORS)
 
-The browser uploads each part with a `PUT` to R2 and needs to read the `ETag`
-R2 sends back. In the bucket, open **Settings > CORS Policy > Add CORS policy**
-and paste this, with your own domain:
+The browser uploads each part with a `PUT` to the bucket and needs to read the
+`ETag` response header. Configure bucket CORS to allow your site and local
+development origin, `PUT`, the `content-type` request header, and expose `ETag`.
+For example:
 
 ```json
 [
@@ -162,17 +178,22 @@ Optional: under **Settings > Object lifecycle rules**, keep the rule that aborts
 incomplete multipart uploads (1 day is plenty), so parts from closed tabs do
 not pile up.
 
-### 5. Add the four settings
+### 5. Add the storage settings
 
-Put these names in `.env.local` for local development and in
-`/opt/sloptube/.env` on the server, with your values after the `=`:
+For Railway Buckets, put these names in `.env.local` for local development and
+in `/opt/sloptube/.env` on the server, with your bucket values after the `=`:
 
 ```bash
-R2_ACCOUNT_ID=
-R2_ACCESS_KEY_ID=
-R2_SECRET_ACCESS_KEY=
-R2_BUCKET=
+S3_ENDPOINT=https://t3.storageapi.dev
+S3_REGION=auto
+S3_ACCESS_KEY_ID=
+S3_SECRET_ACCESS_KEY=
+S3_BUCKET=
+S3_FORCE_PATH_STYLE=false
 ```
+
+For R2, leave all `S3_*` values empty and set `R2_ACCOUNT_ID`,
+`R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` and `R2_BUCKET` instead.
 
 They are read on the server only, at request time. Never prefix them with
 `NEXT_PUBLIC_` and never commit the values. Restart the app after adding them.
@@ -210,7 +231,7 @@ To set it up:
 3. Switch the `processing` flag to `test` or `everyone`.
 
 Worker tests (ladder, ffmpeg arguments, sprite timing, the loop with Supabase
-and R2 mocked, and a real 3 second encode when ffmpeg is installed):
+and object storage mocked, and a real 3 second encode when ffmpeg is installed):
 
 ```bash
 npm ci --prefix worker
@@ -256,25 +277,23 @@ the site instead, at `/api/media/<video>/<file>`:
    watch: public and unlisted videos once they are ready, the owner always.
    Everybody else gets 404, the same as for a video that does not exist.
 2. **Playlists** (`master.m3u8`, `720p/index.m3u8`) and the sprite's `.vtt` are
-   tiny text files. The route reads them from R2 and sends them on, with every
+   tiny text files. The route reads them from object storage and sends them on, with every
    file name inside rewritten to point back at the route.
 3. **Video segments**, init files and images get a `302` redirect to a
-   presigned R2 link that works for 10 minutes. The bytes go straight from R2
-   to the browser; the site only signs links, which needs no request to R2.
+   presigned storage link that works for 10 minutes. The bytes go straight from
+   the bucket to the browser; the site only signs links.
 
 Why not redirect the playlists too: the player would then read the relative
-names inside them against the R2 link and ask R2 for unsigned files, which
-fails. Why not one long lived link per video: anybody could keep sharing it
+names inside them against the storage link and ask the bucket for unsigned files,
+which fails. Why not one long lived link per video: anybody could keep sharing it
 after the video goes private. With the route, making a video private stops
 playback within minutes.
 
-**Optional: a public bucket domain.** If you connect a custom domain to the
-bucket ([Cloudflare docs](https://developers.cloudflare.com/r2/buckets/public-buckets/))
-and set `MEDIA_PUBLIC_URL=https://media.example.com` on the website, the player
-loads `https://media.example.com/hls/<video>/master.m3u8` directly and skips the
-route. That is cheaper and uses Cloudflare's cache, but every file under `hls/`
-is then readable by anybody who knows the video id, including private videos.
-Leave it empty unless that is fine for you.
+**Optional: a public bucket domain.** If your provider supports a public custom
+domain, setting `MEDIA_PUBLIC_URL=https://media.example.com` makes the player
+load `https://media.example.com/hls/<video>/master.m3u8` directly and skip the
+route. Every file under `hls/` is then readable by anybody who knows the video
+id, including private videos. Leave it empty unless that is fine for you.
 
 ### Set it up
 
@@ -283,7 +302,7 @@ Leave it empty unless that is fine for you.
    (after 001 to 006). It adds `videos.views`, the `watch_video` function and a
    `watch` flag that starts `off`. While it is off, `/watch` shows the feature 4
    page.
-2. Let the player read from R2: in the bucket, **Settings > CORS Policy**, add
+2. Let the player read from the bucket: in its CORS settings, add
    `GET` and `HEAD` to the allowed methods and `range` to the allowed headers
    (keep `PUT` for uploads):
 
@@ -651,13 +670,13 @@ the channel's picture, white cards on light grey, blue buttons and links.
   video moves to the trash and becomes private everywhere; the trash shows how
   many days are left and Restore puts it back with the visibility it had.
   After 30 days a daily job deletes the video for good, with its comments,
-  likes and views, and queues its files in R2 for the encoder box to remove
-  (see "Emptying the trash in R2" in [ops/encoder/README.md](../ops/encoder/README.md)).
+  likes and views, and queues its files in object storage for the encoder box to remove
+  (see "Emptying the bucket trash" in [ops/encoder/README.md](../ops/encoder/README.md)).
 - **Video details** (`/studio/video/<id>/edit`): title, description, tags (up
   to 15), visibility, the comments setting (feature 10) and "Show this video
   as a Snip" (feature 11), saved with SAVE; UNDO CHANGES goes back. The
   thumbnail is one of the encoder's three stills or a custom JPG, PNG or WebP
-  up to 2 MB, uploaded straight to R2 next to the video's files; a pick saves
+  up to 2 MB, uploaded straight to object storage next to the video's files; a pick saves
   at once.
 - `/studio/videos` (feature 3) goes to Content while the flag is on.
 - Limits: 60 bulk changes and 60 edits a minute per person.
@@ -665,7 +684,7 @@ the channel's picture, white cards on light grey, blue buttons and links.
 A picked thumbnail shows everywhere when `MEDIA_PUBLIC_URL` is set, or when the
 site runs on https (the link then goes through `/api/media`). Without either,
 for example `npm run dev` on http, only the studio shows the pick. Custom
-thumbnails need the R2 settings and the CORS rule from "Uploads (R2)", which
+thumbnails need the storage settings and the CORS rule from "Uploads (S3-compatible storage)", which
 already allows the `PUT` they use.
 
 To set it up:
@@ -679,7 +698,7 @@ To set it up:
    `studio` flag that starts `off`. While it is off `/studio` shows a coming
    soon page, the studio routes answer 403, and `/studio/comments`,
    `/studio/channel` and `/studio/videos` work as before without the nav.
-2. Update the encoder box to the new worker image, so it empties the R2
+2. Update the encoder box to the new worker image, so it empties the bucket
    folders of purged videos.
 3. Switch the `studio` flag to `test` or `everyone`.
 

@@ -4,7 +4,7 @@ import { AdminError, AdminShell } from "@/components/admin/AdminShell";
 import { AdminWords } from "@/components/admin/AdminWords";
 import { adminGate, adminWords } from "@/lib/moderation/server";
 
-export const metadata = { title: "Word list | sloptube admin", robots: { index: false } };
+export const metadata = { title: "Word list | PlayPulse admin", robots: { index: false } };
 
 async function WordsGate() {
   const gate = await adminGate();
