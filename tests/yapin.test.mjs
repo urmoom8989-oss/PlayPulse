@@ -232,7 +232,7 @@ const video = {
 };
 
 test("with the yapin flag on, watch pages point og:video and twitter:player at /embed/<id>", () => {
-  const m = watchMetadata(video, ORIGIN, "sloptube", { embed: true });
+  const m = watchMetadata(video, ORIGIN, "PlayPulse", { embed: true });
   const embed = `${ORIGIN}${embedPath(video.id)}`;
   assert.equal(embed, "https://tube.example.com/embed/f0000000-0000-4000-8000-000000000001");
   assert.deepEqual(m.openGraph.videos, [{ url: embed, secureUrl: embed, type: "text/html", width: 1280, height: 720 }]);
@@ -247,13 +247,13 @@ test("without it, or for a private video, the cards stay as they were", () => {
   const off = watchMetadata(video, ORIGIN);
   assert.equal(off.openGraph.videos, undefined);
   assert.equal(off.twitter.card, "summary_large_image");
-  assert.equal(watchMetadata({ ...video, visibility: "private" }, ORIGIN, "sloptube", { embed: true }).openGraph.videos, undefined);
+  assert.equal(watchMetadata({ ...video, visibility: "private" }, ORIGIN, "PlayPulse", { embed: true }).openGraph.videos, undefined);
   // http origins get no secure_url.
-  assert.equal(watchMetadata(video, "http://localhost:3000", "sloptube", { embed: true }).openGraph.videos[0].secureUrl, undefined);
+  assert.equal(watchMetadata(video, "http://localhost:3000", "PlayPulse", { embed: true }).openGraph.videos[0].secureUrl, undefined);
 });
 
 test("Snips keep their own canonical link and get a portrait player", () => {
-  const m = shortMetadata({ ...video, width: 1080, height: 1920 }, ORIGIN, "sloptube", { embed: true });
+  const m = shortMetadata({ ...video, width: 1080, height: 1920 }, ORIGIN, "PlayPulse", { embed: true });
   assert.equal(m.alternates.canonical, `${ORIGIN}/shorts/${video.id}`);
   assert.deepEqual(m.twitter.players[0], { playerUrl: `${ORIGIN}/embed/${video.id}`, streamUrl: `${ORIGIN}/embed/${video.id}`, width: 1080, height: 1920 });
   assert.deepEqual(playerSize({ width: null, height: null }), { width: 1280, height: 720 });
@@ -262,7 +262,7 @@ test("Snips keep their own canonical link and get a portrait player", () => {
 
 test("the embed page is kept out of search engines and points at the watch page", () => {
   const m = embedMetadata(video, ORIGIN);
-  assert.equal(m.title, `${video.title} | sloptube`);
+  assert.equal(m.title, `${video.title} | PlayPulse`);
   assert.equal(m.alternates.canonical, `${ORIGIN}/watch?v=${video.id}`);
   assert.deepEqual(m.robots, { index: false, follow: true });
 });

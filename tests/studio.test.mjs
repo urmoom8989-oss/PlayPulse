@@ -284,7 +284,8 @@ test("errors: codes from the database and their HTTP status", () => {
   assert.equal(studioErrorCode("boom"), "failed");
   assert.equal(studioStatus("rate_limited"), 429);
   assert.equal(studioStatus("not_allowed"), 403);
-  assert.equal(studioStatus("in_trash"), 400);
+  assert.equal(studioStatus("in_trash"), 409);
+  assert.equal(studioStatus("publish_required"), 409);
   assert.equal(studioStatus("not_signed_in"), 401);
 });
 
