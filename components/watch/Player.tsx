@@ -1,7 +1,15 @@
 "use client";
 
 import type Hls from "hls.js";
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import {
   CheckIcon,
   ChevronLeftIcon,
@@ -14,6 +22,7 @@ import {
   PlayIcon,
   ReplayIcon,
   SettingsIcon,
+  SubtitlesIcon,
   TheaterIcon,
   VolumeDownIcon,
   VolumeOffIcon,
@@ -22,12 +31,37 @@ import {
 import { resumeAt } from "@/lib/engagement/rules";
 import type { WatchEngagement } from "@/lib/engagement/types";
 import { useWatchPings } from "@/lib/engagement/useWatchPings";
+import { useRouter } from "next/navigation";
+import { useFlag } from "@/lib/store/session";
 import { useWatch } from "@/lib/store/watch";
+import {
+  activeCues,
+  CAPTION_SETTINGS,
+  captionChoices,
+  captionValueLabel,
+  DEFAULT_CAPTION_STYLE,
+  pickTrack,
+  setCaptionSetting,
+  stepCaptionSize,
+  type CaptionSetting,
+  type CaptionTrack,
+} from "@/lib/watch/captions";
+import { chapterAt, parseChapters } from "@/lib/watch/chapters";
+import { endChoice, endScreenVideos, nextVideo } from "@/lib/watch/endscreen";
 import { formatTime } from "@/lib/watch/format";
 import { clampTime, keyAction, stepVolume, type PlayerAction } from "@/lib/watch/keys";
 import { loadQuality, loadResume, loadVolume, saveQuality, saveResume, saveVolume } from "@/lib/watch/prefs";
 import { AUTO, levelForSaved, qualityOptions, qualitySummary, SPEEDS, speedLabel, type QualityOption } from "@/lib/watch/quality";
+import { menuPosition, watchLink } from "@/lib/watch/nerds";
+import { DOUBLE_TAP_MS, nextTap, tapSide, tapTotal, type TapSide, type TapState } from "@/lib/watch/taps";
+import type { UpNextVideo } from "@/lib/watch/types";
 import { cueAt, parseSpriteVtt, type SpriteCue } from "@/lib/watch/vtt";
+import { ChapterTrack } from "./ChapterTrack";
+import { CaptionOverlay } from "./CaptionOverlay";
+import { AutoplayCountdown, EndScreenWall } from "./EndScreen";
+import { PlayerContextMenu } from "./PlayerContextMenu";
+import { StatsForNerds } from "./StatsForNerds";
+import { useCaptions } from "./useCaptions";
 
 type Props = {
   videoId: string;
@@ -47,9 +81,15 @@ type Props = {
   engagement?: WatchEngagement | null;
   /** /embed/<id> (feature 16): no theater mode, there is no page around it. */
   embed?: boolean;
+  /** The description, for chapters on the progress bar (player extras). */
+  description?: string;
+  /** Up next, for autoplay and the end screen (player extras). */
+  upNext?: UpNextVideo[];
+  /** The channel, for Up next cards that have no channel of their own. */
+  channelName?: string;
 };
 
-type Menu = null | "main" | "quality" | "speed";
+type Menu = null | "main" | "quality" | "speed" | "subtitles" | "caption-options" | `caption-${CaptionSetting}`;
 
 /** Controls fade out after this long without the mouse moving, while playing. */
 const IDLE_MS = 2500;
@@ -59,6 +99,8 @@ const RESUME_EVERY_S = 5;
 const NOTE_MS = 1200;
 /** The "Resumed" note stays this long after playback starts. */
 const RESUMED_MS = 3000;
+/** After captions go on, the track's name shows this long (until the first words). */
+const CAPTION_HINT_MS = 3000;
 
 /** Safari (desktop and iOS) plays HLS itself; everybody else gets hls.js. */
 function preferNative(video: HTMLVideoElement): boolean {
@@ -70,11 +112,23 @@ function preferNative(video: HTMLVideoElement): boolean {
 /**
  * The video player, in the 2019 YouTube style: red progress bar with sprite
  * previews on hover, a big play button while paused, and a bottom bar with
- * play, volume, time, the settings gear (speed and quality), theater, picture
- * in picture and fullscreen. hls.js everywhere except Safari, which plays
+ * play, volume, time, CC (player extras), the settings gear (speed,
+ * Subtitles/CC and quality), theater, picture in picture and fullscreen. hls.js everywhere except Safari, which plays
  * HLS natively (and then picks the quality itself).
  */
-export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, engagement = null, embed = false }: Props) {
+export function Player({
+  videoId,
+  src,
+  poster,
+  spriteVtt,
+  durationS,
+  startAt,
+  engagement = null,
+  embed = false,
+  description = "",
+  upNext = [],
+  channelName = "",
+}: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -122,6 +176,43 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
     noteTimer.current = setTimeout(() => setNote(null), NOTE_MS);
   }, []);
 
+  // Player extras: chapters, timestamps that jump here, the right-click menu
+  // with Loop, the links and Stats for nerds, and double tap to skip on phones.
+  const extras = useFlag("player_extras");
+  const [loop, setLoop] = useState(false);
+  const [ctxMenu, setCtxMenu] = useState<{ left: number; top: number } | null>(null);
+  const [nerds, setNerds] = useState(false);
+  const [engine, setEngine] = useState("");
+  const [tapNote, setTapNote] = useState<{ side: TapSide; total: number; key: number } | null>(null);
+  const tapRef = useRef<TapState | null>(null);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerType = useRef("mouse");
+  const menuOpen = useRef(false);
+  const setPlayerVideo = useWatch((s) => s.setPlayerVideo);
+  const clearPlayerVideo = useWatch((s) => s.clearPlayerVideo);
+  const seekRequest = useWatch((s) => s.seek);
+  // A request from before this player existed is not for it.
+  const [firstSeek] = useState(() => useWatch.getState().seek?.n ?? 0);
+  const handledSeek = useRef(firstSeek);
+  const chapters = useMemo(
+    () => (extras && description ? parseChapters(description, durationS ?? (duration > 0 ? duration : null)) : []),
+    [extras, description, durationS, duration],
+  );
+
+  // The end of the video (player extras): autoplay's countdown, or the wall.
+  const router = useRouter();
+  const autoplay = useWatch((s) => s.autoplay);
+  const syncAutoplay = useWatch((s) => s.syncAutoplay);
+  const [ending, setEnding] = useState<"countdown" | "wall" | null>(null);
+  const wall = useMemo(() => endScreenVideos(upNext, videoId), [upNext, videoId]);
+  const next = useMemo(() => nextVideo(upNext, videoId), [upNext, videoId]);
+
+  // Captions (player extras): the tracks the encoder made, drawn in the viewer's style.
+  const captions = useCaptions(src, extras);
+  const [captionHint, setCaptionHint] = useState<string | null>(null);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [playerH, setPlayerH] = useState(0);
+
   // The server only hands engagement over when the flag is on for this
   // viewer, so this is known from the first render and the stream loads once.
   const engagementOn = engagement !== null;
@@ -156,6 +247,7 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
 
     if (preferNative(video)) {
       setNative(true);
+      setEngine("Safari (native HLS)");
       setOptions(qualityOptions([]));
       video.src = src;
       video.addEventListener(
@@ -186,6 +278,7 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
       }
       hls = new HlsClass({ startPosition: start > 0 ? start : -1, maxBufferLength: 30, backBufferLength: 60 });
       hlsRef.current = hls;
+      setEngine(`hls.js ${HlsClass.version}`);
       hls.on(HlsClass.Events.MANIFEST_PARSED, (_e, data) => {
         const opts = qualityOptions(data.levels.map((l) => ({ height: l.height, width: l.width, bitrate: l.bitrate })));
         setOptions(opts);
@@ -264,6 +357,43 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
     return () => document.removeEventListener("fullscreenchange", onChange);
   }, []);
 
+  // The browser's own captions stay off (Safari may turn them on by itself):
+  // with player extras the player draws them.
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video || !extras || !video.textTracks) return;
+    const tracks = video.textTracks;
+    const off = () => {
+      for (const t of Array.from(tracks)) if ((t.kind === "subtitles" || t.kind === "captions") && t.mode === "showing") t.mode = "disabled";
+    };
+    off();
+    tracks.addEventListener("addtrack", off);
+    tracks.addEventListener("change", off);
+    return () => {
+      tracks.removeEventListener("addtrack", off);
+      tracks.removeEventListener("change", off);
+    };
+  }, [extras]);
+
+  // The player's height, for the caption size and the settings menu.
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    const measure = () => setPlayerH(wrap.getBoundingClientRect().height);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(wrap);
+    return () => ro.disconnect();
+  }, []);
+
+  useEffect(
+    () => () => {
+      if (hintTimer.current) clearTimeout(hintTimer.current);
+    },
+    [],
+  );
+
   // Actions ---------------------------------------------------------------------------
 
   const poke = useCallback(() => {
@@ -305,22 +435,37 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
     else void video.requestPictureInPicture().catch(() => {});
   }, []);
 
-  /** c: subtitles on or off, from hls.js or the video's own text tracks; a note when the video has none. */
+  /** A caption track on, or null for off. Turning one on names it for a moment. */
+  const { choose: chooseCaptions } = captions;
+  const showCaptions = useCallback(
+    (track: CaptionTrack | null) => {
+      chooseCaptions(track);
+      if (hintTimer.current) clearTimeout(hintTimer.current);
+      setCaptionHint(track ? track.name : null);
+      if (track) hintTimer.current = setTimeout(() => setCaptionHint(null), CAPTION_HINT_MS);
+    },
+    [chooseCaptions],
+  );
+
+  /** c and the CC button: captions on or off, in the viewer's language; a note when the video has none. */
   const toggleCaptions = useCallback(() => {
-    const video = videoRef.current;
-    const hls = hlsRef.current;
-    if (hls && hls.subtitleTracks.length > 0) {
-      const on = hls.subtitleTrack >= 0 && hls.subtitleDisplay;
-      hls.subtitleDisplay = !on;
-      hls.subtitleTrack = on ? -1 : 0;
-      return flash(on ? "Subtitles off" : "Subtitles on");
-    }
-    const tracks = video ? Array.from(video.textTracks).filter((t) => t.kind === "subtitles" || t.kind === "captions") : [];
-    if (tracks.length === 0) return flash("No subtitles for this video");
-    const on = tracks.some((t) => t.mode === "showing");
-    tracks.forEach((t, i) => (t.mode = !on && i === 0 ? "showing" : "disabled"));
-    flash(on ? "Subtitles off" : "Subtitles on");
-  }, [flash]);
+    if (!extras || captions.tracks.length === 0) return flash("No subtitles for this video");
+    const track = captions.track ? null : pickTrack(captions.tracks, captions.lang);
+    showCaptions(track);
+    flash(track ? track.name : "Subtitles off");
+  }, [extras, captions.tracks, captions.track, captions.lang, showCaptions, flash]);
+
+  /** + and -: bigger or smaller captions, while they are on. */
+  const { style: captionStyle, setStyle: setCaptionStyle } = captions;
+  const stepCaptions = useCallback(
+    (step: 1 | -1) => {
+      if (!captions.track) return;
+      const size = stepCaptionSize(captionStyle.size, step);
+      setCaptionStyle({ ...captionStyle, size });
+      flash(`Font size ${size}%`);
+    },
+    [captions.track, captionStyle, setCaptionStyle, flash],
+  );
 
   const run = useCallback(
     (action: PlayerAction) => {
@@ -350,9 +495,11 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
           return togglePip();
         case "captions":
           return toggleCaptions();
+        case "caption-size":
+          return stepCaptions(action.step);
       }
     },
-    [duration, embed, flash, seekTo, toggleCaptions, toggleFullscreen, togglePip, togglePlay, toggleTheater],
+    [duration, embed, flash, seekTo, stepCaptions, toggleCaptions, toggleFullscreen, togglePip, togglePlay, toggleTheater],
   );
 
   // Keyboard shortcuts, page wide like YouTube, but never while typing or in a dialog.
@@ -376,6 +523,104 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [run, poke]);
+
+  // Timestamps in the description and comments jump this player (player extras).
+  useEffect(() => {
+    if (embed) return;
+    setPlayerVideo(videoId);
+    return () => clearPlayerVideo(videoId);
+  }, [embed, videoId, setPlayerVideo, clearPlayerVideo]);
+
+  useEffect(() => {
+    if (!seekRequest || seekRequest.n === handledSeek.current) return;
+    handledSeek.current = seekRequest.n;
+    const video = videoRef.current;
+    if (embed || seekRequest.videoId !== videoId || !video) return;
+    seekTo(seekRequest.t);
+    video.play().catch(() => {});
+    poke();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [seekRequest, embed, videoId, seekTo, poke]);
+
+  useEffect(() => {
+    menuOpen.current = menu !== null;
+  }, [menu]);
+
+  useEffect(
+    () => () => {
+      if (tapTimer.current) clearTimeout(tapTimer.current);
+    },
+    [],
+  );
+
+  const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
+
+  useEffect(() => syncAutoplay(), [syncAutoplay]);
+  // Autoplay switched off during the countdown: show the wall instead.
+  useEffect(() => {
+    if (ending === "countdown" && !autoplay) setEnding(wall.length ? "wall" : null);
+  }, [ending, autoplay, wall.length]);
+  const playNext = useCallback(() => {
+    if (next) router.push(`/watch?v=${encodeURIComponent(next.id)}`);
+  }, [next, router]);
+  const cancelAutoplay = useCallback(() => setEnding(wall.length ? "wall" : null), [wall.length]);
+
+  /** Right-click: the player menu. A second right-click while it is open shows the browser's own menu. */
+  const onContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (!extras) return;
+    if (ctxMenu) {
+      setCtxMenu(null);
+      return;
+    }
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    e.preventDefault();
+    const rect = wrap.getBoundingClientRect();
+    setMenu(null);
+    setCtxMenu(menuPosition(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height));
+  };
+
+  const copyLink = useCallback(
+    (atS: number) => {
+      const url = watchLink(window.location.origin, videoId, atS);
+      if (!navigator.clipboard?.writeText) return flash("Could not copy the link");
+      navigator.clipboard.writeText(url).then(
+        () => flash("Link copied"),
+        () => flash("Could not copy the link"),
+      );
+    },
+    [videoId, flash],
+  );
+
+  /**
+   * A finger on the video (player extras): two quick taps on the left half go
+   * back 10 seconds, on the right half forward, and each tap after that adds
+   * 10 more. A single tap still plays or pauses, a moment later.
+   */
+  const onVideoPointerUp = (e: ReactPointerEvent<HTMLVideoElement>) => {
+    if (!extras || e.pointerType !== "touch") return;
+    const video = e.currentTarget;
+    const rect = video.getBoundingClientRect();
+    const side = tapSide(e.clientX - rect.left, rect.width);
+    const { state, skip } = nextTap(tapRef.current, performance.now(), side);
+    tapRef.current = state;
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    if (skip === 0) {
+      tapTimer.current = setTimeout(() => {
+        tapRef.current = null;
+        if (menuOpen.current) setMenu(null);
+        else togglePlay();
+      }, DOUBLE_TAP_MS);
+      return;
+    }
+    seekTo(video.currentTime + skip);
+    setTapNote({ side, total: tapTotal(state.count), key: state.at });
+    poke();
+    tapTimer.current = setTimeout(() => {
+      tapRef.current = null;
+      setTapNote(null);
+    }, DOUBLE_TAP_MS + 500);
+  };
 
   // Close the settings menu on a click anywhere else.
   useEffect(() => {
@@ -445,6 +690,8 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
   // Rendering -------------------------------------------------------------------------
 
   const summary = qualitySummary(options, chosen, playingLevel);
+  const captionTrack = extras ? captions.track : null;
+  const shownCues = captionTrack ? activeCues(captions.cues, time) : [];
   const playingOpt = options.find((o) => o.level === (chosen === AUTO ? playingLevel : chosen));
   const hd = playingOpt?.hd ?? false;
   const showChrome = !playing || active || menu !== null || scrubbing || volumeDrag;
@@ -452,7 +699,9 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
   const VolumeIcon = muted || volume === 0 ? VolumeOffIcon : volume < 0.5 ? VolumeDownIcon : VolumeUpIcon;
   const pct = (n: number) => (duration > 0 ? `${Math.min(100, (n / duration) * 100)}%` : "0%");
   const cue = hover && cues.length ? cueAt(cues, hover.t) : null;
-  const tipHalf = Math.max(cue ? cue.w + 4 : 0, 48) / 2;
+  const hoverChapter = hover && chapters.length ? chapters[chapterAt(chapters, hover.t)] : null;
+  const currentChapter = chapters.length ? chapters[chapterAt(chapters, time)] : null;
+  const tipHalf = Math.max(cue ? cue.w + 4 : 0, 48, hoverChapter ? 160 : 0) / 2;
   const tipLeft = hover ? Math.min(Math.max(hover.x, tipHalf), Math.max(tipHalf, hover.w - tipHalf)) : 0;
   // The encoder cuts 160 x 90 tiles, so a frame is shown at its own size.
   const sprite = cue
@@ -469,6 +718,7 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
       data-native={native ? "1" : undefined}
       onPointerMove={poke}
       onPointerLeave={() => playing && setActive(false)}
+      onContextMenu={onContextMenu}
       className={`group/player relative h-full w-full select-none overflow-hidden bg-black text-white ${
         showChrome ? "" : "cursor-none"
       }`}
@@ -478,15 +728,30 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
         poster={poster ?? undefined}
         playsInline
         preload="metadata"
-        className="absolute inset-0 h-full w-full object-contain"
-        onClick={() => (menu ? setMenu(null) : togglePlay())}
-        onDoubleClick={toggleFullscreen}
+        loop={loop}
+        className={`absolute inset-0 h-full w-full object-contain ${extras ? "touch-manipulation" : ""}`}
+        onPointerDown={(e) => {
+          pointerType.current = e.pointerType;
+        }}
+        onPointerUp={onVideoPointerUp}
+        onClick={() => {
+          // With player extras a finger's taps are handled on pointer up.
+          if (extras && pointerType.current === "touch") return;
+          if (menu) setMenu(null);
+          else togglePlay();
+        }}
+        onDoubleClick={() => {
+          if (extras && pointerType.current === "touch") return;
+          toggleFullscreen();
+        }}
         onPlay={() => {
           setPlaying(true);
           setStarted(true);
           setEnded(false);
+          setEnding(null);
           poke();
         }}
+        onSeeking={() => setEnding(null)}
         onPause={(e) => {
           setPlaying(false);
           saveResume(videoId, e.currentTarget.currentTime, e.currentTarget.duration);
@@ -495,6 +760,7 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
           setPlaying(false);
           setEnded(true);
           saveResume(videoId, e.currentTarget.duration, e.currentTarget.duration);
+          if (extras && !embed) setEnding(endChoice(autoplay, next !== null, wall.length));
         }}
         onWaiting={() => setWaiting(true)}
         onPlaying={() => setWaiting(false)}
@@ -565,7 +831,7 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
       )}
 
       {/* The big play button, while paused. */}
-      {!playing && !error && !scrubbing && (
+      {!playing && !error && !scrubbing && ending === null && (
         <button
           type="button"
           aria-label={ended ? "Replay" : "Play"}
@@ -591,6 +857,21 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
         </button>
       )}
 
+      {ending === "countdown" && next && (
+        <AutoplayCountdown video={next} channelName={channelName} onPlay={playNext} onCancel={cancelAutoplay} />
+      )}
+      {ending === "wall" && <EndScreenWall videos={wall} channelName={channelName} />}
+
+      {captionTrack && ending === null && !error && (
+        <CaptionOverlay
+          cues={shownCues}
+          hint={captionHint}
+          style={captions.style}
+          playerHeight={playerH}
+          raised={showChrome}
+        />
+      )}
+
       {/* The bottom chrome. */}
       <div
         className={`absolute inset-x-0 bottom-0 transition-opacity duration-200 ${
@@ -607,6 +888,14 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
             style={{ left: 12 + tipLeft }}
           >
             {sprite && <div data-sprite-frame className="box-content border-2 border-white bg-black bg-no-repeat" style={sprite} />}
+            {hoverChapter && (
+              <span
+                data-hover-chapter
+                className="mt-1 max-w-[160px] truncate text-[12px] font-medium [text-shadow:0_0_4px_rgba(0,0,0,.75)]"
+              >
+                {hoverChapter.title}
+              </span>
+            )}
             <span className="mt-1 text-[13px] font-medium [text-shadow:0_0_4px_rgba(0,0,0,.75)]">
               {formatTime(hover.t)}
             </span>
@@ -630,15 +919,26 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
           onPointerUp={onBarUp}
           className="group/bar absolute inset-x-3 bottom-9 h-[17px] cursor-pointer touch-none"
         >
-          <div
-            className={`absolute inset-x-0 bottom-[7px] h-[3px] origin-bottom bg-white/20 transition-transform group-hover/bar:scale-y-[1.67] ${
-              scrubbing ? "scale-y-[1.67]" : ""
-            }`}
-          >
-            <div className="absolute inset-y-0 left-0 bg-white/40" style={{ width: pct(buffered) }} />
-            {hover && <div className="absolute inset-y-0 left-0 bg-white/50" style={{ width: pct(hover.t) }} />}
-            <div className="absolute inset-y-0 left-0 bg-[var(--mark)]" style={{ width: pct(time) }} />
-          </div>
+          {chapters.length > 0 ? (
+            <ChapterTrack
+              chapters={chapters}
+              duration={duration}
+              time={time}
+              buffered={buffered}
+              hoverT={hover ? hover.t : null}
+              scrubbing={scrubbing}
+            />
+          ) : (
+            <div
+              className={`absolute inset-x-0 bottom-[7px] h-[3px] origin-bottom bg-white/20 transition-transform group-hover/bar:scale-y-[1.67] ${
+                scrubbing ? "scale-y-[1.67]" : ""
+              }`}
+            >
+              <div className="absolute inset-y-0 left-0 bg-white/40" style={{ width: pct(buffered) }} />
+              {hover && <div className="absolute inset-y-0 left-0 bg-white/50" style={{ width: pct(hover.t) }} />}
+              <div className="absolute inset-y-0 left-0 bg-[var(--mark)]" style={{ width: pct(time) }} />
+            </div>
+          )}
           <div
             className={`absolute bottom-[3px] h-[13px] w-[13px] -translate-x-1/2 rounded-full bg-[var(--mark)] transition-transform ${
               scrubbing ? "scale-100" : "scale-0 group-hover/bar:scale-100"
@@ -701,8 +1001,32 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
           <span data-time className="whitespace-nowrap px-2 text-[13px] leading-9 [text-shadow:0_0_2px_rgba(0,0,0,.5)]">
             {formatTime(time)} / {formatTime(duration)}
           </span>
+          {currentChapter && (
+            <span
+              data-chapter-title
+              className="min-w-0 truncate pr-2 text-[13px] leading-9 [text-shadow:0_0_2px_rgba(0,0,0,.5)] max-sm:hidden"
+            >
+              <span aria-hidden className="pr-1.5">
+                {"\u2022"}
+              </span>
+              {currentChapter.title}
+            </span>
+          )}
 
           <div className="ml-auto flex items-center">
+            {extras && (
+              <CtrlButton
+                label={captions.tracks.length ? "Subtitles/closed captions (c)" : "Subtitles/closed captions unavailable"}
+                onClick={toggleCaptions}
+                aria-pressed={captionTrack !== null}
+                data-captions-button={captionTrack ? "on" : captions.tracks.length ? "off" : "none"}
+              >
+                <SubtitlesIcon className={`h-6 w-6 ${captions.tracks.length ? "" : "opacity-50"}`} />
+                {captionTrack && (
+                  <span aria-hidden className="absolute bottom-[5px] left-1/2 h-[3px] w-[22px] -translate-x-1/2 rounded-[1px] bg-[var(--mark)]" />
+                )}
+              </CtrlButton>
+            )}
             <div className="relative">
               <CtrlButton
                 ref={gearRef}
@@ -730,7 +1054,8 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
               </CtrlButton>
             )}
             {pipOk && (
-              <CtrlButton label="Picture in picture (i)" onClick={togglePip} data-pip>
+              // Phones have no room for it next to CC (and their browsers offer it themselves).
+              <CtrlButton label="Picture in picture (i)" onClick={togglePip} className={extras ? "max-sm:hidden" : ""} data-pip>
                 <PipIcon className="h-[22px] w-[22px]" />
               </CtrlButton>
             )}
@@ -747,14 +1072,110 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
           ref={menuRef}
           role="menu"
           data-settings-menu={menu}
-          className="absolute bottom-[49px] right-3 z-20 min-w-[251px] rounded-[2px] bg-[rgba(28,28,28,0.9)] py-2 text-[13px] font-medium text-[#eeeeee] [text-shadow:0_0_2px_rgba(0,0,0,.5)]"
+          className="absolute bottom-[49px] right-3 z-20 min-w-[251px] overflow-y-auto rounded-[2px] bg-[rgba(28,28,28,0.9)] py-2 text-[13px] font-medium text-[#eeeeee] [text-shadow:0_0_2px_rgba(0,0,0,.5)]"
+          style={playerH > 0 ? { maxHeight: Math.max(140, playerH - 60) } : undefined}
         >
           {menu === "main" && (
             <>
               <MenuRow onClick={() => setMenu("speed")} label="Playback speed" value={speedLabel(rate)} />
+              {extras && captions.tracks.length > 0 && (
+                <MenuRow
+                  onClick={() => setMenu("subtitles")}
+                  label={`Subtitles/CC (${captions.tracks.length})`}
+                  value={captionTrack ? captionTrack.name : "Off"}
+                  data-menu-subtitles
+                />
+              )}
               <MenuRow onClick={() => setMenu("quality")} label="Quality" value={summary} />
             </>
           )}
+          {menu === "subtitles" && (
+            <>
+              <MenuBack
+                onClick={() => setMenu("main")}
+                label="Subtitles/CC"
+                extra={
+                  <button
+                    type="button"
+                    onClick={() => setMenu("caption-options")}
+                    data-caption-options
+                    className="ml-auto h-full px-3 text-[13px] font-medium hover:bg-white/10"
+                  >
+                    Options
+                  </button>
+                }
+              />
+              <MenuChoice
+                checked={captionTrack === null}
+                onClick={() => {
+                  showCaptions(null);
+                  setMenu(null);
+                }}
+                data-caption-track="off"
+              >
+                Off
+              </MenuChoice>
+              {captions.tracks.map((t) => (
+                <MenuChoice
+                  key={t.id}
+                  checked={captionTrack?.id === t.id}
+                  onClick={() => {
+                    showCaptions(t);
+                    setMenu(null);
+                  }}
+                  data-caption-track={t.lang || t.name}
+                >
+                  {t.name}
+                </MenuChoice>
+              ))}
+            </>
+          )}
+          {menu === "caption-options" && (
+            <>
+              <MenuBack onClick={() => setMenu("subtitles")} label="Options" />
+              {CAPTION_SETTINGS.map(({ key, label }) => (
+                <MenuRow
+                  key={key}
+                  onClick={() => setMenu(`caption-${key}`)}
+                  label={label}
+                  value={captionValueLabel(captions.style, key)}
+                  data-caption-setting={key}
+                />
+              ))}
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => captions.setStyle(DEFAULT_CAPTION_STYLE)}
+                data-caption-reset
+                className="flex h-10 w-full items-center px-4 hover:bg-white/10"
+              >
+                Reset
+              </button>
+            </>
+          )}
+          {menu?.startsWith("caption-") && menu !== "caption-options" && (() => {
+            const key = menu.slice("caption-".length) as CaptionSetting;
+            const setting = CAPTION_SETTINGS.find((c) => c.key === key);
+            if (!setting) return null;
+            return (
+              <>
+                <MenuBack onClick={() => setMenu("caption-options")} label={setting.label} />
+                {captionChoices(key).map((c) => (
+                  <MenuChoice
+                    key={c.value}
+                    checked={captions.style[key] === c.value}
+                    onClick={() => {
+                      captions.setStyle(setCaptionSetting(captions.style, key, c.value));
+                      setMenu("caption-options");
+                    }}
+                    data-caption-choice={c.value}
+                  >
+                    {c.label}
+                  </MenuChoice>
+                ))}
+              </>
+            );
+          })()}
           {menu === "speed" && (
             <>
               <MenuBack onClick={() => setMenu("main")} label="Playback speed" />
@@ -781,6 +1202,52 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
           )}
         </div>
       )}
+
+      {/* Double tap to skip (player extras). */}
+      {tapNote && (
+        <div
+          key={tapNote.key}
+          aria-hidden
+          data-tap-skip={tapNote.side}
+          className={`pointer-events-none absolute inset-y-0 flex w-2/5 flex-col items-center justify-center bg-white/10 text-white [text-shadow:0_0_4px_rgba(0,0,0,.75)] ${
+            tapNote.side === "back" ? "left-0 rounded-r-[50%]" : "right-0 rounded-l-[50%]"
+          }`}
+        >
+          <span className={`flex ${tapNote.side === "back" ? "-scale-x-100" : ""}`}>
+            {[0, 1, 2].map((i) => (
+              <svg key={i} viewBox="0 0 24 24" className="-mx-1 h-5 w-5 drop-shadow-[0_0_3px_rgba(0,0,0,.75)]" aria-hidden>
+                <path d="M8 5v14l11-7z" fill="currentColor" />
+              </svg>
+            ))}
+          </span>
+          <span className="mt-1 text-[13px] font-medium">{tapNote.total} seconds</span>
+        </div>
+      )}
+
+      {ctxMenu && (
+        <PlayerContextMenu
+          left={ctxMenu.left}
+          top={ctxMenu.top}
+          loop={loop}
+          onLoop={() => setLoop((on) => !on)}
+          onCopy={() => copyLink(0)}
+          onCopyAtTime={() => copyLink(videoRef.current?.currentTime ?? 0)}
+          onStats={() => setNerds(true)}
+          onClose={closeCtxMenu}
+        />
+      )}
+
+      {nerds && (
+        <StatsForNerds
+          videoId={videoId}
+          videoRef={videoRef}
+          hlsRef={hlsRef}
+          engine={engine || "loading"}
+          quality={native ? "picked by Safari" : summary}
+          playingLevel={playingLevel}
+          onClose={() => setNerds(false)}
+        />
+      )}
     </div>
   );
 }
@@ -798,6 +1265,7 @@ function CtrlButton({
   ref?: React.Ref<HTMLButtonElement>;
   onClick?: () => void;
   "aria-expanded"?: boolean;
+  "aria-pressed"?: boolean;
 } & Record<`data-${string}`, unknown>) {
   return (
     <button
@@ -813,9 +1281,14 @@ function CtrlButton({
   );
 }
 
-function MenuRow({ label, value, onClick }: { label: string; value: string; onClick: () => void }) {
+function MenuRow({
+  label,
+  value,
+  onClick,
+  ...rest
+}: { label: string; value: string; onClick: () => void } & Record<`data-${string}`, unknown>) {
   return (
-    <button type="button" role="menuitem" onClick={onClick} className="flex h-10 w-full items-center px-4 hover:bg-white/10">
+    <button type="button" role="menuitem" onClick={onClick} className="flex h-10 w-full items-center px-4 hover:bg-white/10" {...rest}>
       <span className="mr-6 flex-1 text-left">{label}</span>
       <span className="text-right font-normal">{value}</span>
       <ChevronRightIcon className="-mr-1.5 ml-1 h-5 w-5" />
@@ -823,17 +1296,19 @@ function MenuRow({ label, value, onClick }: { label: string; value: string; onCl
   );
 }
 
-function MenuBack({ label, onClick }: { label: string; onClick: () => void }) {
-  return (
+function MenuBack({ label, onClick, extra = null }: { label: string; onClick: () => void; extra?: React.ReactNode }) {
+  const back = (
     <button
       type="button"
       onClick={onClick}
-      className="mb-2 flex h-12 w-full items-center border-b border-white/20 px-2 text-[15px] hover:bg-white/10"
+      className={`flex h-12 items-center px-2 text-[15px] hover:bg-white/10 ${extra ? "" : "w-full"}`}
     >
       <ChevronLeftIcon className="mr-2 h-6 w-6" />
       {label}
     </button>
   );
+  // With something on the right (Options, in Subtitles/CC) the header is a row of two buttons.
+  return <div className="mb-2 flex h-12 items-center border-b border-white/20">{back}{extra}</div>;
 }
 
 function MenuChoice({

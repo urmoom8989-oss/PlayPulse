@@ -274,6 +274,50 @@ stacked under the player.
   shows more videos from the same channel, padded with placeholders until the
   home feed (feature 6) fills it.
 
+### Player extras
+
+Behind the `player_extras` flag (`022_player_extras.sql`, off at first), all in
+the browser:
+
+- **Chapters.** A list of timestamps in the description becomes chapters, with
+  YouTube's 2020 rules: the list starts at a line with `0:00`, has at least 3
+  chapters in order, and each one is at least 10 seconds long. The list is the
+  `0:00` line and the lines right under it; a blank line ends it. The progress
+  bar splits into one part per chapter, hovering shows the chapter's name above
+  the time, and the bottom bar shows the chapter playing. Lines like
+  `0:00 Intro`, `Intro - 0:00`, `[1:05] Setup` and `3. 10:00 Outro` all work.
+- **Timestamps** like `1:05` or `1:02:05` in the description and in comments
+  are links. A click jumps the player and scrolls up to it; a middle click or
+  Ctrl+click opens `/watch?v=...&t=...` in a new tab.
+- **Right-click menu** on the player: Loop, Copy video URL, Copy video URL at
+  current time and Stats for nerds. Right-click again while it is open for the
+  browser's own menu.
+- **Stats for nerds**: video ID, viewport and dropped frames, current and best
+  resolution, volume, codecs, connection speed, buffer health, speed and
+  quality, and the player (hls.js or Safari's own). Safari does not tell the
+  page its codecs or connection speed.
+- **Double tap** on a phone: the left half goes back 10 seconds, the right half
+  forward, and each extra tap adds 10 more. A single tap still plays or pauses.
+- **Autoplay.** The Autoplay switch above Up next works and the browser
+  remembers it (on until switched off). When a video ends with autoplay on,
+  the player shows "Up next in 8" with the next video, a ring that counts
+  down, Cancel and a play button to go at once. With autoplay off, or after
+  Cancel, the end screen is a 3 by 3 wall of nine videos from Up next. Loop
+  stops a video from ending, so it never autoplays.
+- **Captions.** The encoder writes auto-generated captions with a speech model
+  (see "Auto-generated captions" in `ops/encoder/README.md`) and lists them in
+  `master.m3u8`. The player reads that list itself, so the CC button lights up
+  only for videos that have them (it is dimmed, "unavailable", for the rest).
+  CC or `c` turns them on in the viewer's language, and the track's name shows
+  for a moment. **Settings, Subtitles/CC** picks a track or Off, and its
+  **Options** set the font family, font color, font size (50% to 400%),
+  background color and opacity, font opacity and character edge style, with
+  Reset. `+` and `-` make the words bigger or smaller. The player draws the
+  words itself, one box per line near the bottom, above the controls while they
+  show, so they look the same in every browser; the browser remembers on or off,
+  the language and the look. On phones the picture in picture button makes room
+  for CC.
+
 ### How the player gets the video
 
 The bucket is private, so the browser cannot read it directly. The player asks

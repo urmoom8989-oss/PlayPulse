@@ -2,14 +2,18 @@
 
 import Link from "next/link";
 import { useLayoutEffect, useRef, useState } from "react";
+import { TimestampText } from "@/components/watch/TimestampText";
 import { needsReadMore, READ_MORE_LINES, splitMention } from "@/lib/comments/rules";
+import { useFlag } from "@/lib/store/session";
 
 /**
  * A comment's text, folded to four lines with "Read more" like 2019. The
  * first guess comes from the text (needsReadMore), then the real height
  * decides once the comment is on screen.
  */
-export function CommentBody({ text }: { text: string }) {
+export function CommentBody({ text, videoId }: { text: string; /** On the watch page: timestamps jump the player (player extras). */ videoId?: string }) {
+  const extras = useFlag("player_extras");
+  const linked = (t: string) => (extras && videoId ? <TimestampText text={t} videoId={videoId} /> : t);
   const [open, setOpen] = useState(false);
   const [long, setLong] = useState(() => needsReadMore(text, 90));
   const ref = useRef<HTMLDivElement>(null);
@@ -39,7 +43,7 @@ export function CommentBody({ text }: { text: string }) {
             {mention}
           </Link>
         )}
-        {mention ? rest : text}
+        {linked(mention ? rest : text)}
       </div>
       {(long || open) && (
         <button

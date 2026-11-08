@@ -249,7 +249,7 @@ export function CommentItem({ comment, ctx, parentId = null }: { comment: Commen
                   />
                 </div>
               ) : (
-                <CommentBody text={comment.body ?? ""} />
+                <CommentBody text={comment.body ?? ""} videoId={comment.videoId} />
               )}
             </div>
 
