@@ -143,6 +143,7 @@ async function Watch({ searchParams }: { searchParams: PageProps<"/watch">["sear
                 durationS={video.durationS}
                 startAt={parseStart(t)}
                 engagement={engagement}
+                description={video.description}
               />
             }
             info={<VideoInfo video={video} engagement={engagement} />}

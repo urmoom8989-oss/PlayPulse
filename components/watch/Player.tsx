@@ -1,7 +1,15 @@
 "use client";
 
 import type Hls from "hls.js";
-import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import {
   CheckIcon,
   ChevronLeftIcon,
@@ -22,12 +30,19 @@ import {
 import { resumeAt } from "@/lib/engagement/rules";
 import type { WatchEngagement } from "@/lib/engagement/types";
 import { useWatchPings } from "@/lib/engagement/useWatchPings";
+import { useFlag } from "@/lib/store/session";
 import { useWatch } from "@/lib/store/watch";
+import { chapterAt, parseChapters } from "@/lib/watch/chapters";
 import { formatTime } from "@/lib/watch/format";
 import { clampTime, keyAction, stepVolume, type PlayerAction } from "@/lib/watch/keys";
 import { loadQuality, loadResume, loadVolume, saveQuality, saveResume, saveVolume } from "@/lib/watch/prefs";
 import { AUTO, levelForSaved, qualityOptions, qualitySummary, SPEEDS, speedLabel, type QualityOption } from "@/lib/watch/quality";
+import { menuPosition, watchLink } from "@/lib/watch/nerds";
+import { DOUBLE_TAP_MS, nextTap, tapSide, tapTotal, type TapSide, type TapState } from "@/lib/watch/taps";
 import { cueAt, parseSpriteVtt, type SpriteCue } from "@/lib/watch/vtt";
+import { ChapterTrack } from "./ChapterTrack";
+import { PlayerContextMenu } from "./PlayerContextMenu";
+import { StatsForNerds } from "./StatsForNerds";
 
 type Props = {
   videoId: string;
@@ -47,6 +62,8 @@ type Props = {
   engagement?: WatchEngagement | null;
   /** /embed/<id> (feature 16): no theater mode, there is no page around it. */
   embed?: boolean;
+  /** The description, for chapters on the progress bar (player extras). */
+  description?: string;
 };
 
 type Menu = null | "main" | "quality" | "speed";
@@ -74,7 +91,7 @@ function preferNative(video: HTMLVideoElement): boolean {
  * in picture and fullscreen. hls.js everywhere except Safari, which plays
  * HLS natively (and then picks the quality itself).
  */
-export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, engagement = null, embed = false }: Props) {
+export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, engagement = null, embed = false, description = "" }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -122,6 +139,29 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
     noteTimer.current = setTimeout(() => setNote(null), NOTE_MS);
   }, []);
 
+  // Player extras: chapters, timestamps that jump here, the right-click menu
+  // with Loop, the links and Stats for nerds, and double tap to skip on phones.
+  const extras = useFlag("player_extras");
+  const [loop, setLoop] = useState(false);
+  const [ctxMenu, setCtxMenu] = useState<{ left: number; top: number } | null>(null);
+  const [nerds, setNerds] = useState(false);
+  const [engine, setEngine] = useState("");
+  const [tapNote, setTapNote] = useState<{ side: TapSide; total: number; key: number } | null>(null);
+  const tapRef = useRef<TapState | null>(null);
+  const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pointerType = useRef("mouse");
+  const menuOpen = useRef(false);
+  const setPlayerVideo = useWatch((s) => s.setPlayerVideo);
+  const clearPlayerVideo = useWatch((s) => s.clearPlayerVideo);
+  const seekRequest = useWatch((s) => s.seek);
+  // A request from before this player existed is not for it.
+  const [firstSeek] = useState(() => useWatch.getState().seek?.n ?? 0);
+  const handledSeek = useRef(firstSeek);
+  const chapters = useMemo(
+    () => (extras && description ? parseChapters(description, durationS ?? (duration > 0 ? duration : null)) : []),
+    [extras, description, durationS, duration],
+  );
+
   // The server only hands engagement over when the flag is on for this
   // viewer, so this is known from the first render and the stream loads once.
   const engagementOn = engagement !== null;
@@ -156,6 +196,7 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
 
     if (preferNative(video)) {
       setNative(true);
+      setEngine("Safari (native HLS)");
       setOptions(qualityOptions([]));
       video.src = src;
       video.addEventListener(
@@ -186,6 +227,7 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
       }
       hls = new HlsClass({ startPosition: start > 0 ? start : -1, maxBufferLength: 30, backBufferLength: 60 });
       hlsRef.current = hls;
+      setEngine(`hls.js ${HlsClass.version}`);
       hls.on(HlsClass.Events.MANIFEST_PARSED, (_e, data) => {
         const opts = qualityOptions(data.levels.map((l) => ({ height: l.height, width: l.width, bitrate: l.bitrate })));
         setOptions(opts);
@@ -377,6 +419,94 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
     return () => window.removeEventListener("keydown", onKey);
   }, [run, poke]);
 
+  // Timestamps in the description and comments jump this player (player extras).
+  useEffect(() => {
+    if (embed) return;
+    setPlayerVideo(videoId);
+    return () => clearPlayerVideo(videoId);
+  }, [embed, videoId, setPlayerVideo, clearPlayerVideo]);
+
+  useEffect(() => {
+    if (!seekRequest || seekRequest.n === handledSeek.current) return;
+    handledSeek.current = seekRequest.n;
+    const video = videoRef.current;
+    if (embed || seekRequest.videoId !== videoId || !video) return;
+    seekTo(seekRequest.t);
+    video.play().catch(() => {});
+    poke();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, [seekRequest, embed, videoId, seekTo, poke]);
+
+  useEffect(() => {
+    menuOpen.current = menu !== null;
+  }, [menu]);
+
+  useEffect(
+    () => () => {
+      if (tapTimer.current) clearTimeout(tapTimer.current);
+    },
+    [],
+  );
+
+  const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
+
+  /** Right-click: the player menu. A second right-click while it is open shows the browser's own menu. */
+  const onContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
+    if (!extras) return;
+    if (ctxMenu) {
+      setCtxMenu(null);
+      return;
+    }
+    const wrap = wrapRef.current;
+    if (!wrap) return;
+    e.preventDefault();
+    const rect = wrap.getBoundingClientRect();
+    setMenu(null);
+    setCtxMenu(menuPosition(e.clientX - rect.left, e.clientY - rect.top, rect.width, rect.height));
+  };
+
+  const copyLink = useCallback(
+    (atS: number) => {
+      const url = watchLink(window.location.origin, videoId, atS);
+      if (!navigator.clipboard?.writeText) return flash("Could not copy the link");
+      navigator.clipboard.writeText(url).then(
+        () => flash("Link copied"),
+        () => flash("Could not copy the link"),
+      );
+    },
+    [videoId, flash],
+  );
+
+  /**
+   * A finger on the video (player extras): two quick taps on the left half go
+   * back 10 seconds, on the right half forward, and each tap after that adds
+   * 10 more. A single tap still plays or pauses, a moment later.
+   */
+  const onVideoPointerUp = (e: ReactPointerEvent<HTMLVideoElement>) => {
+    if (!extras || e.pointerType !== "touch") return;
+    const video = e.currentTarget;
+    const rect = video.getBoundingClientRect();
+    const side = tapSide(e.clientX - rect.left, rect.width);
+    const { state, skip } = nextTap(tapRef.current, performance.now(), side);
+    tapRef.current = state;
+    if (tapTimer.current) clearTimeout(tapTimer.current);
+    if (skip === 0) {
+      tapTimer.current = setTimeout(() => {
+        tapRef.current = null;
+        if (menuOpen.current) setMenu(null);
+        else togglePlay();
+      }, DOUBLE_TAP_MS);
+      return;
+    }
+    seekTo(video.currentTime + skip);
+    setTapNote({ side, total: tapTotal(state.count), key: state.at });
+    poke();
+    tapTimer.current = setTimeout(() => {
+      tapRef.current = null;
+      setTapNote(null);
+    }, DOUBLE_TAP_MS + 500);
+  };
+
   // Close the settings menu on a click anywhere else.
   useEffect(() => {
     if (!menu) return;
@@ -452,7 +582,9 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
   const VolumeIcon = muted || volume === 0 ? VolumeOffIcon : volume < 0.5 ? VolumeDownIcon : VolumeUpIcon;
   const pct = (n: number) => (duration > 0 ? `${Math.min(100, (n / duration) * 100)}%` : "0%");
   const cue = hover && cues.length ? cueAt(cues, hover.t) : null;
-  const tipHalf = Math.max(cue ? cue.w + 4 : 0, 48) / 2;
+  const hoverChapter = hover && chapters.length ? chapters[chapterAt(chapters, hover.t)] : null;
+  const currentChapter = chapters.length ? chapters[chapterAt(chapters, time)] : null;
+  const tipHalf = Math.max(cue ? cue.w + 4 : 0, 48, hoverChapter ? 160 : 0) / 2;
   const tipLeft = hover ? Math.min(Math.max(hover.x, tipHalf), Math.max(tipHalf, hover.w - tipHalf)) : 0;
   // The encoder cuts 160 x 90 tiles, so a frame is shown at its own size.
   const sprite = cue
@@ -469,6 +601,7 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
       data-native={native ? "1" : undefined}
       onPointerMove={poke}
       onPointerLeave={() => playing && setActive(false)}
+      onContextMenu={onContextMenu}
       className={`group/player relative h-full w-full select-none overflow-hidden bg-black text-white ${
         showChrome ? "" : "cursor-none"
       }`}
@@ -478,9 +611,22 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
         poster={poster ?? undefined}
         playsInline
         preload="metadata"
-        className="absolute inset-0 h-full w-full object-contain"
-        onClick={() => (menu ? setMenu(null) : togglePlay())}
-        onDoubleClick={toggleFullscreen}
+        loop={loop}
+        className={`absolute inset-0 h-full w-full object-contain ${extras ? "touch-manipulation" : ""}`}
+        onPointerDown={(e) => {
+          pointerType.current = e.pointerType;
+        }}
+        onPointerUp={onVideoPointerUp}
+        onClick={() => {
+          // With player extras a finger's taps are handled on pointer up.
+          if (extras && pointerType.current === "touch") return;
+          if (menu) setMenu(null);
+          else togglePlay();
+        }}
+        onDoubleClick={() => {
+          if (extras && pointerType.current === "touch") return;
+          toggleFullscreen();
+        }}
         onPlay={() => {
           setPlaying(true);
           setStarted(true);
@@ -607,6 +753,14 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
             style={{ left: 12 + tipLeft }}
           >
             {sprite && <div data-sprite-frame className="box-content border-2 border-white bg-black bg-no-repeat" style={sprite} />}
+            {hoverChapter && (
+              <span
+                data-hover-chapter
+                className="mt-1 max-w-[160px] truncate text-[12px] font-medium [text-shadow:0_0_4px_rgba(0,0,0,.75)]"
+              >
+                {hoverChapter.title}
+              </span>
+            )}
             <span className="mt-1 text-[13px] font-medium [text-shadow:0_0_4px_rgba(0,0,0,.75)]">
               {formatTime(hover.t)}
             </span>
@@ -630,15 +784,26 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
           onPointerUp={onBarUp}
           className="group/bar absolute inset-x-3 bottom-9 h-[17px] cursor-pointer touch-none"
         >
-          <div
-            className={`absolute inset-x-0 bottom-[7px] h-[3px] origin-bottom bg-white/20 transition-transform group-hover/bar:scale-y-[1.67] ${
-              scrubbing ? "scale-y-[1.67]" : ""
-            }`}
-          >
-            <div className="absolute inset-y-0 left-0 bg-white/40" style={{ width: pct(buffered) }} />
-            {hover && <div className="absolute inset-y-0 left-0 bg-white/50" style={{ width: pct(hover.t) }} />}
-            <div className="absolute inset-y-0 left-0 bg-[var(--mark)]" style={{ width: pct(time) }} />
-          </div>
+          {chapters.length > 0 ? (
+            <ChapterTrack
+              chapters={chapters}
+              duration={duration}
+              time={time}
+              buffered={buffered}
+              hoverT={hover ? hover.t : null}
+              scrubbing={scrubbing}
+            />
+          ) : (
+            <div
+              className={`absolute inset-x-0 bottom-[7px] h-[3px] origin-bottom bg-white/20 transition-transform group-hover/bar:scale-y-[1.67] ${
+                scrubbing ? "scale-y-[1.67]" : ""
+              }`}
+            >
+              <div className="absolute inset-y-0 left-0 bg-white/40" style={{ width: pct(buffered) }} />
+              {hover && <div className="absolute inset-y-0 left-0 bg-white/50" style={{ width: pct(hover.t) }} />}
+              <div className="absolute inset-y-0 left-0 bg-[var(--mark)]" style={{ width: pct(time) }} />
+            </div>
+          )}
           <div
             className={`absolute bottom-[3px] h-[13px] w-[13px] -translate-x-1/2 rounded-full bg-[var(--mark)] transition-transform ${
               scrubbing ? "scale-100" : "scale-0 group-hover/bar:scale-100"
@@ -701,6 +866,17 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
           <span data-time className="whitespace-nowrap px-2 text-[13px] leading-9 [text-shadow:0_0_2px_rgba(0,0,0,.5)]">
             {formatTime(time)} / {formatTime(duration)}
           </span>
+          {currentChapter && (
+            <span
+              data-chapter-title
+              className="min-w-0 truncate pr-2 text-[13px] leading-9 [text-shadow:0_0_2px_rgba(0,0,0,.5)] max-sm:hidden"
+            >
+              <span aria-hidden className="pr-1.5">
+                {"\u2022"}
+              </span>
+              {currentChapter.title}
+            </span>
+          )}
 
           <div className="ml-auto flex items-center">
             <div className="relative">
@@ -780,6 +956,52 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
             </>
           )}
         </div>
+      )}
+
+      {/* Double tap to skip (player extras). */}
+      {tapNote && (
+        <div
+          key={tapNote.key}
+          aria-hidden
+          data-tap-skip={tapNote.side}
+          className={`pointer-events-none absolute inset-y-0 flex w-2/5 flex-col items-center justify-center bg-white/10 text-white [text-shadow:0_0_4px_rgba(0,0,0,.75)] ${
+            tapNote.side === "back" ? "left-0 rounded-r-[50%]" : "right-0 rounded-l-[50%]"
+          }`}
+        >
+          <span className={`flex ${tapNote.side === "back" ? "-scale-x-100" : ""}`}>
+            {[0, 1, 2].map((i) => (
+              <svg key={i} viewBox="0 0 24 24" className="-mx-1 h-5 w-5 drop-shadow-[0_0_3px_rgba(0,0,0,.75)]" aria-hidden>
+                <path d="M8 5v14l11-7z" fill="currentColor" />
+              </svg>
+            ))}
+          </span>
+          <span className="mt-1 text-[13px] font-medium">{tapNote.total} seconds</span>
+        </div>
+      )}
+
+      {ctxMenu && (
+        <PlayerContextMenu
+          left={ctxMenu.left}
+          top={ctxMenu.top}
+          loop={loop}
+          onLoop={() => setLoop((on) => !on)}
+          onCopy={() => copyLink(0)}
+          onCopyAtTime={() => copyLink(videoRef.current?.currentTime ?? 0)}
+          onStats={() => setNerds(true)}
+          onClose={closeCtxMenu}
+        />
+      )}
+
+      {nerds && (
+        <StatsForNerds
+          videoId={videoId}
+          videoRef={videoRef}
+          hlsRef={hlsRef}
+          engine={engine || "loading"}
+          quality={native ? "picked by Safari" : summary}
+          playingLevel={playingLevel}
+          onClose={() => setNerds(false)}
+        />
       )}
     </div>
   );

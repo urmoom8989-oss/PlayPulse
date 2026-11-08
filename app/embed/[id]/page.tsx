@@ -48,6 +48,7 @@ async function Embed({ params }: { params: PageProps<"/embed/[id]">["params"] })
         durationS={video.durationS}
         startAt={0}
         embed
+        description={video.description}
       />
       {/* The title links to the watch page in a new tab, like YouTube's embeds. */}
       <a

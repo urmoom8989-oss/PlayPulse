@@ -1,7 +1,20 @@
-// The right-click menu's links and the "Stats for nerds" box (player extras).
+// The player's right-click menu (where it opens, its links) and the "Stats
+// for nerds" box (player extras).
 // Only imports format.ts, which has no imports, so the tests can load it.
 
 import { startParam } from "./format.ts";
+
+/** About the size of the player's right-click menu: 4 rows of 40 px and its padding. */
+export const CONTEXT_MENU_W = 300;
+export const CONTEXT_MENU_H = 4 * 40 + 16;
+
+/** Where the right-click menu goes for a click at (x, y), kept inside a player of `width` by `height`. */
+export function menuPosition(x: number, y: number, width: number, height: number): { left: number; top: number } {
+  return {
+    left: Math.max(4, Math.min(x, width - CONTEXT_MENU_W - 4)),
+    top: Math.max(4, Math.min(y, height - CONTEXT_MENU_H - 4)),
+  };
+}
 
 /** The watch page link, at a time when `atS` is 1 second or more: /watch?v=id&t=90. */
 export function watchLink(origin: string, videoId: string, atS: number = 0): string {

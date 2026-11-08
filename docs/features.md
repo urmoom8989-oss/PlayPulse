@@ -253,6 +253,31 @@ stacked under the player.
   shows more videos from the same channel, padded with placeholders until the
   home feed (feature 6) fills it.
 
+### Player extras
+
+Behind the `player_extras` flag (`022_player_extras.sql`, off at first), all in
+the browser:
+
+- **Chapters.** A list of timestamps in the description becomes chapters, with
+  YouTube's 2020 rules: the list starts at a line with `0:00`, has at least 3
+  chapters in order, and each one is at least 10 seconds long. The list is the
+  `0:00` line and the lines right under it; a blank line ends it. The progress
+  bar splits into one part per chapter, hovering shows the chapter's name above
+  the time, and the bottom bar shows the chapter playing. Lines like
+  `0:00 Intro`, `Intro - 0:00`, `[1:05] Setup` and `3. 10:00 Outro` all work.
+- **Timestamps** like `1:05` or `1:02:05` in the description and in comments
+  are links. A click jumps the player and scrolls up to it; a middle click or
+  Ctrl+click opens `/watch?v=...&t=...` in a new tab.
+- **Right-click menu** on the player: Loop, Copy video URL, Copy video URL at
+  current time and Stats for nerds. Right-click again while it is open for the
+  browser's own menu.
+- **Stats for nerds**: video ID, viewport and dropped frames, current and best
+  resolution, volume, codecs, connection speed, buffer health, speed and
+  quality, and the player (hls.js or Safari's own). Safari does not tell the
+  page its codecs or connection speed.
+- **Double tap** on a phone: the left half goes back 10 seconds, the right half
+  forward, and each extra tap adds 10 more. A single tap still plays or pauses.
+
 ### How the player gets the video
 
 The bucket is private, so the browser cannot read it directly. The player asks

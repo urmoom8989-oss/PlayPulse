@@ -2,18 +2,7 @@
 
 import { useEffect, useRef, type ComponentType } from "react";
 import { CheckIcon, InfoIcon, LinkIcon, LoopIcon, ScheduleIcon } from "@/components/icons";
-
-/** About the size of the menu, to keep it inside the player. */
-const MENU_W = 264;
-const MENU_H = 4 * 40 + 16;
-
-/** Where to put the menu so it stays inside a player of `width` by `height`. */
-export function menuPosition(x: number, y: number, width: number, height: number): { left: number; top: number } {
-  return {
-    left: Math.max(4, Math.min(x, width - MENU_W - 4)),
-    top: Math.max(4, Math.min(y, height - MENU_H - 4)),
-  };
-}
+import { CONTEXT_MENU_W } from "@/lib/watch/nerds";
 
 /**
  * The player's right-click menu, like 2020 (player extras): Loop, Copy video
@@ -42,8 +31,12 @@ export function PlayerContextMenu({
 }) {
   const ref = useRef<HTMLDivElement>(null);
 
+  // Keyboard users land on the first choice when the menu opens.
   useEffect(() => {
     ref.current?.querySelector<HTMLButtonElement>("button")?.focus({ preventScroll: true });
+  }, []);
+
+  useEffect(() => {
     const onDown = (e: PointerEvent) => {
       if (e.button === 2) return;
       if (!ref.current?.contains(e.target as Node)) onClose();
@@ -76,9 +69,13 @@ export function PlayerContextMenu({
       role="menu"
       aria-label="Player menu"
       data-player-context-menu
-      onContextMenu={(e) => e.stopPropagation()}
+      onContextMenu={(e) => {
+        // Right-click on the menu itself: close it and let the browser's own menu show.
+        e.stopPropagation();
+        onClose();
+      }}
       className="absolute z-30 rounded-[2px] bg-[rgba(28,28,28,0.9)] py-2 text-[13px] font-medium text-[#eeeeee] [text-shadow:0_0_2px_rgba(0,0,0,.5)]"
-      style={{ left, top, width: MENU_W }}
+      style={{ left, top, width: CONTEXT_MENU_W }}
     >
       <Item Icon={LoopIcon} label="Loop" onClick={pick(onLoop)} checked={loop} data-menu-loop />
       <Item Icon={LinkIcon} label="Copy video URL" onClick={pick(onCopy)} data-menu-copy />
