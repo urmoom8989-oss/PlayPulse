@@ -222,9 +222,24 @@ deleting. Nothing to set up beyond migration 014.
 - To stop the encoder: `systemctl stop sloptube-encoder`. A running job goes back
   in the queue.
 
+## On Railway instead of a box
+
+The worker also runs as a second Railway service next to the website, with a
+Railway bucket instead of R2:
+
+1. Add a service from this GitHub repository and set its **Root Directory** to
+   `/worker`. Railway finds `worker/Dockerfile` (the same image as `Dockerfile` here).
+2. Give it these variables. The bucket ones can reference the website service,
+   for example `${{sloptube.S3_BUCKET}}`:
+   `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`,
+   `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_REGION`, `S3_FORCE_PATH_STYLE`.
+   With `S3_ENDPOINT` set the `R2_*` settings are not needed.
+3. It needs no domain or port. One replica: two workers would just share the queue.
+
 ## Files
 
 - `Dockerfile`: the worker image (Node 22 and ffmpeg from Debian), built from `worker/`
+- `../../worker/Dockerfile`: the same image for hosts that build from `worker/` itself (Railway)
 - `docker-compose.yml`: the service, its work and state folders and log limits
 - `install.sh`: the installer above
 - `../../.github/workflows/encoder.yml`: tests the worker and builds the image on push to `release`

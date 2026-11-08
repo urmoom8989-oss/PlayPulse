@@ -43,6 +43,11 @@ Sign up with Google or with email and password, sign in, the avatar menu and
 `/settings` (name, username, picture, bio, delete account). People must be 13 or
 older: the birthday is asked at sign up and checked in the database.
 
+A username is 3 to 24 characters of anything except emoji (and invisible
+characters), keeps the case people type, and counts as taken whatever its case.
+Channel addresses (`/@handle`) are separate and stay plain letters, numbers,
+underscores and dots.
+
 ### 1. Run the migrations
 
 In the [SQL editor](https://supabase.com/dashboard/project/_/sql/new),
@@ -109,7 +114,8 @@ bucket with presigned URLs, in 16 MB parts, so the app server never touches the
 bytes. Processing (feature 4) turns it into HLS and the watch page (feature 5)
 plays it.
 
-- MP4, MOV, WebM or MKV, up to 2 GB per file, 10 uploads a day per person.
+- MP4, MOV, WebM or MKV, up to 2 GB per file, as many uploads as people like
+  (`021_open_uploads_usernames.sql` removed the old 10 a day limit).
 - Uploading needs a finished sign up (13 or older) and a channel.
 - New videos are private unless the uploader picks unlisted or public.
 

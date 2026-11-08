@@ -1,9 +1,9 @@
 // Upload rules shared by the /upload page, the API routes and the tests.
-// Keep in step with public.create_upload() in supabase/migrations/005_videos.sql.
+// Keep in step with public.create_upload() in supabase/migrations/021_open_uploads_usernames.sql.
 // No imports on purpose, so Node can load this file directly.
+// There is no daily upload limit: 021 removed it.
 
 export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
-export const UPLOADS_PER_DAY = 10;
 /** Every part is 16 MB except the last one. R2 wants at least 5 MB per part. */
 export const PART_SIZE = 16 * 1024 * 1024;
 /** How many parts upload at the same time. */
@@ -172,7 +172,8 @@ export function uploadErrorText(code: string | null | undefined): string {
     case "bad_type":
       return "Only MP4, MOV, WebM and MKV videos can be uploaded.";
     case "daily_limit":
-      return `You can upload ${UPLOADS_PER_DAY} videos a day. Try again tomorrow.`;
+      // Only a database without 021 still raises this.
+      return "You have reached the upload limit for today. Try again tomorrow.";
     case "not_configured":
       return "Uploads are not configured on this server yet.";
     case "size_mismatch":

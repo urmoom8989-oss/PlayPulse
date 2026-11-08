@@ -61,6 +61,6 @@ export function usernameNote(status: UsernameStatus): { hint?: string; error?: s
     case "unknown":
       return { hint: "Could not check right now. We will check when you save." };
     default:
-      return { hint: "3 to 24 letters, numbers or underscores" };
+      return { hint: "3 to 24 characters, anything but emoji" };
   }
 }
