@@ -17,13 +17,13 @@ const roboto = Roboto({
 });
 
 export const metadata: Metadata = {
-  title: "sloptube",
-  description: "A video platform, built in the open one feature at a time.",
+  title: "PlayPulse",
+  description: "Videos, creators, and communities worth discovering.",
 };
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: light)", color: "#0f766e" },
     { media: "(prefers-color-scheme: dark)", color: "#202020" },
   ],
 };

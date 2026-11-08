@@ -22,7 +22,7 @@ export function AuthCard({
       >
         <div className="flex items-center justify-center gap-1">
           <LogoMark className="h-6 w-[34px]" />
-          <span className="text-[24px] font-bold tracking-[-1px] text-red">sloptube</span>
+          <span className="text-[24px] font-bold tracking-[-1px] text-[var(--logo-word)]">PlayPulse</span>
         </div>
         <h1 className="mt-4 text-center text-[24px] font-normal leading-8 text-text">{title}</h1>
         {subtitle && <p className="mt-2 text-center text-[16px] leading-6 text-text">{subtitle}</p>}
