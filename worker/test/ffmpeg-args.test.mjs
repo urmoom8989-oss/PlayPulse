@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   buildEncodeArgs,
+  buildSpriteArgs,
   buildThumbnailArgs,
   createProgressParser,
   encodePercent,
@@ -20,7 +21,7 @@ const SNAPSHOT_720P = [
   "[0:v]split=3[s0][s1][sp];" +
     "[s0]scale=640:360:flags=bicubic,setsar=1,format=yuv420p[v0];" +
     "[s1]scale=1280:720:flags=bicubic,setsar=1,format=yuv420p[v1];" +
-    "[sp]fps=1/5,scale=160:90:force_original_aspect_ratio=decrease,pad=160:90:(ow-iw)/2:(oh-ih)/2,setsar=1,tile=3x1[spr]",
+    "[sp]fps=1/5,scale=160:90:force_original_aspect_ratio=decrease,pad=160:90:(ow-iw)/2:(oh-ih)/2,setsar=1[spr]",
   "-map", "[v0]", "-map", "0:a:0",
   "-map", "[v1]", "-map", "0:a:0",
   "-c:v", "libx264", "-preset", "veryfast", "-profile:v", "high",
@@ -36,7 +37,7 @@ const SNAPSHOT_720P = [
   "-master_pl_name", "master.m3u8",
   "-var_stream_map", "v:0,a:0,name:360p v:1,a:1,name:720p",
   "%v/index.m3u8",
-  "-map", "[spr]", "-frames:v", "1", "-c:v", "libwebp", "-quality", "70", "sprite.webp",
+  "-map", "[spr]", "-frames:v", "3", "-c:v", "png", "-f", "image2", "/work/job/sprite/%03d.png",
 ];
 
 test("encode args for a 720p source with sound (snapshot)", () => {
@@ -45,8 +46,40 @@ test("encode args for a 720p source with sound (snapshot)", () => {
     renditions: pickRenditions({ width: 1280, height: 720 }),
     hasAudio: true,
     sprite: spritePlan(12),
+    spriteFrames: "/work/job/sprite/%03d.png",
   });
   assert.deepEqual(args, SNAPSHOT_720P);
+});
+
+test("the sprite is not tiled inside the encode, so ffmpeg reports progress from the start", () => {
+  const args = buildEncodeArgs({
+    input: "in.mp4",
+    renditions: pickRenditions({ width: 1280, height: 720 }),
+    hasAudio: true,
+    sprite: spritePlan(10693.4),
+    spriteFrames: "/work/job/sprite/%03d.png",
+  });
+  assert.ok(!args[args.indexOf("-filter_complex") + 1].includes("tile="));
+  assert.ok(!args.includes("libwebp"));
+  assert.equal(args[args.indexOf("[spr]") + 2], "100");
+});
+
+test("a sprite without a place for its frames is a bug", () => {
+  assert.throws(
+    () => buildEncodeArgs({ input: "x", renditions: pickRenditions({ width: 640, height: 360 }), hasAudio: false, sprite: spritePlan(12) }),
+    /spriteFrames/,
+  );
+});
+
+test("sprite tiling args (snapshot)", () => {
+  assert.deepEqual(buildSpriteArgs({ frames: "/work/job/sprite/%03d.png", plan: spritePlan(10693.4), output: "/work/job/out/sprite.webp" }), [
+    "-hide_banner", "-nostdin", "-y", "-loglevel", "error",
+    "-framerate", "1", "-start_number", "1", "-i", "/work/job/sprite/%03d.png",
+    "-vf", "tile=10x10",
+    "-frames:v", "1",
+    "-c:v", "libwebp", "-quality", "70",
+    "/work/job/out/sprite.webp",
+  ]);
 });
 
 test("without sound there are no audio maps or codecs", () => {
@@ -116,4 +149,15 @@ test("ffprobe args and parsing", () => {
     () => parseProbe({ format: { duration: "3" }, streams: [{ codec_type: "video", disposition: { attached_pic: 1 } }] }),
     /no video stream/,
   );
+});
+
+test("the time limit follows the video's length, between 2 and 12 hours", async () => {
+  const { JOB_TIMEOUT_MAX_MS, JOB_TIMEOUT_MS, jobTimeoutMs } = await import("../lib/limits.mjs");
+  const hour = 60 * 60 * 1000;
+  assert.equal(JOB_TIMEOUT_MS, 2 * hour);
+  assert.equal(jobTimeoutMs(60), 2 * hour);
+  assert.equal(jobTimeoutMs(NaN), 2 * hour);
+  // The 3 hour upload that sat at 5%: 1 hour plus twice its length.
+  assert.equal(jobTimeoutMs(10693.4), hour + 10693.4 * 2000);
+  assert.equal(jobTimeoutMs(24 * 3600), JOB_TIMEOUT_MAX_MS);
 });

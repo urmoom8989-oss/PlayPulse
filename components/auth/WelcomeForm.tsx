@@ -72,7 +72,7 @@ export function WelcomeForm({ suggested, next }: { suggested: string; next: stri
         autoCapitalize="none"
         spellCheck={false}
         required
-        maxLength={25}
+        maxLength={60}
         value={username}
         onChange={(e) => setUsername(e.target.value)}
         hint={note.hint}

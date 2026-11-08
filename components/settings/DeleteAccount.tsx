@@ -76,7 +76,7 @@ export function DeleteAccount({
         </button>
         <button
           type="button"
-          disabled={busy || typed.trim().toLowerCase() !== username}
+          disabled={busy || typed.trim().toLowerCase() !== username.toLowerCase()}
           onClick={remove}
           className="btn-blue !bg-[var(--red)]"
         >

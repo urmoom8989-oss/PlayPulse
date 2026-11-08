@@ -163,7 +163,7 @@ export function SettingsForm({ profile, disabled }: { profile: SettingsProfile; 
               label="Username"
               autoCapitalize="none"
               spellCheck={false}
-              maxLength={25}
+              maxLength={60}
               value={username}
               disabled={disabled}
               onChange={(e) => setUsername(e.target.value)}

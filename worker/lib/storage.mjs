@@ -13,13 +13,17 @@ import {
   S3Client,
 } from "@aws-sdk/client-s3";
 
-/** An S3 client pointed at the account's R2 endpoint (same settings as lib/upload/r2.ts in the app). */
-export function createR2Client({ accountId, accessKeyId, secretAccessKey }) {
+/**
+ * An S3 client for the video bucket: the account's R2 endpoint (same settings
+ * as lib/upload/r2.ts in the app), or any S3 compatible endpoint when one is
+ * given (a Railway bucket, for example).
+ */
+export function createR2Client({ accountId, accessKeyId, secretAccessKey, endpoint, region = "auto", forcePathStyle = true }) {
   return new S3Client({
-    region: "auto",
-    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    region,
+    endpoint: endpoint || `https://${accountId}.r2.cloudflarestorage.com`,
     credentials: { accessKeyId, secretAccessKey },
-    forcePathStyle: true,
+    forcePathStyle,
     requestChecksumCalculation: "WHEN_REQUIRED",
     responseChecksumValidation: "WHEN_REQUIRED",
   });

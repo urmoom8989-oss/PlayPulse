@@ -4,8 +4,22 @@
 /** A job is tried this many times before the video is marked failed (encode_max_attempts()). */
 export const MAX_ATTEMPTS = 3;
 
-/** A worker stops a job after 2 hours. The database takes a job back after 2 h 15 min. */
+/**
+ * A worker stops a job that runs too long. Until the probe knows the video's
+ * length the limit is 2 hours; then it is 1 hour plus twice the length, at
+ * least 2 and at most 12 hours, so a 3 hour upload gets 7 hours. The database
+ * only takes a running job back when another worker asks for work and the job
+ * started more than 2 h 15 min ago (encode_stale_after() in 006): run one
+ * worker when uploads can be that long.
+ */
 export const JOB_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+export const JOB_TIMEOUT_MAX_MS = 12 * 60 * 60 * 1000;
+
+/** The time limit for a job whose video is `durationS` seconds long. */
+export function jobTimeoutMs(durationS) {
+  const d = Number.isFinite(durationS) && durationS > 0 ? durationS : 0;
+  return Math.min(JOB_TIMEOUT_MAX_MS, Math.max(JOB_TIMEOUT_MS, 60 * 60 * 1000 + d * 2 * 1000));
+}
 
 /** How long the worker waits between claim_encode_job calls when there is nothing to do. */
 export const POLL_MS = 5000;
@@ -54,6 +68,32 @@ export const CLEANUP_EVERY_MS = 10 * 60 * 1000;
 
 /** Folders claimed per cleanup round (claim_cleanup's lim). */
 export const CLEANUP_BATCH = 20;
+
+/**
+ * Auto-generated captions (lib/captions.mjs). The sound goes to the speech
+ * model in 15 minute pieces, so memory and disk stay small on long videos.
+ */
+export const CAPTION_CHUNK_S = 15 * 60;
+
+/**
+ * Speech to text may take as long as the video plays, at least 15 minutes and
+ * at most 6 hours. A video that takes longer simply gets no captions.
+ */
+export const CAPTIONS_TIMEOUT_MIN_MS = 15 * 60 * 1000;
+export const CAPTIONS_TIMEOUT_MAX_MS = 6 * 60 * 60 * 1000;
+
+/** The time limit for the captions of a video that is `durationS` seconds long. */
+export function captionsTimeoutMs(durationS) {
+  const d = Number.isFinite(durationS) && durationS > 0 ? durationS : 0;
+  return Math.min(CAPTIONS_TIMEOUT_MAX_MS, Math.max(CAPTIONS_TIMEOUT_MIN_MS, d * 1000));
+}
+
+/** One caption on screen: at most 2 lines of about 42 characters, like TV captions. */
+export const CAPTION_LINE_CHARS = 42;
+export const CAPTION_MAX_LINES = 2;
+
+/** CPU threads for speech to text when CAPTIONS_THREADS is not set: the CPU count, at most this. */
+export const CAPTION_MAX_THREADS = 8;
 
 /** How often, between encodes, the worker posts queued Yapin' announcements (feature 16). */
 export const YAPIN_EVERY_MS = 15000;
