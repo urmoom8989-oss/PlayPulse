@@ -278,19 +278,24 @@ export function SearchBox({ initialQuery = "" }: { initialQuery?: string }) {
 
   return (
     <>
-      <div className="mx-10 hidden min-w-0 max-w-[728px] flex-1 items-center search:flex" data-search-box="bar">
-        <div className="flex min-w-0 max-w-[640px] flex-1">
-          <SearchForm initialQuery={initialQuery} variant="bar" />
+      {/* The middle of the top bar takes all the room between the logo and the
+          icons, so the icons sit at the right edge. The search box keeps its
+          size (at most 728 px) and sits in the center of that room. */}
+      <div className="mx-10 hidden min-w-0 flex-1 justify-center search:flex">
+        <div className="flex min-w-0 max-w-[728px] flex-1 items-center" data-search-box="bar">
+          <div className="flex min-w-0 max-w-[640px] flex-1">
+            <SearchForm initialQuery={initialQuery} variant="bar" />
+          </div>
+          <button
+            type="button"
+            aria-label="Search with your voice"
+            disabled
+            title="Voice search is not part of PlayPulse yet"
+            className="ml-2 grid h-10 w-10 shrink-0 place-items-center rounded-full text-icon"
+          >
+            <MicIcon className="h-6 w-6" />
+          </button>
         </div>
-        <button
-          type="button"
-          aria-label="Search with your voice"
-          disabled
-          title="Voice search is not part of PlayPulse yet"
-          className="ml-2 grid h-10 w-10 shrink-0 place-items-center rounded-full text-icon"
-        >
-          <MicIcon className="h-6 w-6" />
-        </button>
       </div>
 
       <div className="flex flex-1 justify-end search:hidden">
