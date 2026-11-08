@@ -1,5 +1,6 @@
 // The worker's settings, read from the environment (the box's env file).
-import { hostname, tmpdir } from "node:os";
+import { availableParallelism, hostname, tmpdir } from "node:os";
+import { CAPTION_MAX_THREADS } from "./limits.mjs";
 import { YAPIN_WEBHOOK_HOSTS } from "./yapin.mjs";
 
 /** Always required: the database. */
@@ -25,6 +26,14 @@ export const S3_ENV = ["S3_ENDPOINT", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"
  *                     Without it thumbnail_url stays empty and the app signs a link.
  *   SITE_URL          this sloptube's address, like https://tube.example.com, for the
  *                     links in Yapin' announcements (feature 16). Without it none are posted.
+ *
+ * Auto-generated captions (lib/captions.mjs), all optional. The encoder image sets
+ * the two model paths; without CAPTIONS_MODEL, or with CAPTIONS=off, there are none.
+ *   CAPTIONS            "off" turns them off
+ *   CAPTIONS_MODEL      the whisper.cpp speech model file (ggml-base.bin)
+ *   CAPTIONS_VAD_MODEL  the voice detection model, so music and silence get no words
+ *   CAPTIONS_THREADS    CPU threads for speech to text (default: the CPU count, at most 8)
+ *   WHISPER_BIN         the whisper.cpp program (default: whisper-cli on the PATH)
  */
 export function readConfig(env = process.env) {
   const get = (name) => env[name]?.trim() || "";
@@ -58,5 +67,21 @@ export function readConfig(env = process.env) {
     mediaPublicUrl: /^https:\/\//.test(publicUrl) ? publicUrl : null,
     siteUrl: /^https?:\/\/[^/\s]+$/.test(siteUrl) ? siteUrl : null,
     yapinHosts: YAPIN_WEBHOOK_HOSTS,
+    captions:
+      get("CAPTIONS_MODEL") && !/^(off|false|no|0)$/i.test(get("CAPTIONS"))
+        ? {
+            bin: get("WHISPER_BIN") || "whisper-cli",
+            model: get("CAPTIONS_MODEL"),
+            vadModel: get("CAPTIONS_VAD_MODEL") || null,
+            threads: captionThreads(get("CAPTIONS_THREADS")),
+          }
+        : null,
   };
+}
+
+/** CAPTIONS_THREADS when it is a sensible whole number, otherwise the CPU count up to CAPTION_MAX_THREADS. */
+export function captionThreads(value, cpus = availableParallelism()) {
+  const n = Number(value);
+  if (value && Number.isInteger(n) && n >= 1 && n <= 64) return n;
+  return Math.max(1, Math.min(CAPTION_MAX_THREADS, cpus));
 }

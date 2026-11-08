@@ -1,9 +1,9 @@
 # Set up the encoder box
 
 The encoder turns uploaded videos into something people can stream: HLS at
-360p, 720p and 1080p (only the sizes the upload can fill), three thumbnails and
-a hover preview sprite. It runs on its own server, separate from the website,
-because encoding keeps every CPU core busy.
+360p, 720p and 1080p (only the sizes the upload can fill), three thumbnails, a
+hover preview sprite and auto-generated captions. It runs on its own server,
+separate from the website, because encoding keeps every CPU core busy.
 
 It takes about 15 minutes. You need:
 
@@ -16,7 +16,8 @@ It takes about 15 minutes. You need:
 How it works once it is set up: the worker asks the database for a job every
 5 seconds. When someone finishes an upload it downloads the file from R2,
 encodes it, uploads the result to `hls/<video id>/` in the same bucket and marks
-the video ready. One video at a time. When you push `main` to `release` and the
+the video ready. Then it listens to the video with a speech model and adds the
+captions (see [Auto-generated captions](#auto-generated-captions)). One video at a time. When you push `main` to `release` and the
 worker code changed, GitHub builds a new image and the box switches to it within
 5 minutes, but never in the middle of an encode.
 
@@ -94,6 +95,8 @@ Where each value comes from:
 | `WORKER_NAME` | optional, shown in the `encode_jobs.worker` column. Defaults to the server's name. Give every encoder box its own. |
 | `MEDIA_PUBLIC_URL` | optional. If you connect a [custom domain to the bucket](https://developers.cloudflare.com/r2/buckets/public-buckets/), put it here and `thumbnail_url` is filled in. Without it the site serves the thumbnail through `/api/media`. Use the same value on the website (see "Watch page" in the main README). |
 | `SITE_URL` | optional. The website's address, like `https://tube.example.com`, without a slash at the end. The encoder needs it for the links in Yapin' announcements (feature 16, see "Yapin'" in the main README). Without it no announcements are posted. |
+| `CAPTIONS` | optional. `off` turns the auto-generated captions off. The image sets everything else they need. |
+| `CAPTIONS_THREADS` | optional. CPU threads for speech to text. Defaults to the number of CPUs, at most 8. |
 
 **The secret key can read and change everything in the database.** It lives only
 in this file on this box: never in the repository, never in a chat, and in the
@@ -151,6 +154,7 @@ docker logs -f sloptube-encoder
 One line per step, for example:
 
 ```
+2026-11-04T10:00:00.000Z captions threads=8 on with speech.bin and vad.bin, checked in 3.1s
 2026-11-04T10:00:00.000Z start worker=encoder-1 polling every 5s
 2026-11-04T10:02:11.000Z claim job=1a2b3c4d video=5e6f7a8b attempt=1 worker=encoder-1 uploads/.../source.mp4
 2026-11-04T10:02:11.200Z head job=1a2b3c4d video=5e6f7a8b source is 812.4 MB, size matches
@@ -160,11 +164,13 @@ One line per step, for example:
 2026-11-04T10:13:44.000Z thumbnails job=1a2b3c4d video=5e6f7a8b 3 thumbnails and a 100 frame sprite in 4.0s
 2026-11-04T10:14:02.000Z upload job=1a2b3c4d video=5e6f7a8b 456 files, 610.2 MB in 18.0s
 2026-11-04T10:14:02.300Z done job=1a2b3c4d video=5e6f7a8b ready in 711.3s
+2026-11-04T10:15:10.800Z captions job=1a2b3c4d video=5e6f7a8b language=en cues=212 English (auto-generated) in 68.5s
 ```
 
 Updates are logged in `/var/log/sloptube-encoder-update.log`.
 
-Check that ffmpeg works on the box (encodes a 3 second test clip):
+Check that ffmpeg and whisper work on the box (encodes a 3 second test clip and
+has whisper listen to 2 seconds of silence):
 
 ```bash
 docker exec sloptube-encoder node --test test/
@@ -182,6 +188,7 @@ Everything for a video lives under `hls/<video id>/` in the bucket:
 | `360p/`, `720p/`, `1080p/` | `index.m3u8`, an `init` segment and 4 second `.m4s` segments |
 | `thumb-1.webp`, `thumb-2.webp`, `thumb-3.webp` | frames at 10%, 50% and 90%, 1280 wide. The first is the default. |
 | `sprite.webp`, `sprite.vtt` | the hover preview: one 160x90 frame every 5 s (at most 100), and the WebVTT that maps time to tile (`videos.preview_sprite_key`) |
+| `captions/<lang>.vtt`, `captions/<lang>.m3u8` | the auto-generated captions as WebVTT, and the HLS subtitle playlist that `master.m3u8` names. `<lang>` is the language the speech model heard, like `en`. Only when somebody speaks. |
 
 - **Never upscaled.** A 720p upload gets 360p and 720p. Something between two
   sizes (like 1600x900) also gets one at its own size. Portrait videos count
@@ -192,6 +199,35 @@ Everything for a video lives under `hls/<video id>/` in the bucket:
 
 Custom thumbnails from the studio (feature 12) land in the same folder as
 `custom-<random>.jpg`, `.png` or `.webp`. The website writes those, not the encoder.
+
+## Auto-generated captions
+
+After a video is ready, so nobody waits for them, the worker writes its
+captions with [whisper.cpp](https://github.com/ggml-org/whisper.cpp) and the
+multilingual `base` model, both in the image:
+
+1. ffmpeg cuts the sound into 15 minute pieces of 16 kHz mono WAV, one at a time,
+   so memory and disk stay small even for a long video.
+2. `whisper-cli` turns each piece into words with times. The Silero voice
+   detection model skips music and silence, so a game soundtrack does not become
+   made-up sentences. The first piece where somebody speaks sets the language;
+   the rest of the video stays in it.
+3. The words become a WebVTT file with at most 2 lines of about 42 characters
+   per caption, and `master.m3u8` is uploaded again with an
+   `EXT-X-MEDIA:TYPE=SUBTITLES` line ("English (auto-generated)", off by default)
+   on every variant. Viewers turn them on with the CC button. The database does
+   not change: the player finds them in the playlist.
+
+How long it takes depends on the CPUs; the limit is the video's length (at
+least 15 minutes, at most 6 hours), and the next upload waits until it is done. Captions never fail a video: when
+whisper breaks, runs out of time or hears nobody, the video simply has none and
+the log says why. At start the worker has whisper listen to 2 seconds of silence
+and logs `captions ... on`, or `captions off: ...` with the reason (a CPU
+without AVX2, for example). `CAPTIONS=off` turns them off.
+
+The image builds whisper.cpp from a pinned release (`WHISPER_VERSION` in the
+Dockerfile) and checks the speech model against the SHA-1 in whisper.cpp's
+`models/README.md`.
 
 ## Emptying the trash in R2
 
@@ -237,10 +273,14 @@ Railway bucket instead of R2:
    `S3_SECRET_ACCESS_KEY`, `S3_BUCKET`, `S3_REGION`, `S3_FORCE_PATH_STYLE`.
    With `S3_ENDPOINT` set the `R2_*` settings are not needed.
 3. It needs no domain or port. One replica: two workers would just share the queue.
+4. Every push to the branch it follows rebuilds it, which stops a running encode
+   (the job goes back in the queue and starts again). Push worker changes while
+   no video is processing.
 
 ## Files
 
-- `Dockerfile`: the worker image (Node 22 and ffmpeg from Debian), built from `worker/`
+- `Dockerfile`: the worker image (Node 22 and ffmpeg from Debian, and whisper.cpp
+  with its models for the captions), built from `worker/`
 - `../../worker/Dockerfile`: the same image for hosts that build from `worker/` itself (Railway)
 - `docker-compose.yml`: the service, its work and state folders and log limits
 - `install.sh`: the installer above

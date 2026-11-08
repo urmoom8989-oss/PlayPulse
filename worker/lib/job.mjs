@@ -1,8 +1,10 @@
-// One encode job, from the claimed row to encode_done (or encode_failed).
+// One encode job, from the claimed row to encode_done (or encode_failed),
+// then the auto-generated captions of the ready video.
 // Every outside effect comes in through `deps`, so the tests run this with a
 // fake database, fake R2 and a fake ffmpeg.
 import { mkdir, mkdtemp, rm, statfs, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { addCaptions } from "./captions.mjs";
 import {
   MASTER_PLAYLIST,
   PROGRESS_STEPS,
@@ -18,7 +20,7 @@ import {
 } from "./ffmpeg.mjs";
 import { pickRenditions } from "./ladder.mjs";
 import { DISK_MARGIN_BYTES, DISK_SOURCE_FACTOR, JOB_TIMEOUT_MS, PROGRESS_EVERY_MS, THUMBNAIL_AT, jobTimeoutMs } from "./limits.mjs";
-import { human, seconds } from "./log.mjs";
+import { human, limitText, seconds } from "./log.mjs";
 import { buildProbeArgs, parseProbe } from "./probe.mjs";
 import { run as realRun } from "./run.mjs";
 import { buildVtt, spritePlan } from "./sprite.mjs";
@@ -47,14 +49,6 @@ export function diskNeeded(sourceBytes) {
 function sourceName(key) {
   const ext = /\.([a-z0-9]{2,4})$/i.exec(key)?.[1] ?? "bin";
   return `source.${ext.toLowerCase()}`;
-}
-
-/** A time limit in words: "7 hours", "90 minutes", "1 second". */
-export function limitText(ms) {
-  const plural = (n, unit) => `${n} ${unit}${n === 1 ? "" : "s"}`;
-  if (ms >= 60 * 60 * 1000) return plural(Math.round((ms / (60 * 60 * 1000)) * 10) / 10, "hour");
-  if (ms >= 60 * 1000) return plural(Math.round(ms / (60 * 1000)), "minute");
-  return plural(Math.max(1, Math.round(ms / 1000)), "second");
 }
 
 /** What ends up in videos.renditions: one entry per rung, smallest first. */
@@ -220,6 +214,14 @@ export async function processJob(job, deps) {
       renditions: renditionsJson(renditions),
     });
     log("done", ids, `ready in ${seconds(now() - started)}`);
+
+    // 9. Auto-generated captions, now that the video is ready, so nobody waits
+    // for them. They have their own time limit and never fail the job.
+    clearTimeout(timer);
+    await addCaptions(
+      { input, dir, out, durationS: probe.durationS, hasAudio: probe.hasAudio, prefix, ids },
+      { storage, log, config, run, now, stopSignal: deps.stopSignal, captionsTimeoutMs: deps.captionsTimeoutMs },
+    );
     return "done";
   } catch (caught) {
     const err = signal.aborted && signal.reason instanceof Error ? signal.reason : caught;

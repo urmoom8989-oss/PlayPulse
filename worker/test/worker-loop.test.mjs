@@ -10,6 +10,7 @@ import { test } from "node:test";
 import { createDb } from "../lib/db.mjs";
 import { runLoop, tick } from "../lib/loop.mjs";
 import { createR2Client, createStorage } from "../lib/storage.mjs";
+import { whisperJson } from "./whisper-fake.mjs";
 
 const VIDEO = "aaaaaaaa-bbbb-cccc-dddd-000000000001";
 const OWNER = "11111111-2222-3333-4444-555555555555";
@@ -94,7 +95,8 @@ function fakeR2({ size = BYTES } = {}) {
     if (name === "PutObjectCommand") {
       const chunks = [];
       for await (const c of input.Body) chunks.push(c);
-      puts.set(input.Key, { type: input.ContentType, cache: input.CacheControl, bytes: Buffer.concat(chunks).length });
+      const body = Buffer.concat(chunks);
+      puts.set(input.Key, { type: input.ContentType, cache: input.CacheControl, bytes: body.length, text: body.toString("utf8") });
       return {};
     }
     throw new Error("unexpected " + name);
@@ -115,15 +117,29 @@ const PROBE = JSON.stringify({
  * would (per variant playlists, init and segments, master, sprite) and
  * reports progress; a thumbnail run writes its output file.
  */
-function fakeRun({ failEncode = 0, hang = false } = {}) {
+function fakeRun({ failEncode = 0, hang = false, probe = PROBE, whisper = null, quietFrom = Infinity } = {}) {
   const runs = [];
   let encodes = 0;
+  let heard = 0;
   const fn = async (cmd, args, { cwd, signal, onStdout } = {}) => {
     runs.push({ cmd, args });
-    if (cmd === "ffprobe") return PROBE;
+    if (cmd === "ffprobe") return probe;
+    // whisper-cli: `whisper(n, args, signal)` gives the JSON of its nth run, or throws.
+    if (cmd === "whisper-cli") {
+      const json = await whisper(heard++, args, signal);
+      await writeFile(`${args[args.indexOf("-of") + 1]}.json`, json);
+      return "";
+    }
     const isEncode = args.includes("-filter_complex");
     if (!isEncode) {
-      await writeFile(args.at(-1), "webp");
+      const output = args.at(-1);
+      // A piece of sound for the captions: `quietFrom` (seconds) on, the sound track has ended.
+      if (output.endsWith(".wav")) {
+        const startS = Number(args[args.indexOf("-ss") + 1]);
+        await writeFile(output, startS >= quietFrom ? Buffer.alloc(44) : Buffer.alloc(44 + 32000));
+        return "";
+      }
+      await writeFile(output, "webp");
       return "";
     }
     encodes++;
@@ -138,7 +154,7 @@ function fakeRun({ failEncode = 0, hang = false } = {}) {
       await writeFile(join(cwd, n, "init_0.mp4"), "init");
       await writeFile(join(cwd, n, "seg_00000.m4s"), "seg");
     }
-    await writeFile(join(cwd, "master.m3u8"), "#EXTM3U\n");
+    await writeFile(join(cwd, "master.m3u8"), `#EXTM3U\n${names.map((n) => `#EXT-X-STREAM-INF:BANDWIDTH=1000000\n${n}/index.m3u8\n`).join("")}`);
     await writeFile(join(cwd, "sprite.webp"), "sprite");
     for (const us of [3000000, 6000000, 12000000]) onStdout?.(`out_time_us=${us}\nprogress=continue\n`);
     onStdout?.("progress=end\n");
@@ -164,10 +180,11 @@ async function setup(opts = {}) {
       return run(...a);
     },
     log: (step, fields, text) => lines.push(`${step} ${text ?? ""}`),
-    config: { workerName: "test-box", workDir, stateDir, mediaPublicUrl: opts.mediaPublicUrl ?? null },
+    config: { workerName: "test-box", workDir, stateDir, mediaPublicUrl: opts.mediaPublicUrl ?? null, captions: opts.captions ?? null },
     diskFree: async () => opts.free ?? 100 * 1024 ** 3,
     progressEveryMs: 0,
     timeoutMs: opts.timeoutMs,
+    captionsTimeoutMs: opts.captionsTimeoutMs,
   };
   const cleanup = () => Promise.all([rm(workDir, { recursive: true, force: true }), rm(stateDir, { recursive: true, force: true })]);
   return { deps, supabase, r2, lines, run, workDir, stateDir, busySeen, cleanup };
@@ -384,6 +401,161 @@ test("the loop runs jobs one after another and stops on the signal", async () =>
     assert.deepEqual(s.supabase.rows.map((r) => r.status), ["done", "done"]);
     assert.equal(claims, 3);
     assert.ok(s.lines.at(-1).startsWith("stop "));
+  } finally {
+    await s.cleanup();
+  }
+});
+
+const CAPTIONS = { bin: "whisper-cli", model: "/m/speech.bin", vadModel: "/m/vad.bin", threads: 2 };
+const captionKeys = (s) => [...s.r2.puts.keys()].filter((k) => k.includes("/captions/")).sort();
+
+test("captions: after encode_done, the words go up as WebVTT and the master playlist names them", async () => {
+  const s = await setup({
+    jobs: [{}],
+    captions: CAPTIONS,
+    whisper: async () => whisperJson("en", [[500, 3000, " Hello and welcome back."], [3000, 4000, " [BLANK_AUDIO]"], [4000, 7500, " Today we play a game."]]),
+  });
+  try {
+    let putsAtDone = -1;
+    const done = s.deps.db.done;
+    s.deps.db.done = async (...a) => {
+      putsAtDone = s.r2.sent.filter((x) => x.name === "PutObjectCommand").length;
+      return done(...a);
+    };
+    assert.equal(await tick(s.deps), "done");
+
+    assert.deepEqual(captionKeys(s), [`hls/${VIDEO}/captions/en.m3u8`, `hls/${VIDEO}/captions/en.vtt`]);
+    const vtt = s.r2.puts.get(`hls/${VIDEO}/captions/en.vtt`);
+    assert.equal(vtt.type, "text/vtt; charset=utf-8");
+    assert.equal(vtt.text, "WEBVTT\n\n00:00:00.500 --> 00:00:03.000\nHello and welcome back.\n\n00:00:04.000 --> 00:00:07.500\nToday we play a game.\n");
+    assert.match(s.r2.puts.get(`hls/${VIDEO}/captions/en.m3u8`).text, /#EXTINF:12\.000,\nen\.vtt\n/);
+
+    const master = s.r2.puts.get(`hls/${VIDEO}/master.m3u8`).text;
+    assert.match(master, /#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English \(auto-generated\)",LANGUAGE="en",.*URI="captions\/en.m3u8"/);
+    assert.equal(master.match(/SUBTITLES="subs"/g).length, 2);
+
+    // The video was ready before any caption file went up, and the master went up again last.
+    const puts = s.r2.sent.filter((x) => x.name === "PutObjectCommand").map((x) => x.key);
+    assert.ok(putsAtDone > 0 && puts.slice(0, putsAtDone).every((k) => !k.includes("/captions/")), "captions before encode_done");
+    assert.deepEqual(puts.slice(putsAtDone), [`hls/${VIDEO}/captions/en.vtt`, `hls/${VIDEO}/captions/en.m3u8`, `hls/${VIDEO}/master.m3u8`]);
+
+    // Whisper got the 16 kHz piece of sound and the voice detection model; the first run guesses the language.
+    const w = s.run.runs.find((r) => r.cmd === "whisper-cli").args;
+    assert.equal(w[w.indexOf("-l") + 1], "auto");
+    assert.equal(w[w.indexOf("-vm") + 1], "/m/vad.bin");
+    assert.equal(w[w.indexOf("-t") + 1], "2");
+    assert.ok(s.lines.some((l) => l.startsWith("captions English (auto-generated) in ")), s.lines.join("\n"));
+    assert.deepEqual(await readdir(s.workDir), []);
+  } finally {
+    await s.cleanup();
+  }
+});
+
+test("captions: a long video is heard in pieces, in the language of the first piece with speech", async () => {
+  const probe = JSON.stringify({
+    format: { duration: "2000.0" },
+    streams: [
+      { codec_type: "video", codec_name: "h264", width: 640, height: 360, avg_frame_rate: "30/1" },
+      { codec_type: "audio", codec_name: "aac" },
+    ],
+  });
+  const s = await setup({
+    jobs: [{}],
+    probe,
+    captions: CAPTIONS,
+    whisper: async (n) =>
+      n === 0 ? whisperJson("ja", []) : whisperJson(n === 1 ? "fr" : "en", [[1000, 2000, n === 1 ? " Bonjour." : " Au revoir."]]),
+  });
+  try {
+    assert.equal(await tick(s.deps), "done");
+    const runs = s.run.runs.filter((r) => r.cmd === "whisper-cli").map((r) => r.args[r.args.indexOf("-l") + 1]);
+    assert.deepEqual(runs, ["auto", "auto", "fr"]);
+    assert.deepEqual(await readdir(s.workDir), []);
+    const seeks = s.run.runs.filter((r) => r.args.includes("pcm_s16le")).map((r) => r.args[r.args.indexOf("-ss") + 1]);
+    assert.deepEqual(seeks, ["0.000", "900.000", "1800.000"]);
+    assert.deepEqual(captionKeys(s), [`hls/${VIDEO}/captions/fr.m3u8`, `hls/${VIDEO}/captions/fr.vtt`]);
+    assert.equal(
+      s.r2.puts.get(`hls/${VIDEO}/captions/fr.vtt`).text,
+      "WEBVTT\n\n00:15:01.000 --> 00:15:02.000\nBonjour.\n\n00:30:01.000 --> 00:30:02.000\nAu revoir.\n",
+    );
+    assert.match(s.r2.puts.get(`hls/${VIDEO}/master.m3u8`).text, /NAME="French \(auto-generated\)",LANGUAGE="fr"/);
+  } finally {
+    await s.cleanup();
+  }
+});
+
+test("captions: when whisper breaks, the video is still done and has none", async () => {
+  const s = await setup({
+    jobs: [{}],
+    captions: CAPTIONS,
+    whisper: async () => {
+      throw new Error("whisper-cli exited with 10: failed to process audio");
+    },
+  });
+  try {
+    assert.equal(await tick(s.deps), "done");
+    assert.equal(s.supabase.rows[0].status, "done");
+    assert.deepEqual(captionKeys(s), []);
+    assert.doesNotMatch(s.r2.puts.get(`hls/${VIDEO}/master.m3u8`).text, /SUBTITLES/);
+    assert.equal(s.r2.sent.filter((x) => x.key === `hls/${VIDEO}/master.m3u8`).length, 1);
+    assert.ok(s.lines.some((l) => l === "captions no captions: whisper-cli exited with 10: failed to process audio"), s.lines.join("\n"));
+    assert.deepEqual(await readdir(s.workDir), []);
+  } finally {
+    await s.cleanup();
+  }
+});
+
+test("captions: speech to text over its time limit is stopped, the video stays done", async () => {
+  const s = await setup({
+    jobs: [{}],
+    captions: CAPTIONS,
+    captionsTimeoutMs: 50,
+    whisper: (n, args, signal) => new Promise((_, reject) => signal.addEventListener("abort", () => reject(signal.reason), { once: true })),
+  });
+  try {
+    assert.equal(await tick(s.deps), "done");
+    assert.deepEqual(captionKeys(s), []);
+    assert.ok(s.lines.includes("captions no captions: took longer than 1 second"), s.lines.join("\n"));
+  } finally {
+    await s.cleanup();
+  }
+});
+
+test("captions: no speech, no sound or captions off: nothing is added", async () => {
+  const quiet = await setup({ jobs: [{}], captions: CAPTIONS, whisper: async () => whisperJson("en", [[0, 1000, " [BLANK_AUDIO]"]]) });
+  const mute = JSON.stringify({
+    format: { duration: "12.0" },
+    streams: [{ codec_type: "video", codec_name: "h264", width: 1280, height: 720, avg_frame_rate: "30/1" }],
+  });
+  const silent = await setup({ jobs: [{}], probe: mute, captions: CAPTIONS, whisper: async () => assert.fail("whisper ran on a video without sound") });
+  const off = await setup({ jobs: [{}], whisper: async () => assert.fail("whisper ran with captions off") });
+  try {
+    for (const s of [quiet, silent, off]) {
+      assert.equal(await tick(s.deps), "done");
+      assert.deepEqual(captionKeys(s), []);
+      assert.doesNotMatch(s.r2.puts.get(`hls/${VIDEO}/master.m3u8`).text, /SUBTITLES/);
+    }
+    assert.ok(quiet.lines.some((l) => /^captions no speech found/.test(l)), quiet.lines.join("\n"));
+    assert.ok(silent.lines.includes("captions the video has no sound, so no captions"), silent.lines.join("\n"));
+    assert.ok(!off.lines.some((l) => l.startsWith("captions ")));
+  } finally {
+    await Promise.all([quiet.cleanup(), silent.cleanup(), off.cleanup()]);
+  }
+});
+
+test("captions: pieces after the sound track ends are not sent to whisper", async () => {
+  const probe = JSON.stringify({
+    format: { duration: "2000.0" },
+    streams: [
+      { codec_type: "video", codec_name: "h264", width: 640, height: 360, avg_frame_rate: "30/1" },
+      { codec_type: "audio", codec_name: "aac" },
+    ],
+  });
+  const s = await setup({ jobs: [{}], probe, quietFrom: 900, captions: CAPTIONS, whisper: async () => whisperJson("en", [[1000, 2000, " Hi."]]) });
+  try {
+    assert.equal(await tick(s.deps), "done");
+    assert.equal(s.run.runs.filter((r) => r.cmd === "whisper-cli").length, 1);
+    assert.equal(s.r2.puts.get(`hls/${VIDEO}/captions/en.vtt`).text, "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nHi.\n");
   } finally {
     await s.cleanup();
   }
