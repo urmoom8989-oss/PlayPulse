@@ -8,8 +8,8 @@ import { jobsFor } from "@/lib/processing/server";
 import { progressFor, type JobInfo } from "@/lib/processing/status";
 import { readSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
-import { readR2Config } from "./env";
-import type { VideoStatus, Visibility } from "./rules";
+import { readStorageConfig } from "./env";
+import type { VideoCategory, VideoStatus, Visibility } from "./rules";
 
 export type UploadPageState =
   /** No Supabase settings while running `next dev`: show the page as a preview. */
@@ -30,7 +30,7 @@ export async function uploadPageState(): Promise<UploadPageState> {
   if (!(await flagOn("upload", user?.id ?? null))) return { kind: "off", noDb: false };
   if (!user) return { kind: "signed-out" };
   if (!user.onboarded) return { kind: "not-onboarded" };
-  return { kind: "ready", user, configured: readR2Config() !== null };
+  return { kind: "ready", user, configured: readStorageConfig() !== null };
 }
 
 export type StudioVideo = {
@@ -38,6 +38,7 @@ export type StudioVideo = {
   title: string;
   description: string;
   visibility: Visibility;
+  category: VideoCategory;
   status: VideoStatus;
   sourceBytes: number | null;
   thumbnailUrl: string | null;
@@ -49,7 +50,7 @@ export type StudioVideo = {
   progress: number | null;
 };
 
-const VIDEO_COLUMNS = "id, owner_id, title, description, visibility, status, source_bytes, thumbnail_url, error, created_at";
+const VIDEO_COLUMNS = "id, owner_id, title, description, visibility, category, status, source_bytes, thumbnail_url, error, created_at";
 
 type VideoRow = {
   id: string;
@@ -57,6 +58,7 @@ type VideoRow = {
   title: string;
   description: string;
   visibility: Visibility;
+  category: VideoCategory;
   status: VideoStatus;
   source_bytes: number | string | null;
   thumbnail_url: string | null;
@@ -70,6 +72,7 @@ function rowToVideo(r: VideoRow): StudioVideo {
     title: r.title,
     description: r.description,
     visibility: r.visibility,
+    category: r.category,
     status: r.status,
     sourceBytes: r.source_bytes === null ? null : Number(r.source_bytes),
     thumbnailUrl: r.thumbnail_url,
@@ -131,6 +134,8 @@ export async function myVideos(): Promise<StudioVideosState> {
     .from("videos")
     .select(VIDEO_COLUMNS)
     .eq("owner_id", user.id)
+    .is("deleted_at", null)
+    .is("removed_at", null)
     .order("created_at", { ascending: false })
     .limit(200);
   if (error || !data) return { kind: "not-set-up" };

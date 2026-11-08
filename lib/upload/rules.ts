@@ -1,10 +1,11 @@
 // Upload rules shared by the /upload page, the API routes and the tests.
-// Keep in step with public.create_upload() in supabase/migrations/005_videos.sql.
+// Keep in step with public.create_upload(): 021_upload_size.sql sets the size
+// limit and 023_open_uploads_usernames.sql removed the daily limit.
 // No imports on purpose, so Node can load this file directly.
+// There is no daily upload limit: 023 removed it.
 
-export const MAX_UPLOAD_BYTES = 2 * 1024 * 1024 * 1024; // 2 GB
-export const UPLOADS_PER_DAY = 10;
-/** Every part is 16 MB except the last one. R2 wants at least 5 MB per part. */
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB
+/** Every part is 16 MB except the last one. S3-compatible multipart uploads require at least 5 MB per part. */
 export const PART_SIZE = 16 * 1024 * 1024;
 /** How many parts upload at the same time. */
 export const PARALLEL_PARTS = 3;
@@ -17,6 +18,8 @@ export const TITLE_MAX = 100;
 export const DESCRIPTION_MAX = 5000;
 export const VISIBILITIES = ["private", "unlisted", "public"] as const;
 export type Visibility = (typeof VISIBILITIES)[number];
+export const VIDEO_CATEGORIES = ["Music", "Sports", "Gaming", "Movies and TV", "News", "Live", "Other"] as const;
+export type VideoCategory = (typeof VIDEO_CATEGORIES)[number];
 
 export const VIDEO_STATUSES = ["uploading", "uploaded", "processing", "ready", "failed"] as const;
 export type VideoStatus = (typeof VIDEO_STATUSES)[number];
@@ -89,7 +92,7 @@ export function planParts(bytes: number, partSize = PART_SIZE): Part[] {
   return parts;
 }
 
-/** The R2 key for an upload. The database builds the same key in create_upload(). */
+/** The object key for an upload. The database builds the same key in create_upload(). */
 export function sourceKey(ownerId: string, videoId: string, mime: string): string | null {
   const ext = VIDEO_TYPES[mime];
   if (!ext || !isUuid(ownerId) || !isUuid(videoId)) return null;
@@ -106,10 +109,10 @@ export function isUuid(value: unknown): value is string {
   return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
-export type Details = { title: string; description: string; visibility: Visibility };
+export type Details = { title: string; description: string; visibility: Visibility; category: VideoCategory };
 
 /** Why the details form cannot be saved, or null. */
-export function detailsProblem(d: { title?: unknown; description?: unknown; visibility?: unknown }): string | null {
+export function detailsProblem(d: { title?: unknown; description?: unknown; visibility?: unknown; category?: unknown }): string | null {
   const title = typeof d.title === "string" ? d.title.trim() : "";
   if (!title) return "Add a title.";
   if (title.length > TITLE_MAX) return `Titles can be up to ${TITLE_MAX} characters.`;
@@ -118,6 +121,7 @@ export function detailsProblem(d: { title?: unknown; description?: unknown; visi
     return `Descriptions can be up to ${DESCRIPTION_MAX} characters.`;
   }
   if (!VISIBILITIES.includes(d.visibility as Visibility)) return "Pick private, unlisted or public.";
+  if (!VIDEO_CATEGORIES.includes(d.category as VideoCategory)) return "Pick a video category.";
   return null;
 }
 
@@ -165,14 +169,31 @@ export function uploadErrorText(code: string | null | undefined): string {
       return `Descriptions can be up to ${DESCRIPTION_MAX} characters.`;
     case "bad_visibility":
       return "Pick private, unlisted or public.";
+    case "bad_category":
+      return "Pick a video category.";
+    case "thumbnail_invalid":
+      return "Pick a JPG, PNG or WebP thumbnail up to 2 MB.";
+    case "upload_failed":
+      return "The thumbnail did not arrive. Try again.";
+    case "not_ready":
+      return "Finish uploading the video before adding a thumbnail.";
+    case "not_uploading":
+      return "The video upload is not ready for that action.";
+    case "storage_error":
+      return "Object storage could not complete the request. Try again.";
+    case "removed":
+      return "This video was removed and cannot be published.";
+    case "in_trash":
+      return "Restore the video before publishing it.";
     case "file_empty":
       return "This file is empty.";
     case "file_too_big":
-      return "This file is bigger than 2 GB, the most one upload can be.";
+      return "This file is bigger than 5 GB, the most one upload can be.";
     case "bad_type":
       return "Only MP4, MOV, WebM and MKV videos can be uploaded.";
     case "daily_limit":
-      return `You can upload ${UPLOADS_PER_DAY} videos a day. Try again tomorrow.`;
+      // Only a database without 023 still raises this.
+      return "You have reached the upload limit for today. Try again tomorrow.";
     case "not_configured":
       return "Uploads are not configured on this server yet.";
     case "size_mismatch":

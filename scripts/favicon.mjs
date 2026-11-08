@@ -3,35 +3,18 @@
 //
 //   node scripts/favicon.mjs
 //
-// Renders the mark at 48 and 32 px with Playwright's Chromium and packs the
+// Renders the mark at 48 and 32 px with sharp and packs the
 // two PNGs into one .ico (PNG entries, which the Turbopack image decoder reads).
 
 import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { createRequire } from "node:module";
+import { fileURLToPath } from "node:url";
+import sharp from "sharp";
 import { markSvg } from "../lib/brand.ts";
 
-const require = createRequire(import.meta.url);
-let chromium;
-try {
-  ({ chromium } = require("playwright"));
-} catch {
-  console.error("Playwright is not installed. Run: npm i -D playwright && npx playwright install chromium");
-  process.exit(2);
-}
-
-const root = resolve(new URL("..", import.meta.url).pathname);
+const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const sizes = [48, 32];
-
-const browser = await chromium.launch();
-const page = await browser.newPage({ deviceScaleFactor: 1 });
-const pngs = [];
-for (const size of sizes) {
-  await page.setViewportSize({ width: size, height: size });
-  await page.setContent(`<style>html,body{margin:0;background:transparent}</style>${markSvg(size)}`);
-  pngs.push(await page.locator("svg").screenshot({ omitBackground: true }));
-}
-await browser.close();
+const pngs = await Promise.all(sizes.map((size) => sharp(Buffer.from(markSvg(size))).png().toBuffer()));
 
 // ICONDIR (6 bytes), one ICONDIRENTRY (16 bytes) per image, then the PNGs.
 const head = Buffer.alloc(6 + 16 * pngs.length);

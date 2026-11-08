@@ -16,10 +16,9 @@
   --text-3: #717171;
   --link: #065fd4;
   --red: #cc0000;
-  /* The brand green (lib/brand.ts): the mark, active guide icons and thumbnail progress. */
-  --mark: #16a34a;
-  /* "slop" in the wordmark; "tube" uses the text color. */
-  --logo-word: #15803d;
+  /* Brand teal (lib/brand.ts): the mark, active guide icons and thumbnail progress. */
+  --mark: #0f766e;
+  --logo-word: #0f766e;
   --divider: #e5e5e5;
   --hover: #f2f2f2;
   --active: #e5e5e5;
@@ -55,8 +54,8 @@
   --text-3: #8a8a8a;
   --link: #3ea6ff;
   --red: #cc0000;
-  --mark: #22c55e;
-  --logo-word: #4ade80;
+  --mark: #2dd4bf;
+  --logo-word: #5eead4;
   --divider: #383838;
   --hover: #303030;
   --active: #383838;

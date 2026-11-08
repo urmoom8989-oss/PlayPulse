@@ -94,7 +94,7 @@ export function playerSize(v: Pick<SeoVideo, "width" | "height">): { width: numb
  * yapin flag, feature 16) also og:video and a twitter:player card that point
  * at /embed/<id>, so chat apps can show a playable card.
  */
-export function watchMetadata(v: SeoVideo, origin: string, siteName = "sloptube", opts: { embed?: boolean } = {}): Metadata {
+export function watchMetadata(v: SeoVideo, origin: string, siteName = "PlayPulse", opts: { embed?: boolean } = {}): Metadata {
   const url = absoluteUrl(origin, watchPath(v.id));
   const description = videoDescription(v);
   const image = v.thumbnail ? absoluteUrl(origin, v.thumbnail) : null;
@@ -136,7 +136,7 @@ export function watchMetadata(v: SeoVideo, origin: string, siteName = "sloptube"
 }
 
 /** The metadata of /shorts/<id>: like a watch page, with the short's own canonical link. */
-export function shortMetadata(v: SeoVideo, origin: string, siteName = "sloptube", opts: { embed?: boolean } = {}): Metadata {
+export function shortMetadata(v: SeoVideo, origin: string, siteName = "PlayPulse", opts: { embed?: boolean } = {}): Metadata {
   const base = watchMetadata(v, origin, siteName, opts);
   const url = absoluteUrl(origin, shortPath(v.id));
   return {
@@ -148,7 +148,7 @@ export function shortMetadata(v: SeoVideo, origin: string, siteName = "sloptube"
 }
 
 /** The metadata of /embed/<id>: the title, kept out of search engines, the watch page as the canonical link. */
-export function embedMetadata(v: SeoVideo, origin: string, siteName = "sloptube"): Metadata {
+export function embedMetadata(v: SeoVideo, origin: string, siteName = "PlayPulse"): Metadata {
   return {
     title: `${v.title} | ${siteName}`,
     alternates: { canonical: absoluteUrl(origin, watchPath(v.id)) },
@@ -157,7 +157,7 @@ export function embedMetadata(v: SeoVideo, origin: string, siteName = "sloptube"
 }
 
 /** The metadata of /@handle: the channel's name, description, avatar and canonical link. */
-export function channelMetadata(c: SeoChannel, origin: string, siteName = "sloptube", tab: "home" | "videos" | "shorts" | "about" = "home"): Metadata {
+export function channelMetadata(c: SeoChannel, origin: string, siteName = "PlayPulse", tab: "home" | "videos" | "shorts" | "about" = "home"): Metadata {
   const url = absoluteUrl(origin, channelPath(c.handle));
   const description = clip(c.description || `${c.name} on ${siteName}. ${c.videoCount} video${c.videoCount === 1 ? "" : "s"}.`);
   const image = c.avatarUrl ? absoluteUrl(origin, c.avatarUrl) : null;

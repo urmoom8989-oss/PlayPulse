@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { EmptyState } from "@/components/EmptyState";
 import { SkeletonRow, videoGridClass } from "@/components/VideoCard";
 import { feedState } from "@/lib/feed/server";
@@ -33,12 +34,14 @@ export async function FeedView({
   kind,
   title,
   placeholder,
+  home = false,
 }: {
   kind: Extract<FeedKind, "newest" | "trending">;
   title: string;
   placeholder: { title?: string; hint?: string };
+  home?: boolean;
 }) {
-  const state = await feedState(kind);
+  const state = await feedState(kind, home ? { limit: 8 } : {});
   switch (state.kind) {
     case "off":
     case "no-db":
@@ -59,10 +62,19 @@ export async function FeedView({
     case "ready": {
       // The Snips shelf (feature 11), only on the home feed and only with the shorts flag on.
       const shelf = kind === "newest" ? await shelfShorts() : [];
+      const trending = home ? await feedState("trending") : null;
+      const trendingCards =
+        trending?.kind === "ready"
+          ? trending.page.cards.filter((card) => !state.page.cards.some((recommended) => recommended.id === card.id)).slice(0, 8)
+          : [];
       if (state.page.cards.length === 0 && shelf.length === 0) {
         return (
           <div data-feed-state="empty">
-            <EmptyState title="Nothing here yet" hint="Public videos show up here once they are processed." cards={4} />
+            <EmptyState
+              title={home ? title : "Nothing here yet"}
+              hint={home ? "Public videos appear here after they are uploaded and processed." : "Public videos show up here once they are processed."}
+              cards={home ? 8 : 4}
+            />
           </div>
         );
       }
@@ -70,6 +82,23 @@ export async function FeedView({
         <div className={frame} data-feed-state="ready">
           <Header title={title} />
           <FeedGrid kind={kind} initial={state.page} now={state.now} ranked={kind === "trending"} shelf={shelf} />
+          {trending?.kind === "ready" && trendingCards.length > 0 && (
+            <section className="mt-10 border-t border-divider pt-6" aria-labelledby="home-trending-title">
+              <div className="mb-4 flex items-center justify-between px-3 sm:px-0">
+                <h2 id="home-trending-title" className="text-[20px] font-medium leading-7 text-text">
+                  Trending
+                </h2>
+                <Link href="/trending" className="text-[14px] font-medium text-link hover:underline">
+                  See all
+                </Link>
+              </div>
+              <FeedGrid
+                kind="trending"
+                initial={{ cards: trendingCards, next: null }}
+                now={trending.now}
+              />
+            </section>
+          )}
         </div>
       );
     }

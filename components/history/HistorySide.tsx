@@ -10,7 +10,7 @@ type Ask = null | "clear" | "pause" | "resume";
 const ASKS: Record<Exclude<Ask, null>, { title: string; text: string; confirm: string }> = {
   clear: {
     title: "Clear watch history?",
-    text: "Your sloptube watch history will be cleared, and the red bars and resume points go with it.",
+    text: "Your PlayPulse watch history will be cleared, and the red bars and resume points go with it.",
     confirm: "Clear watch history",
   },
   pause: {

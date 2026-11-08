@@ -22,8 +22,9 @@ for a video series, so the code, the commits and the docs are meant to be easy
 to follow.
 
 Built with Next.js 16, React 19, Tailwind 4, zustand and Supabase (Postgres and
-Auth). Video files live on Cloudflare R2, a small ffmpeg worker turns uploads
-into HLS, and hls.js plays them. Light by default, with a dark theme.
+Auth). Video files live in S3-compatible object storage such as Railway Buckets
+(Cloudflare R2 remains supported), a small ffmpeg worker turns uploads into HLS,
+and hls.js plays them. Light by default, with a dark theme.
 
 ![The home feed in the light theme](docs/screenshots/home-light.webp)
 
@@ -47,8 +48,8 @@ channels from `npm run demo`.
   off except accounts and the admin flag panel, so you choose what is live.
 - The app runs without a database (it says "database not connected"), and
   `npm run demo` shows a filled site with no accounts and no setup. Uploading
-  and playing your own videos needs your own Supabase project, an R2 bucket and
-  the encoder worker.
+  and playing your own videos needs your own Supabase project, an S3-compatible
+  bucket and the encoder worker.
 - Only the latest `main` gets fixes.
 
 ## Quick start
@@ -121,7 +122,8 @@ The full setup, with your own database, uploads and a server, is below in
 - [ffmpeg](https://ffmpeg.org/download.html) for the demo, the encoder worker and
   some checks (not needed to just run the site)
 - For a real site: a free [Supabase](https://supabase.com/) project, and for
-  uploads a [Cloudflare R2](https://developers.cloudflare.com/r2/) bucket
+  uploads an S3-compatible bucket such as
+  [Railway Buckets](https://docs.railway.com/storage-buckets)
 
 ### 1. Get the code and install
 
@@ -207,12 +209,12 @@ flag panel and switch each one to **Off**, **Me** or **Everyone**. More in
 
 ### 5. Uploads and the encoder
 
-1. Create an R2 bucket, an API token and the CORS rule, then put the four
-   `R2_*` settings in `.env.local`: [Uploads (R2)](docs/features.md#uploads-r2).
+1. Create a Railway Bucket, configure CORS and put its S3 settings in
+   `.env.local`: [Uploads (S3-compatible storage)](docs/features.md#uploads-s3-compatible-storage).
 2. Run the encoder worker, which turns uploads into HLS with ffmpeg. Locally:
 
    ```bash
-   cp worker/.env.example worker/.env     # fill in the Supabase secret key and R2
+   cp worker/.env.example worker/.env     # fill in the Supabase secret key and bucket credentials
    npm ci --prefix worker
    node --env-file=worker/.env worker/index.mjs
    ```

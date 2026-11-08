@@ -5,7 +5,7 @@ import { readQuery } from "@/lib/search/query";
 // /results?search_query=<q>, the 2019 address. The query is in the title.
 export async function generateMetadata({ searchParams }: PageProps<"/results">) {
   const q = readQuery(await searchParams);
-  return { title: q ? `${q} | sloptube` : "Search | sloptube" };
+  return { title: q ? `${q} | PlayPulse` : "Search | PlayPulse" };
 }
 
 export default function ResultsPage({ searchParams }: PageProps<"/results">) {

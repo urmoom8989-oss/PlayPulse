@@ -2,11 +2,11 @@
 // route, /api/media/<video>/<path>. No imports, so Node can load it directly.
 //
 // Why: the bucket is private. The route checks who may watch, then sends a
-// 302 to a short lived presigned R2 URL. If the playlists were redirected too,
+// 302 to a short lived presigned storage URL. If the playlists were redirected too,
 // the player would resolve the relative names inside them ("720p/index.m3u8",
-// "seg_00001.m4s") against the presigned R2 URL and ask R2 directly, without a
+// "seg_00001.m4s") against the presigned storage URL and ask the bucket directly, without a
 // signature, and get 403. So playlists are small text files the route reads
-// from R2 and hands over itself, with every URI rewritten to the route.
+// from the bucket and hands over itself, with every URI rewritten to the route.
 
 /** The URL prefix of the media route for one video. */
 export function mediaBase(videoId: string): string {

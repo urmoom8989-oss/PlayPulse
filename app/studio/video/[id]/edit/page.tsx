@@ -7,7 +7,7 @@ import { UUID } from "@/lib/studio/http";
 import { statsOn } from "@/lib/stats/server";
 import { studioVideo } from "@/lib/studio/server";
 
-export const metadata = { title: "Video details | sloptube" };
+export const metadata = { title: "Video details | PlayPulse" };
 
 async function EditGate({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;

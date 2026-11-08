@@ -44,12 +44,27 @@ export function createUploadDb(supabase: SupabaseClient): UploadDb {
         title: d.title,
         description: d.description,
         visibility: d.visibility,
+        category: d.category,
+      });
+      return code(error);
+    },
+
+    async saveThumbnail(id, name, url) {
+      const { error } = await supabase.rpc("save_upload_thumbnail", {
+        video_id: id,
+        name,
+        url,
       });
       return code(error);
     },
 
     async finishUpload(id) {
       const { error } = await supabase.rpc("finish_upload", { video_id: id });
+      return code(error);
+    },
+
+    async publishVideo(id) {
+      const { error } = await supabase.rpc("publish_video", { video_id: id });
       return code(error);
     },
 

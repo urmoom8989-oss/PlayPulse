@@ -28,3 +28,11 @@ export function human(bytes) {
 export function seconds(ms) {
   return `${(ms / 1000).toFixed(1)}s`;
 }
+
+/** A time limit in words: "7 hours", "90 minutes", "1 second". */
+export function limitText(ms) {
+  const plural = (n, unit) => `${n} ${unit}${n === 1 ? "" : "s"}`;
+  if (ms >= 60 * 60 * 1000) return plural(Math.round((ms / (60 * 60 * 1000)) * 10) / 10, "hour");
+  if (ms >= 60 * 1000) return plural(Math.round(ms / (60 * 1000)), "minute");
+  return plural(Math.max(1, Math.round(ms / 1000)), "second");
+}

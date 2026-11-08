@@ -1,4 +1,4 @@
-// The media route's view of R2: read a small text file, presign a GET.
+// The media route's view of S3-compatible storage: read a small text file, presign a GET.
 // Relative imports only, so the tests load it directly with a mocked client.
 
 import { GetObjectCommand, type S3Client } from "@aws-sdk/client-s3";

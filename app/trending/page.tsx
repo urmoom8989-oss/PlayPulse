@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { FeedSkeleton, FeedView } from "@/components/feed/FeedView";
 
-export const metadata = { title: "Trending | sloptube" };
+export const metadata = { title: "Trending | PlayPulse" };
 
 export default function Trending() {
   return (

@@ -1,10 +1,10 @@
 "use client";
 
 import { create } from "zustand";
-import { probeVideoFile } from "@/lib/shorts/probe";
-import { shortProblem } from "@/lib/shorts/rules";
-import { useSession } from "@/lib/store/session";
-import { SpeedMeter, UploadCancelled, uploadParts, xhrPutPart, type SignedPart } from "@/lib/upload/parts";
+import { probeVideoFile } from "../shorts/probe.ts";
+import { shortProblem } from "../shorts/rules.ts";
+import { useSession } from "./session.ts";
+import { SpeedMeter, UploadCancelled, uploadParts, xhrPutPart, type SignedPart } from "../upload/parts.ts";
 import {
   detailsProblem,
   fileProblem,
@@ -12,9 +12,10 @@ import {
   uploadErrorText,
   videoTypeFor,
   type Details,
-} from "@/lib/upload/rules";
+} from "../upload/rules.ts";
+import { thumbnailFileProblem } from "../studio/rules.ts";
 
-export type UploadPhase = "idle" | "signing" | "uploading" | "finishing" | "done" | "failed";
+export type UploadPhase = "idle" | "draft" | "signing" | "uploading" | "finishing" | "done" | "failed";
 
 /**
  * The "Upload as a Snip" box (feature 11). The file's shape is read in the
@@ -28,6 +29,8 @@ type SignResponse = { videoId: string; uploadId: string; parts: SignedPart[] };
 
 type UploadState = {
   phase: UploadPhase;
+  step: 0 | 1 | 2;
+  file: File | null;
   fileName: string;
   total: number;
   sent: number;
@@ -35,18 +38,27 @@ type UploadState = {
   details: Details;
   videoId: string | null;
   watchUrl: string | null;
+  thumbnailFile: File | null;
+  thumbnailPreview: string | null;
+  thumbnailSaving: boolean;
+  thumbnailError: string | null;
+  published: boolean;
+  publishError: string | null;
   error: string | null;
   /** A short line under the drop zone, like "Upload cancelled". */
   notice: string | null;
   short: ShortBox;
   pick: (file: File) => void;
+  goToStep: (step: 0 | 1 | 2) => void;
+  startUpload: () => Promise<void>;
   setDetails: (patch: Partial<Details>) => void;
+  setThumbnailFile: (file: File | null) => void;
   setShortOn: (on: boolean) => void;
   cancel: () => Promise<void>;
   reset: () => void;
 };
 
-const emptyDetails: Details = { title: "", description: "", visibility: "private" };
+const emptyDetails: Details = { title: "", description: "", visibility: "private", category: "Other" };
 const checkingShort: ShortBox = { state: "checking", problem: null, on: false };
 
 // The running upload lives outside the store: it is not something to render.
@@ -66,8 +78,25 @@ async function postJson<T>(path: string, body: unknown, signal?: AbortSignal): P
   return json;
 }
 
+async function uploadThumbnail(videoId: string, file: File): Promise<void> {
+  const signed = await postJson<{ name: string; url: string }>("/api/upload/thumbnail/sign", {
+    videoId,
+    mime: file.type,
+    bytes: file.size,
+  });
+  const put = await fetch(signed.url, { method: "PUT", headers: { "content-type": file.type }, body: file });
+  if (!put.ok) throw new Error("The thumbnail upload did not finish. Try again.");
+  await postJson("/api/upload/thumbnail", { videoId, name: signed.name });
+}
+
+function revokeThumbnailPreview(preview: string | null) {
+  if (preview?.startsWith("blob:")) URL.revokeObjectURL(preview);
+}
+
 export const useUpload = create<UploadState>((set, get) => ({
   phase: "idle",
+  step: 0,
+  file: null,
   fileName: "",
   total: 0,
   sent: 0,
@@ -75,23 +104,29 @@ export const useUpload = create<UploadState>((set, get) => ({
   details: emptyDetails,
   videoId: null,
   watchUrl: null,
+  thumbnailFile: null,
+  thumbnailPreview: null,
+  thumbnailSaving: false,
+  thumbnailError: null,
+  published: false,
+  publishError: null,
   error: null,
   notice: null,
   short: checkingShort,
 
   pick(file) {
-    if (running) return;
+    if (running || !["idle", "draft"].includes(get().phase)) return;
     const problem = fileProblem(file);
     if (problem) {
       set({ notice: problem });
       return;
     }
-    const mime = videoTypeFor(file)!;
-    const controller = new AbortController();
-    running = { controller, videoId: null, uploadId: null };
+    revokeThumbnailPreview(get().thumbnailPreview);
     const details = { ...emptyDetails, title: titleFromFileName(file.name) };
     set({
-      phase: "signing",
+      phase: "draft",
+      step: 0,
+      file,
       fileName: file.name,
       total: file.size,
       sent: 0,
@@ -99,6 +134,12 @@ export const useUpload = create<UploadState>((set, get) => ({
       details,
       videoId: null,
       watchUrl: null,
+      thumbnailFile: null,
+      thumbnailPreview: null,
+      thumbnailSaving: false,
+      thumbnailError: null,
+      published: false,
+      publishError: null,
       error: null,
       notice: null,
       short: checkingShort,
@@ -110,67 +151,142 @@ export const useUpload = create<UploadState>((set, get) => ({
       const problem = shortProblem(shape);
       set({ short: { state: "ready", problem, on: problem === null } });
     });
+  },
 
-    void (async () => {
-      const job = running!;
-      try {
-        const signed = await postJson<SignResponse>(
-          "/api/upload/sign",
-          { title: details.title, bytes: file.size, mime },
-          controller.signal,
-        );
-        job.videoId = signed.videoId;
-        job.uploadId = signed.uploadId;
-        set({ phase: "uploading", videoId: signed.videoId });
+  goToStep(step) {
+    if (get().phase !== "draft") return;
+    set({ step, error: null });
+  },
 
-        const meter = new SpeedMeter();
-        let lastPaint = 0;
-        const parts = await uploadParts({
-          file,
-          parts: signed.parts,
-          putPart: xhrPutPart,
-          signal: controller.signal,
-          onProgress: (sent) => {
-            const speed = meter.add(sent);
-            const now = Date.now();
-            // Paint at most five times a second.
-            if (now - lastPaint > 200 || sent === file.size) {
-              lastPaint = now;
-              set({ sent, speed });
-            }
-          },
-        });
+  async startUpload() {
+    const { phase, step, file, details, thumbnailFile } = get();
+    if (phase !== "draft" || step !== 2 || !file || running) return;
+    const problem = detailsProblem(details);
+    if (problem) {
+      set({ error: problem });
+      return;
+    }
+    const publishAfterUpload = details.visibility === "public";
 
-        set({ phase: "finishing", sent: file.size });
-        const d = get().details;
-        const finalDetails = detailsProblem(d) ? { ...d, title: d.title.trim() || details.title } : d;
-        const done = await postJson<{ watchUrl: string }>(
-          "/api/upload/complete",
-          { videoId: signed.videoId, uploadId: signed.uploadId, parts, ...finalDetails },
-          controller.signal,
-        );
-        running = null;
-        set({ phase: "done", watchUrl: done.watchUrl, details: finalDetails });
-        // The "Upload as a Snip" box. Only a file that qualifies has a say;
-        // the rest is decided by shape after processing either way.
-        const box = get().short;
-        if (useSession.getState().flags.shorts && box.state === "ready" && box.problem === null) {
-          void postJson("/api/shorts/choice", { videoId: signed.videoId, on: box.on }).catch(() => undefined);
+    const mime = videoTypeFor(file);
+    if (!mime) {
+      set({ error: fileProblem(file) ?? uploadErrorText("bad_type") });
+      return;
+    }
+    const controller = new AbortController();
+    running = { controller, videoId: null, uploadId: null };
+    const job = running;
+    set({ phase: "signing", sent: 0, speed: 0, error: null, publishError: null });
+
+    try {
+      const signed = await postJson<SignResponse>(
+        "/api/upload/sign",
+        { title: details.title.trim(), bytes: file.size, mime },
+        controller.signal,
+      );
+      job.videoId = signed.videoId;
+      job.uploadId = signed.uploadId;
+      set({ phase: "uploading", videoId: signed.videoId });
+
+      const meter = new SpeedMeter();
+      let lastPaint = 0;
+      const parts = await uploadParts({
+        file,
+        parts: signed.parts,
+        putPart: xhrPutPart,
+        signal: controller.signal,
+        onProgress: (sent) => {
+          const speed = meter.add(sent);
+          const now = Date.now();
+          if (now - lastPaint > 200 || sent === file.size) {
+            lastPaint = now;
+            set({ sent, speed });
+          }
+        },
+      });
+
+      set({ phase: "finishing", sent: file.size });
+      const currentDetails = get().details;
+      const finalDetails = detailsProblem(currentDetails)
+        ? { ...currentDetails, title: currentDetails.title.trim() || details.title }
+        : currentDetails;
+      const done = await postJson<{ watchUrl: string }>(
+        "/api/upload/complete",
+        { videoId: signed.videoId, uploadId: signed.uploadId, parts, ...finalDetails },
+        controller.signal,
+      );
+
+      const selectedThumbnail = get().thumbnailFile ?? thumbnailFile;
+      if (selectedThumbnail) {
+        set({ thumbnailSaving: true, thumbnailError: null });
+        try {
+          await uploadThumbnail(signed.videoId, selectedThumbnail);
+        } catch (thumbnailError) {
+          set({
+            thumbnailError:
+              thumbnailError instanceof Error ? thumbnailError.message : "The thumbnail upload did not finish. Try again.",
+          });
+        } finally {
+          set({ thumbnailSaving: false });
         }
-      } catch (err) {
-        if (err instanceof UploadCancelled || controller.signal.aborted) return;
-        running = null;
-        // Throw the parts away so they do not sit in the bucket.
-        if (job.videoId && job.uploadId) {
-          void postJson("/api/upload/abort", { videoId: job.videoId, uploadId: job.uploadId }).catch(() => undefined);
-        }
-        set({ phase: "failed", error: (err as Error).message || uploadErrorText(null) });
       }
-    })();
+
+      if (publishAfterUpload) {
+        try {
+          await postJson("/api/upload/publish", { videoId: signed.videoId }, controller.signal);
+          set({ published: true, publishError: null });
+        } catch (publishError) {
+          set({
+            published: false,
+            publishError: publishError instanceof Error ? publishError.message : "Could not publish the video.",
+          });
+        }
+      }
+
+      running = null;
+      set({
+        phase: "done",
+        file: null,
+        watchUrl: done.watchUrl,
+        details: finalDetails,
+      });
+      const box = get().short;
+      if (useSession.getState().flags.shorts && box.state === "ready" && box.problem === null) {
+        void postJson("/api/shorts/choice", { videoId: signed.videoId, on: box.on }).catch(() => undefined);
+      }
+    } catch (err) {
+      if (err instanceof UploadCancelled || controller.signal.aborted) return;
+      running = null;
+      if (job.videoId && job.uploadId) {
+        void postJson("/api/upload/abort", { videoId: job.videoId, uploadId: job.uploadId }).catch(() => undefined);
+      }
+      set({ phase: "failed", error: (err as Error).message || uploadErrorText(null) });
+    }
   },
 
   setDetails(patch) {
     set({ details: { ...get().details, ...patch } });
+  },
+
+  setThumbnailFile(file) {
+    const current = get();
+    if (file) {
+      const problem = thumbnailFileProblem(file);
+      if (problem) {
+        set({ thumbnailError: problem });
+        return;
+      }
+    }
+    revokeThumbnailPreview(current.thumbnailPreview);
+    const preview = file ? URL.createObjectURL(file) : null;
+    set({ thumbnailFile: file, thumbnailPreview: preview, thumbnailError: null });
+    if (file && current.phase === "done" && current.videoId) {
+      set({ thumbnailSaving: true });
+      void uploadThumbnail(current.videoId, file)
+        .then(() => set({ thumbnailError: null }))
+        .catch((err) => set({ thumbnailError: err instanceof Error ? err.message : "The thumbnail upload did not finish. Try again." }))
+        .finally(() => set({ thumbnailSaving: false }));
+    }
   },
 
   setShortOn(on) {
@@ -188,6 +304,7 @@ export const useUpload = create<UploadState>((set, get) => ({
     running = null;
     if (!job) return;
     job.controller.abort();
+    revokeThumbnailPreview(get().thumbnailPreview);
     set({ ...initialView(), notice: "Upload cancelled." });
     if (job.videoId && job.uploadId) {
       await postJson("/api/upload/abort", { videoId: job.videoId, uploadId: job.uploadId }).catch(() => undefined);
@@ -196,6 +313,8 @@ export const useUpload = create<UploadState>((set, get) => ({
 
   reset() {
     if (running) return;
+    picks++;
+    revokeThumbnailPreview(get().thumbnailPreview);
     set(initialView());
   },
 }));
@@ -203,6 +322,8 @@ export const useUpload = create<UploadState>((set, get) => ({
 function initialView() {
   return {
     phase: "idle" as const,
+    step: 0 as const,
+    file: null,
     fileName: "",
     total: 0,
     sent: 0,
@@ -210,6 +331,12 @@ function initialView() {
     details: emptyDetails,
     videoId: null,
     watchUrl: null,
+    thumbnailFile: null,
+    thumbnailPreview: null,
+    thumbnailSaving: false,
+    thumbnailError: null,
+    published: false,
+    publishError: null,
     error: null,
     notice: null,
     short: checkingShort,

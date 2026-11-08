@@ -20,6 +20,7 @@ import { SubscribeButton } from "@/components/subscriptions/SubscribeButton";
 import { SubscriberCount } from "@/components/subscriptions/SubscriberCount";
 import { LikeButtons } from "./LikeButtons";
 import { ShareDialog } from "./ShareDialog";
+import { TimestampText } from "./TimestampText";
 
 function ActionButton({
   Icon,
@@ -67,8 +68,9 @@ function VisibilityNote({ visibility }: { visibility: WatchVideo["visibility"] }
   );
 }
 
-/** The description, folded to three lines with SHOW MORE, like 2019. */
-function Description({ text }: { text: string }) {
+/** The description, folded to three lines with SHOW MORE, like 2019. Timestamps are links with player extras. */
+function Description({ text, videoId }: { text: string; videoId: string }) {
+  const extras = useFlag("player_extras");
   const [open, setOpen] = useState(false);
   const [long, setLong] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -84,7 +86,7 @@ function Description({ text }: { text: string }) {
         ref={ref}
         className={`whitespace-pre-wrap break-words text-[14px] leading-5 text-text ${open ? "" : "line-clamp-3"}`}
       >
-        {text}
+        {extras ? <TimestampText text={text} videoId={videoId} /> : text}
       </div>
       {(long || open) && (
         <button
@@ -166,7 +168,7 @@ export function VideoInfo({
             <SubscribeButton channelId={video.channel.id} channelName={video.channel.name} count={video.channel.subscriberCount} />
           )}
         </div>
-        <div className="mt-3 tab:ml-16">{children ?? <Description text={video.description} />}</div>
+        <div className="mt-3 tab:ml-16">{children ?? <Description text={video.description} videoId={video.id} />}</div>
       </div>
 
       {sharing && <ShareDialog videoId={video.id} title={video.title} onClose={() => setSharing(false)} />}

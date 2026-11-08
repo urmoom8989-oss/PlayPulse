@@ -5,7 +5,7 @@ import { AdminQueue } from "@/components/admin/AdminQueue";
 import { AdminError, AdminShell } from "@/components/admin/AdminShell";
 import { adminGate, adminQueue, adminSuspended, findChannel, serverNow } from "@/lib/moderation/server";
 
-export const metadata = { title: "Reports | sloptube admin", robots: { index: false } };
+export const metadata = { title: "Reports | PlayPulse admin", robots: { index: false } };
 
 async function QueueGate({ searchParams }: { searchParams: PageProps<"/admin">["searchParams"] }) {
   const gate = await adminGate();

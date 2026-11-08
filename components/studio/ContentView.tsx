@@ -64,7 +64,7 @@ function Thumb({ v }: { v: StudioRow }) {
         </span>
       )}
       {v.durationS ? (
-        <span className="absolute bottom-1 right-1 rounded-[2px] bg-black/80 px-1 text-[11px] font-medium leading-4 text-white">
+        <span className="absolute bottom-1 right-1 bg-black/80 px-1 text-[11px] font-medium leading-4 text-white">
           {formatTime(v.durationS)}
         </span>
       ) : null}
@@ -308,7 +308,7 @@ export function ContentView({
                   }
                 >
                   {(close) =>
-                    (["public", "unlisted", "private"] as Visibility[]).map((v) => {
+                    (["unlisted", "private"] as Visibility[]).map((v) => {
                       const { label, Icon } = VIS[v];
                       return (
                         <MenuItem
@@ -475,7 +475,7 @@ export function ContentView({
                                 <AnalyticsIcon className="h-5 w-5" />
                               </IconLink>
                             )}
-                            <IconLink href={watchHref} label="View on sloptube">
+                            <IconLink href={watchHref} label="View on PlayPulse">
                               <PlayIcon className="h-5 w-5" />
                             </IconLink>
                             <IconButton onClick={() => setConfirm([v.id])} label="Delete" disabled={busy}>

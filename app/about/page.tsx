@@ -3,8 +3,8 @@ import { ContactEmail, Owner, PublicPage, Section } from "@/components/launch/Pu
 import { siteConfig } from "@/site.config";
 
 export const metadata = {
-  title: "About | sloptube",
-  description: "What sloptube is, who runs this copy and how to get in touch.",
+  title: "About | PlayPulse",
+  description: "What PlayPulse is, who runs this copy and how to get in touch.",
   alternates: { canonical: "/about" },
 };
 
@@ -13,12 +13,12 @@ export default function AboutPage() {
   return (
     <PublicPage
       page="about"
-      title="About sloptube"
+      title="About PlayPulse"
       intro={<p>A video platform, built in the open one feature at a time.</p>}
     >
       <Section title="What this is">
         <p>
-          sloptube is a video site with the feel of 2019 and 2020: channels, uploads, a watch page, a home feed,
+          PlayPulse is a video site with the feel of 2019 and 2020: channels, uploads, a watch page, a home feed,
           subscriptions, search, likes, comments, Snips, a creator studio, analytics and moderation. Each feature was
           built in its own session and filmed, so the code and the docs are meant to be easy to follow.
         </p>
@@ -29,7 +29,7 @@ export default function AboutPage() {
       </Section>
       <Section title="Who runs this copy">
         <p>
-          This copy of sloptube is run by <Owner value={siteConfig.ownerName} />. They decide what is allowed here,
+          This copy of PlayPulse is run by <Owner value={siteConfig.ownerName} />. They decide what is allowed here,
           following the <Link href="/guidelines">Community Guidelines</Link> and the <Link href="/terms">Terms</Link>.
         </p>
       </Section>

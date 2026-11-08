@@ -36,12 +36,12 @@ function tags(meta) {
 
 test("watch page metadata for a sample video", () => {
   const t = tags(watchMetadata(sample, ORIGIN));
-  assert.equal(t.title, "Fluffy pancakes in ten minutes, no mixer needed | sloptube");
+  assert.equal(t.title, "Fluffy pancakes in ten minutes, no mixer needed | PlayPulse");
   assert.equal(t.description, "A made up video. Flour, milk, eggs and a hot pan. That's it.");
   assert.equal(t.canonical, `${ORIGIN}/watch?v=${sample.id}`);
   assert.equal(t["og:type"], "video.other");
   assert.equal(t["og:url"], t.canonical);
-  assert.equal(t["og:site_name"], "sloptube");
+  assert.equal(t["og:site_name"], "PlayPulse");
   assert.equal(t["og:image"], `${ORIGIN}/api/media/${sample.id}/thumb-1.webp`);
   assert.equal(t["og:image:width"], "1920");
   assert.equal(t["twitter:card"], "summary_large_image");
@@ -71,17 +71,17 @@ test("shorts and channels", () => {
   assert.equal(s.canonical, `${ORIGIN}/shorts/${sample.id}`);
   assert.equal(s["og:url"], s.canonical);
   assert.equal(s["og:image:height"], "1920");
-  assert.match(s.title, /\| sloptube Snips$/);
+  assert.match(s.title, /\| PlayPulse Snips$/);
 
   const channel = { handle: "samplekitchen", name: "Sample Kitchen", description: "", avatarUrl: "https://cdn.example.com/a.webp", bannerUrl: null, videoCount: 1, subscriberCount: 3 };
   const c = tags(channelMetadata(channel, ORIGIN));
-  assert.equal(c.title, "Sample Kitchen | sloptube");
-  assert.equal(c.description, "Sample Kitchen on sloptube. 1 video.");
+  assert.equal(c.title, "Sample Kitchen | PlayPulse");
+  assert.equal(c.description, "Sample Kitchen on PlayPulse. 1 video.");
   assert.equal(c.canonical, `${ORIGIN}/@samplekitchen`);
   assert.equal(c["og:type"], "profile");
   assert.equal(c["og:image"], channel.avatarUrl);
   assert.equal(c["twitter:card"], "summary");
-  assert.equal(tags(channelMetadata(channel, ORIGIN, "sloptube", "videos")).canonical, `${ORIGIN}/@samplekitchen/videos`);
+  assert.equal(tags(channelMetadata(channel, ORIGIN, "PlayPulse", "videos")).canonical, `${ORIGIN}/@samplekitchen/videos`);
 });
 
 test("JSON-LD VideoObject", () => {

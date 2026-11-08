@@ -1,11 +1,14 @@
-// What the player remembers in this browser: volume, the last quality picked
-// and where each video was left. Feature 9 moves the resume position to the
-// server. Every read and write is wrapped: storage can be off or full.
+// What the player remembers in this browser: volume, the last quality picked,
+// the captions settings and where each video was left. Feature 9 moves the
+// resume position to the server. Every read and write is wrapped: storage can
+// be off or full.
 
 const VOLUME_KEY = "sloptube.player.volume";
 const QUALITY_KEY = "sloptube.player.quality";
 const THEATER_KEY = "sloptube.player.theater";
 const RESUME_KEY = "sloptube.player.resume";
+const AUTOPLAY_KEY = "sloptube.player.autoplay";
+const CAPTIONS_KEY = "sloptube.player.captions";
 
 /** How many videos keep a resume position. The oldest is dropped first. */
 const RESUME_MAX = 50;
@@ -48,6 +51,24 @@ export function loadQuality(): string | null {
 
 export function saveQuality(label: string) {
   write(QUALITY_KEY, label);
+}
+
+/** Autoplay is on until someone switches it off, like YouTube. */
+export function loadAutoplay(): boolean {
+  return read(AUTOPLAY_KEY) !== "0";
+}
+
+export function saveAutoplay(on: boolean) {
+  write(AUTOPLAY_KEY, on ? null : "0");
+}
+
+/** The captions settings as saved text; lib/watch/captions.ts reads and writes it. */
+export function loadCaptions(): string | null {
+  return read(CAPTIONS_KEY);
+}
+
+export function saveCaptions(text: string) {
+  write(CAPTIONS_KEY, text);
 }
 
 export function loadTheater(): boolean {

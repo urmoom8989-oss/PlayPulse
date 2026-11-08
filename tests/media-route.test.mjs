@@ -4,8 +4,8 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { cleanMediaPath, playbackUrls, readPublicBase, serveMedia } from "../lib/watch/media.ts";
 import { resolveEntry, rewritePlaylist } from "../lib/watch/playlist.ts";
-import { createMediaStorage } from "../lib/watch/r2.ts";
-import { createR2Client } from "../lib/upload/r2.ts";
+import { createMediaStorage } from "../lib/watch/s3.ts";
+import { createS3Client } from "../lib/upload/s3.ts";
 
 const PUBLIC = "aaaaaaaa-0000-4000-8000-000000000001";
 const UNLISTED = "aaaaaaaa-0000-4000-8000-000000000002";
@@ -49,7 +49,13 @@ function setup({ owner = false, db = true, flag = true, storage = true } = {}) {
     [PRIVATE]: { visibility: "private", status: "ready" },
     [PROCESSING]: { visibility: "public", status: "processing" },
   };
-  const client = createR2Client({ accountId: "example", accessKeyId: "test-key-id", secretAccessKey: "test-secret" });
+  const client = createS3Client({
+    endpoint: "https://s3.example.test",
+    region: "auto",
+    accessKeyId: "test-key-id",
+    secretAccessKey: "test-secret",
+    forcePathStyle: false,
+  });
   const calls = [];
   client.send = async (command) => {
     const name = command.constructor.name;
@@ -67,8 +73,7 @@ function setup({ owner = false, db = true, flag = true, storage = true } = {}) {
             const r = rows[id];
             if (!r) return null;
             if (r.visibility === "private" && !owner) return null;
-            const playable = r.status === "ready" || owner;
-            return { status: r.status, is_owner: owner, hls_key: playable ? `hls/${id}/master.m3u8` : null };
+            return { status: r.status, is_owner: owner, hls_key: r.status === "ready" ? `hls/${id}/master.m3u8` : null };
           },
         }
       : null,
@@ -110,13 +115,13 @@ test("media: the rendition playlist points init and segments back at the route",
   assert.match(r.body, /#EXT-X-ENDLIST/);
 });
 
-test("media: segments redirect to a presigned R2 link for 10 minutes", async () => {
+test("media: segments redirect to a presigned storage link for 10 minutes", async () => {
   const { ctx, calls } = setup();
   const r = await serveMedia(UNLISTED, ["720p", "seg_00001.m4s"], ctx);
   assert.equal(r.status, 302);
   const url = new URL(r.headers.location);
-  assert.equal(url.host, "example.r2.cloudflarestorage.com");
-  assert.equal(url.pathname, `/videos-test/hls/${UNLISTED}/720p/seg_00001.m4s`);
+  assert.equal(url.host, "videos-test.s3.example.test");
+  assert.equal(url.pathname, `/hls/${UNLISTED}/720p/seg_00001.m4s`);
   assert.equal(url.searchParams.get("X-Amz-Expires"), "600");
   assert.ok(url.searchParams.get("X-Amz-Signature"));
   assert.equal(r.headers["cache-control"], "private, max-age=300");
@@ -140,15 +145,25 @@ test("media: not ready is a 404 for others; missing videos and files are 404", a
   assert.deepEqual([gone.status, body(gone)], [404, { error: "not_found" }]);
 });
 
+test("media: an owner can load a custom thumbnail before processing finishes", async () => {
+  const name = "custom-abcdefgh1234.png";
+  assert.equal((await serveMedia(PROCESSING, [name], setup().ctx)).status, 404);
+  const r = await serveMedia(PROCESSING, [name], setup({ owner: true }).ctx);
+  assert.equal(r.status, 302);
+  assert.equal(new URL(r.headers.location).pathname, `/hls/${PROCESSING}/${name}`);
+  assert.equal(r.headers["cache-control"], "private, no-store");
+});
+
 test("media: the sprite vtt is proxied as text, images redirect", async () => {
   const vtt = await serveMedia(PUBLIC, ["sprite.vtt"], setup().ctx);
   assert.equal(vtt.status, 200);
   assert.equal(vtt.headers["content-type"], "text/vtt; charset=utf-8");
   assert.equal((await serveMedia(PUBLIC, ["sprite.webp"], setup().ctx)).status, 302);
   assert.equal((await serveMedia(PUBLIC, ["thumb-1.webp"], setup().ctx)).status, 302);
+  assert.equal((await serveMedia(PUBLIC, ["custom-abcdefgh1234.png"], setup().ctx)).status, 302);
 });
 
-test("media: without R2 settings the route says so", async () => {
+test("media: without storage settings the route says so", async () => {
   const r = await serveMedia(PUBLIC, ["master.m3u8"], setup({ storage: false }).ctx);
   assert.deepEqual([r.status, body(r)], [503, { error: "media_not_configured" }]);
 });
@@ -189,6 +204,7 @@ test("playlist rewriting: relative entries resolve like a browser, the rest stay
 test("paths the route serves", () => {
   assert.deepEqual(cleanMediaPath(["720p", "seg_00001.m4s"]), { path: "720p/seg_00001.m4s", ext: "m4s" });
   assert.deepEqual(cleanMediaPath(["master.m3u8"]), { path: "master.m3u8", ext: "m3u8" });
+  assert.deepEqual(cleanMediaPath(["custom-abcdefgh1234.png"]), { path: "custom-abcdefgh1234.png", ext: "png" });
   assert.equal(cleanMediaPath(["source.mp4.exe"]), null);
   assert.equal(cleanMediaPath(["a..b.m4s"]), null);
 });

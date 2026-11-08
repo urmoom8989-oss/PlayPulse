@@ -3,16 +3,16 @@ import { getCurrentUser } from "@/lib/auth";
 import { flagOn } from "@/lib/flags";
 import { createClient } from "@/lib/supabase/server";
 import { createUploadDb } from "./db";
-import { readR2Config } from "./env";
+import { readStorageConfig } from "./env";
 import type { HandlerResult, UploadContext } from "./handlers";
-import { createR2Client, createR2Storage } from "./r2";
+import { createS3Client, createS3Storage } from "./s3";
 
-/** The real R2 storage, Supabase and session for the upload routes. */
+/** The real object storage, Supabase and session for the upload routes. */
 export async function uploadContext(): Promise<UploadContext> {
-  const r2 = readR2Config();
+  const storage = readStorageConfig();
   const supabase = await createClient();
   return {
-    storage: r2 ? createR2Storage(createR2Client(r2), r2.bucket) : null,
+    storage: storage ? createS3Storage(createS3Client(storage), storage.bucket) : null,
     db: supabase ? createUploadDb(supabase) : null,
     userId: async () => (await getCurrentUser())?.id ?? null,
     flagOn: (userId) => flagOn("upload", userId),

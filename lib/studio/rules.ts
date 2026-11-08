@@ -108,6 +108,7 @@ const MESSAGES: Record<string, string> = {
   rate_limited: "That's a lot of changes at once. Wait a minute and try again.",
   bad_action: "That action isn't available.",
   bad_visibility: "Pick public, unlisted or private.",
+  publish_required: "Use the Publish button to make this video public.",
   too_many: `Pick up to ${BULK_MAX} videos at once.`,
   in_trash: "Restore the video from the trash first.",
   title_invalid: "Add a title of up to 100 characters.",
@@ -150,6 +151,9 @@ export function studioStatus(code: string): number {
       return 403;
     case "not_found":
       return 404;
+    case "publish_required":
+    case "in_trash":
+      return 409;
     case "rate_limited":
       return 429;
     case "storage_not_configured":

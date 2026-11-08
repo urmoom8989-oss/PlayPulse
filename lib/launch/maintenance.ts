@@ -27,7 +27,7 @@ function escapeHtml(s: string): string {
 }
 
 /** The whole page: the logo, one line, one grey line, the 2019 look in light or dark like the rest of the site. */
-export function maintenanceHtml(siteName = "sloptube"): string {
+export function maintenanceHtml(siteName = "PlayPulse"): string {
   const name = escapeHtml(siteName);
   return `<!doctype html>
 <html lang="en">
@@ -38,8 +38,8 @@ export function maintenanceHtml(siteName = "sloptube"): string {
 <title>Back soon | ${name}</title>
 <script>try{if(localStorage.getItem("sloptube-theme")==="dark")document.documentElement.className="dark"}catch(e){}</script>
 <style>
-:root{--page:#f9f9f9;--text:#030303;--text-2:#606060;--word:#15803d;--card:#ffffff;--line:#e5e5e5}
-.dark{--word:#4ade80;--page:#181818;--text:#ffffff;--text-2:#aaaaaa;--card:#202020;--line:#383838}
+:root{--page:#f9f9f9;--text:#030303;--text-2:#606060;--word:#0f766e;--card:#ffffff;--line:#e5e5e5}
+.dark{--word:#5eead4;--page:#181818;--text:#ffffff;--text-2:#aaaaaa;--card:#202020;--line:#383838}
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;background:var(--page);color:var(--text);font-family:Roboto,Arial,sans-serif}
 main{min-height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center}
@@ -52,7 +52,7 @@ p{margin:8px 0 0;font-size:14px;line-height:20px;color:var(--text-2)}
 </head>
 <body>
 <main data-error-state="maintenance">
-<div class="logo" aria-label="${name}"><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M12 2a8.5 8.5 0 0 1 4.8 15.5V20a1.2 1.2 0 0 1-2.4 0v-1.6a8.5 8.5 0 0 1-4.6.3v1.7a1.6 1.6 0 0 1-3.2 0v-2.9A8.5 8.5 0 0 1 12 2z" fill="#16a34a"/><path d="M6.9 10.6c1.3-1.8 2.5-1.8 3.8 0s2.5 1.8 3.8 0 2.5-1.8 3.8 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg><span>${name}</span></div>
+<div class="logo" aria-label="${name}"><svg viewBox="0 0 24 24" width="28" height="28" aria-hidden="true"><path d="M12 2a8.5 8.5 0 0 1 4.8 15.5V20a1.2 1.2 0 0 1-2.4 0v-1.6a8.5 8.5 0 0 1-4.6.3v1.7a1.6 1.6 0 0 1-3.2 0v-2.9A8.5 8.5 0 0 1 12 2z" fill="#0f766e"/><path d="M6.9 10.6c1.3-1.8 2.5-1.8 3.8 0s2.5 1.8 3.8 0 2.5-1.8 3.8 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg><span>${name}</span></div>
 <div class="card">
 <h1>We're doing some maintenance.</h1>
 <p>${name} will be back in a few minutes. Thanks for your patience.</p>

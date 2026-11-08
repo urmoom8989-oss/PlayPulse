@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { SubscriptionsSkeleton, SubscriptionsView } from "@/components/subscriptions/SubscriptionsView";
 
-export const metadata = { title: "Subscriptions | sloptube" };
+export const metadata = { title: "Subscriptions | PlayPulse" };
 
 export default function SubscriptionsFeed() {
   return (

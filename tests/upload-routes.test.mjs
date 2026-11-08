@@ -2,16 +2,30 @@
 // mocked and an in-memory database. Presigning is real (it needs no network).
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { abortUpload, completeUpload, signUpload } from "../lib/upload/handlers.ts";
-import { createR2Client, createR2Storage } from "../lib/upload/r2.ts";
+import {
+  abortUpload,
+  completeUpload,
+  finishUploadThumbnail,
+  publishUpload,
+  signUpload,
+  signUploadThumbnail,
+} from "../lib/upload/handlers.ts";
+import { createS3Client, createS3Storage } from "../lib/upload/s3.ts";
 import { PART_SIZE, sourceKey } from "../lib/upload/rules.ts";
+import { thumbnailKey } from "../lib/studio/rules.ts";
 
 const OWNER = "11111111-2222-3333-4444-555555555555";
 const OTHER = "99999999-8888-7777-6666-555555555555";
 const MB = 1024 * 1024;
 
 function setup({ userId = OWNER, flag = true, storage = true, db = true, headSize } = {}) {
-  const client = createR2Client({ accountId: "example", accessKeyId: "test-key-id", secretAccessKey: "test-secret" });
+  const client = createS3Client({
+    endpoint: "https://s3.example.test",
+    region: "auto",
+    accessKeyId: "test-key-id",
+    secretAccessKey: "test-secret",
+    forcePathStyle: false,
+  });
   const calls = [];
   const objects = new Map();
   client.send = async (command) => {
@@ -26,7 +40,15 @@ function setup({ userId = OWNER, flag = true, storage = true, db = true, headSiz
     if (name === "AbortMultipartUploadCommand") return {};
     if (name === "HeadObjectCommand") {
       if (!objects.has(input.Key)) throw Object.assign(new Error("NotFound"), { name: "NotFound", $metadata: { httpStatusCode: 404 } });
-      return { ContentLength: objects.get(input.Key) };
+      const object = objects.get(input.Key);
+      return {
+        ContentLength: typeof object === "number" ? object : object.bytes,
+        ContentType: typeof object === "number" ? "video/mp4" : object.type,
+      };
+    }
+    if (name === "DeleteObjectCommand") {
+      objects.delete(input.Key);
+      return {};
     }
     throw new Error("unexpected " + name);
   };
@@ -35,7 +57,7 @@ function setup({ userId = OWNER, flag = true, storage = true, db = true, headSiz
   let n = 0;
   const fakeDb = {
     async createUpload(title, bytes, mime) {
-      if (bytes > 2 * 1024 * MB) return { error: "file_too_big" };
+      if (bytes > 5 * 1024 * MB) return { error: "file_too_big" };
       const id = `aaaaaaaa-bbbb-cccc-dddd-${String(++n).padStart(12, "0")}`;
       const key = sourceKey(userId, id, mime);
       videos.set(id, { id, ownerId: userId, status: "uploading", sourceKey: key, sourceBytes: bytes, sourceMime: mime, title });
@@ -49,8 +71,16 @@ function setup({ userId = OWNER, flag = true, storage = true, db = true, headSiz
       Object.assign(videos.get(id), d);
       return null;
     },
+    async saveThumbnail(id, name, url) {
+      Object.assign(videos.get(id), { thumbnailName: name, thumbnailUrl: url });
+      return null;
+    },
     async finishUpload(id) {
       videos.get(id).status = "uploaded";
+      return null;
+    },
+    async publishVideo(id) {
+      videos.get(id).visibility = "public";
       return null;
     },
     async abandonUpload(id, reason) {
@@ -60,15 +90,15 @@ function setup({ userId = OWNER, flag = true, storage = true, db = true, headSiz
   };
 
   const ctx = {
-    storage: storage ? createR2Storage(client, "sloptube-test") : null,
+    storage: storage ? createS3Storage(client, "sloptube-test") : null,
     db: db ? fakeDb : null,
     userId: async () => userId,
     flagOn: async () => flag,
   };
-  return { ctx, calls, videos };
+  return { ctx, calls, videos, objects };
 }
 
-test("sign: 501 when R2 is not configured", async () => {
+test("sign: 501 when object storage is not configured", async () => {
   const { ctx } = setup({ storage: false });
   const res = await signUpload({ title: "a", bytes: 10, mime: "video/mp4" }, ctx);
   assert.equal(res.status, 501);
@@ -85,7 +115,7 @@ test("sign: signed out, flag off and no database are refused", async () => {
 test("sign: bad files are refused before anything is created", async () => {
   const { ctx, calls, videos } = setup();
   assert.equal((await signUpload({ title: "a", bytes: 10, mime: "image/gif" }, ctx)).status, 415);
-  assert.equal((await signUpload({ title: "a", bytes: 3 * 1024 * MB, mime: "video/mp4" }, ctx)).status, 413);
+  assert.equal((await signUpload({ title: "a", bytes: 6 * 1024 * MB, mime: "video/mp4" }, ctx)).status, 413);
   assert.equal((await signUpload({ title: "a", bytes: 0, mime: "video/mp4" }, ctx)).status, 400);
   assert.equal((await signUpload({ title: " ", bytes: 10, mime: "video/mp4" }, ctx)).status, 400);
   assert.equal(calls.length, 0);
@@ -105,8 +135,8 @@ test("sign: starts a multipart upload and presigns one URL per 16 MB part", asyn
   assert.equal(calls[0].input.ContentType, "video/webm");
 
   const url = new URL(res.body.parts[2].url);
-  assert.equal(url.hostname, "example.r2.cloudflarestorage.com");
-  assert.equal(url.pathname, "/sloptube-test/" + res.body.key);
+  assert.equal(url.hostname, "sloptube-test.s3.example.test");
+  assert.equal(url.pathname, "/" + res.body.key);
   assert.equal(url.searchParams.get("partNumber"), "3");
   assert.equal(url.searchParams.get("uploadId"), "upload-1");
   assert.equal(url.searchParams.get("X-Amz-Expires"), "21600");
@@ -127,6 +157,7 @@ test("complete: joins the parts, checks the size, saves the form", async () => {
       title: "Lisbon trip",
       description: "Day one",
       visibility: "unlisted",
+      category: "Music",
     },
     ctx,
   );
@@ -139,10 +170,38 @@ test("complete: joins the parts, checks the size, saves the form", async () => {
   const v = videos.get(videoId);
   assert.equal(v.status, "uploaded");
   assert.equal(v.title, "Lisbon trip");
-  assert.equal(v.visibility, "unlisted");
+  assert.equal(v.visibility, "private");
+  assert.equal(v.category, "Music");
 
   // Completing twice is harmless.
   assert.equal((await completeUpload({ videoId, uploadId, parts: [] }, ctx)).status, 200);
+});
+
+test("publish: makes a completed private upload public only after the explicit action", async () => {
+  const { ctx, videos } = setup();
+  const { videoId, uploadId } = (await signUpload({ title: "Trip", bytes: 20, mime: "video/mp4" }, ctx)).body;
+  await completeUpload({ videoId, uploadId, parts: [{ partNumber: 1, etag: "e" }], title: "Trip" }, ctx);
+  assert.equal(videos.get(videoId).visibility, "private");
+  assert.equal((await publishUpload({ videoId }, ctx)).status, 200);
+  assert.equal(videos.get(videoId).visibility, "public");
+});
+
+test("thumbnail: validates, presigns, verifies the object and saves the owner's custom image", async () => {
+  const { ctx, objects, videos } = setup();
+  const { videoId, uploadId } = (await signUpload({ title: "Trip", bytes: 20, mime: "video/mp4" }, ctx)).body;
+  await completeUpload({ videoId, uploadId, parts: [{ partNumber: 1, etag: "e" }], title: "Trip" }, ctx);
+  const signed = await signUploadThumbnail({ videoId, mime: "image/jpeg", bytes: 123 }, ctx);
+  assert.equal(signed.status, 200);
+  assert.ok(signed.body.url);
+  objects.set(thumbnailKey(videoId, signed.body.name), { bytes: 123, type: "image/jpeg" });
+  const result = await finishUploadThumbnail(
+    { videoId, name: signed.body.name },
+    ctx,
+    "https://playpulse.example",
+  );
+  assert.equal(result.status, 200);
+  assert.equal(videos.get(videoId).thumbnailName, signed.body.name);
+  assert.equal(videos.get(videoId).thumbnailUrl, `https://playpulse.example/api/media/${videoId}/${signed.body.name}`);
 });
 
 test("complete: a size mismatch marks the video failed", async () => {

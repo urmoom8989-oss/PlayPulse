@@ -6,7 +6,7 @@ import { VideoTable, VideoTableSkeleton } from "@/components/upload/VideoTable";
 import { studioOn } from "@/lib/studio/server";
 import { myVideos } from "@/lib/upload/server";
 
-export const metadata = { title: "Channel videos | sloptube" };
+export const metadata = { title: "Channel videos | PlayPulse" };
 
 async function VideosGate() {
   // With the creator studio on, Content (feature 12) takes over this list.
@@ -20,8 +20,8 @@ async function VideosGate() {
     case "not-set-up":
       return (
         <UploadMessage state="not-set-up" title="Videos aren't set up yet">
-          The videos table could not be read. Run <code>supabase/migrations/005_videos.sql</code> in the Supabase SQL
-          editor, then reload.
+          The videos table could not be read. Run the migrations in order through
+          <code> supabase/migrations/022_upload_categories_publish.sql</code> in the Supabase SQL editor, then reload.
         </UploadMessage>
       );
     case "no-db":

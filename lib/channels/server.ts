@@ -16,6 +16,13 @@ export type ChannelState =
   | { kind: "not-set-up" }
   | { kind: "ready"; channel: Channel; isOwner: boolean; user: CurrentUser | null };
 
+export type BrowseChannelsState =
+  | { kind: "no-db" }
+  | { kind: "off" }
+  | { kind: "not-set-up" }
+  | { kind: "failed" }
+  | { kind: "ready"; channels: Channel[]; page: number; pages: number };
+
 async function channelsGate(): Promise<"no-db" | "off" | { user: CurrentUser | null }> {
   await connection();
   if (!readSupabaseConfig()) return "no-db";
@@ -71,6 +78,42 @@ export async function handleForChannelId(id: string): Promise<ChannelState | { k
   if (error) return { kind: "not-set-up" };
   if (!data) return { kind: "missing" };
   return { kind: "handle", handle: data.handle };
+}
+
+const BROWSE_PAGE_SIZE = 24;
+
+/** The most-followed public channels for the /channels directory. */
+export async function browseChannels(requestedPage = 1): Promise<BrowseChannelsState> {
+  const gate = await channelsGate();
+  if (gate === "no-db" || gate === "off") return { kind: gate };
+  const supabase = await createClient();
+  if (!supabase) return { kind: "no-db" };
+  const { data, error, count } = await supabase
+    .from("channels")
+    .select(CHANNEL_COLUMNS, { count: "exact" })
+    .is("suspended_at", null)
+    .order("subscriber_count", { ascending: false })
+    .order("video_count", { ascending: false })
+    .range((requestedPage - 1) * BROWSE_PAGE_SIZE, requestedPage * BROWSE_PAGE_SIZE - 1);
+  if (error) {
+    return { kind: error.code === "42P01" || error.code === "PGRST205" ? "not-set-up" : "failed" };
+  }
+  const pages = Math.max(1, Math.ceil((count ?? 0) / BROWSE_PAGE_SIZE));
+  const page = Math.min(requestedPage, pages);
+  if (page !== requestedPage) {
+    const lastPage = await supabase
+      .from("channels")
+      .select(CHANNEL_COLUMNS)
+      .is("suspended_at", null)
+      .order("subscriber_count", { ascending: false })
+      .order("video_count", { ascending: false })
+      .range((page - 1) * BROWSE_PAGE_SIZE, page * BROWSE_PAGE_SIZE - 1);
+    if (lastPage.error) {
+      return { kind: lastPage.error.code === "42P01" || lastPage.error.code === "PGRST205" ? "not-set-up" : "failed" };
+    }
+    return { kind: "ready", channels: (lastPage.data ?? []).map(rowToChannel), page, pages };
+  }
+  return { kind: "ready", channels: (data ?? []).map(rowToChannel), page, pages };
 }
 
 export type StudioState =

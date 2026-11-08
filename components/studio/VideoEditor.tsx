@@ -7,6 +7,7 @@ import { DESCRIPTION_MAX, TITLE_MAX } from "@/lib/upload/rules";
 import { parseTags, studioErrorMessage, TAGS_MAX, tagsProblem, thumbnailFileProblem } from "@/lib/studio/rules";
 import type { CommentsMode, StudioRow, Visibility } from "@/lib/studio/types";
 import { formatTime } from "@/lib/watch/format";
+import { PublishButton } from "@/components/upload/PublishButton";
 import { ArrowBackIcon, CheckIcon, CloseIcon, EyeIcon, ImageIcon, LinkIcon, LockIcon } from "../icons";
 
 export type Still = { name: string; url: string };
@@ -230,6 +231,9 @@ export function VideoEditor({
               Analytics
             </Link>
           )}
+          {video.visibility !== "public" && video.status !== "failed" && video.status !== "uploading" && !preview && (
+            <PublishButton videoId={video.id} successText="Published" />
+          )}
           <button type="button" className="btn-text" disabled={!dirty || busy} onClick={undo} data-undo>
             Undo changes
           </button>
@@ -410,7 +414,7 @@ export function VideoEditor({
                 </div>
               )}
               {video.durationS ? (
-                <span className="absolute bottom-2 right-2 rounded-[2px] bg-black/80 px-1 text-[12px] font-medium text-white">
+                <span className="absolute bottom-2 right-2 bg-black/80 px-1 text-[12px] font-medium text-white">
                   {formatTime(video.durationS)}
                 </span>
               ) : null}
@@ -428,7 +432,7 @@ export function VideoEditor({
           <div className="mt-6">
             <h2 className="mb-2 text-[15px] font-medium text-text">Visibility</h2>
             <div className="rounded-[2px] border border-divider bg-surface" role="radiogroup" aria-label="Visibility" data-visibility-choice>
-              {VIS.map((v) => (
+              {VIS.filter((v) => v.value !== "public" || video.visibility === "public").map((v) => (
                 <label key={v.value} className="flex cursor-pointer items-start gap-3 border-b border-divider px-4 py-3 last:border-0">
                   <input
                     type="radio"

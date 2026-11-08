@@ -91,7 +91,7 @@ export function ReportDialog({ kind, targetId, onClose }: { kind: TargetKind; ta
           </p>
         )}
         <p className="mt-3 px-6 text-[12px] leading-4 text-text-2">
-          Reports are reviewed by the sloptube team. Misusing reports can get your account limited.
+          Reports are reviewed by the PlayPulse team. Misusing reports can get your account limited.
         </p>
         <div className="mt-4 flex justify-end gap-2 px-4">
           <button type="button" className="btn-text" onClick={onClose}>

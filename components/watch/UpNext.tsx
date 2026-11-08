@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Thumb } from "@/components/Thumb";
 import { ThumbProgress } from "@/components/ThumbProgress";
 import { formatTime, shortCount, timeAgo } from "@/lib/watch/format";
+import { AutoplaySwitch } from "./AutoplaySwitch";
 import type { UpNextVideo, WatchChannel } from "@/lib/watch/types";
 
 /** Up next shows this many cards, padded with placeholders when there are fewer videos. */
@@ -14,7 +15,7 @@ function Card({ video, channel }: { video: UpNextVideo; channel: WatchChannel })
       <Link href={href} className="relative block aspect-video w-[168px] shrink-0 overflow-hidden bg-skeleton" tabIndex={-1} aria-hidden>
         {video.thumbnail && <Thumb src={video.thumbnail} alt={video.title} sizes="168px" />}
         {video.durationS !== null && (
-          <span className="absolute bottom-1 right-1 rounded-sm bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 text-white">
+          <span className="absolute bottom-1 right-1 bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 text-white">
             {formatTime(video.durationS)}
           </span>
         )}
@@ -56,15 +57,7 @@ export function UpNext({ videos, channel }: { videos: UpNextVideo[]; channel: Wa
     <div className="px-3 pb-6 pt-4 tab:px-0 tab:pt-0">
       <div className="mb-3 flex items-center justify-between">
         <h2 className="text-[16px] font-normal text-text">Up next</h2>
-        <span
-          title="Autoplay arrives in a later feature."
-          className="flex cursor-not-allowed items-center gap-2 text-[13px] font-medium uppercase text-text-2"
-        >
-          Autoplay
-          <span aria-hidden className="relative h-[14px] w-9 rounded-full bg-[var(--progress-track)]">
-            <span className="absolute -top-[3px] left-0 h-5 w-5 rounded-full bg-[#bdbdbd] shadow" />
-          </span>
-        </span>
+        <AutoplaySwitch />
       </div>
       <div className="flex flex-col gap-2">
         {shown.map((v) => (

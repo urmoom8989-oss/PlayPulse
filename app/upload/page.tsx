@@ -4,7 +4,7 @@ import { Uploader } from "@/components/upload/Uploader";
 import { UploadSkeleton, UploadsOff } from "@/components/upload/UploadNotices";
 import { uploadPageState } from "@/lib/upload/server";
 
-export const metadata = { title: "Upload videos | sloptube" };
+export const metadata = { title: "Upload videos | PlayPulse" };
 
 async function UploadGate() {
   const state = await uploadPageState();

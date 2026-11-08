@@ -4,11 +4,13 @@
 // Polls claim_encode_job every 5 seconds with the Supabase service role key,
 // downloads the source from R2, encodes it to HLS (360p, 720p, 1080p as the
 // source allows), makes thumbnails and the hover preview sprite, uploads it
-// all to R2 under hls/<video>/ and calls encode_done. One job at a time.
+// all to R2 under hls/<video>/ and calls encode_done. Then it writes the
+// video's auto-generated captions with whisper.cpp. One job at a time.
 // Between jobs it empties the R2 folders of videos the studio trash purged.
 //
 // Settings come from the environment, see lib/env.mjs and ops/encoder/README.md.
 //   node index.mjs
+import { checkCaptions } from "./lib/captions.mjs";
 import { createDb, createSupabase } from "./lib/db.mjs";
 import { readConfig } from "./lib/env.mjs";
 import { createLogger } from "./lib/log.mjs";
@@ -33,6 +35,9 @@ try {
   log("ffmpeg", {}, `ffmpeg is not installed or does not run: ${err.message}`);
   process.exit(1);
 }
+
+// Auto-generated captions only when whisper.cpp and its model are there.
+config.captions = await checkCaptions(config.captions, { log, run, workDir: config.workDir });
 
 const stop = new AbortController();
 for (const sig of ["SIGTERM", "SIGINT"]) {

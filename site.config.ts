@@ -1,7 +1,7 @@
 // The owner's details for the public pages (/about, /terms, /privacy,
 // /guidelines, /press, /contact), the footer and the share cards.
 //
-// Fill these in before you open your sloptube to the public. Nothing here is
+// Fill these in before you open your PlayPulse site to the public. Nothing here is
 // secret: it all shows on the site. Until a value is changed, the pages show
 // the placeholder in capitals so a missing detail is easy to spot.
 //
@@ -9,8 +9,8 @@
 
 export const siteConfig = {
   /** The site's name in titles, share cards and the footer. */
-  siteName: "sloptube",
-  /** The person or organization that runs this copy of sloptube, as it should appear in the terms. */
+  siteName: "PlayPulse",
+  /** The person or organization that runs this PlayPulse site, as it should appear in the terms. */
   ownerName: "OWNER_NAME",
   /** Where people (and the press) can write. Also shown on /contact next to the form. */
   contactEmail: "CONTACT_EMAIL",

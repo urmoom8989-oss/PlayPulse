@@ -9,10 +9,11 @@
 import { execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { PRESS_SHOTS } from "../lib/launch/press.ts";
 import { logoSvg, markSvg } from "../lib/brand.ts";
 
-const root = resolve(new URL("..", import.meta.url).pathname);
+const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const out = join(root, "public/press");
 mkdirSync(out, { recursive: true });
 
@@ -26,6 +27,6 @@ for (const shot of logoOnly ? [] : PRESS_SHOTS) {
 }
 
 // The logo and the mark, drawn from lib/brand.ts like LogoMark in components/icons.tsx.
-writeFileSync(join(out, "sloptube-logo.svg"), logoSvg() + "\n");
-writeFileSync(join(out, "sloptube-mark.svg"), markSvg(240) + "\n");
-console.log("public/press/sloptube-logo.svg, public/press/sloptube-mark.svg");
+writeFileSync(join(out, "playpulse-logo.svg"), logoSvg() + "\n");
+writeFileSync(join(out, "playpulse-mark.svg"), markSvg(240) + "\n");
+console.log("public/press/playpulse-logo.svg, public/press/playpulse-mark.svg");

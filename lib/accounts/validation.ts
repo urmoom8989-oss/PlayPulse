@@ -1,10 +1,46 @@
 // Account rules shared by the forms and the tests (`node --test tests/`).
-// Keep in step with public.username_is_valid() in supabase/migrations/002_profiles.sql.
+// Keep in step with public.username_is_valid() in
+// supabase/migrations/023_open_uploads_usernames.sql.
 // No imports on purpose, so Node can load this file directly.
 
+/** Usernames are 3 to 24 characters, counted as Unicode characters (not UTF-16 units). */
 export const USERNAME_MIN = 3;
 export const USERNAME_MAX = 24;
-export const USERNAME_PATTERN = /^[a-z0-9_]{3,24}$/;
+/**
+ * Emoji, as code point ranges: everything Unicode shows as an emoji by default
+ * (Emoji_Presentation), the pictograph blocks from U+1F000 up (which also
+ * covers emoji added later), and the pieces emoji are built from (the zero
+ * width joiner, the emoji style selector, the keycap mark and tag characters).
+ * Text symbols like ★ ♥ © ™ stay allowed unless they are turned into emoji.
+ * The database has the same list in username_is_valid(); a test keeps them equal.
+ */
+export const EMOJI_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0x200d, 0x200d], [0x20e3, 0x20e3], [0x231a, 0x231b], [0x23e9, 0x23ec], [0x23f0, 0x23f0],
+  [0x23f3, 0x23f3], [0x25fd, 0x25fe], [0x2614, 0x2615], [0x2648, 0x2653], [0x267f, 0x267f],
+  [0x2693, 0x2693], [0x26a1, 0x26a1], [0x26aa, 0x26ab], [0x26bd, 0x26be], [0x26c4, 0x26c5],
+  [0x26ce, 0x26ce], [0x26d4, 0x26d4], [0x26ea, 0x26ea], [0x26f2, 0x26f3], [0x26f5, 0x26f5],
+  [0x26fa, 0x26fa], [0x26fd, 0x26fd], [0x2705, 0x2705], [0x270a, 0x270b], [0x2728, 0x2728],
+  [0x274c, 0x274c], [0x274e, 0x274e], [0x2753, 0x2755], [0x2757, 0x2757], [0x2795, 0x2797],
+  [0x27b0, 0x27b0], [0x27bf, 0x27bf], [0x2b1b, 0x2b1c], [0x2b50, 0x2b50], [0x2b55, 0x2b55],
+  [0xfe0f, 0xfe0f], [0x1f000, 0x1faff], [0x1fc00, 0x1fffd], [0xe0020, 0xe007f],
+];
+/**
+ * Characters nobody can see, which would let two usernames look the same:
+ * control characters, zero width spaces and marks, and text direction overrides.
+ * Kept in step with the database like EMOJI_RANGES.
+ */
+export const INVISIBLE_RANGES: ReadonlyArray<readonly [number, number]> = [
+  [0x1, 0x1f], [0x7f, 0x9f], [0x200b, 0x200f], [0x202a, 0x202e], [0x2060, 0x2064],
+  [0x2066, 0x2069], [0xfeff, 0xfeff],
+];
+
+function rangeClass(ranges: ReadonlyArray<readonly [number, number]>): RegExp {
+  const hex = (n: number) => `\\u{${n.toString(16)}}`;
+  return new RegExp(`[${ranges.map(([a, b]) => (a === b ? hex(a) : `${hex(a)}-${hex(b)}`)).join("")}]`, "u");
+}
+const EMOJI = rangeClass(EMOJI_RANGES);
+const INVISIBLE = rangeClass(INVISIBLE_RANGES);
+
 export const MIN_AGE = 13;
 export const DISPLAY_NAME_MAX = 50;
 export const BIO_MAX = 1000;
@@ -17,17 +53,23 @@ export const RESERVED_USERNAMES = new Set([
   "undefined", "upload", "watch", "welcome",
 ]);
 
-/** Usernames are stored lower case. Trims spaces and a leading "@". */
+/**
+ * Usernames keep the case and characters people type. Trims spaces around the
+ * name and a leading "@". Two names that differ only in case are the same
+ * name for "is it taken" (the database compares them lower case).
+ */
 export function normalizeUsername(input: string): string {
-  return input.trim().replace(/^@/, "").toLowerCase();
+  return input.trim().replace(/^@/, "").trim();
 }
 
 /** Returns a short reason, or null when the username is fine. Expects a normalized name. */
 export function usernameProblem(name: string): string | null {
-  if (name.length < USERNAME_MIN) return `Use at least ${USERNAME_MIN} characters.`;
-  if (name.length > USERNAME_MAX) return `Use at most ${USERNAME_MAX} characters.`;
-  if (!USERNAME_PATTERN.test(name)) return "Use only letters, numbers and underscores.";
-  if (RESERVED_USERNAMES.has(name)) return "That username is reserved.";
+  const length = [...name].length;
+  if (length < USERNAME_MIN) return `Use at least ${USERNAME_MIN} characters.`;
+  if (length > USERNAME_MAX) return `Use at most ${USERNAME_MAX} characters.`;
+  if (EMOJI.test(name)) return "Usernames can't have emoji.";
+  if (INVISIBLE.test(name)) return "Usernames can't have invisible characters.";
+  if (RESERVED_USERNAMES.has(name.toLowerCase())) return "That username is reserved.";
   return null;
 }
 
@@ -90,11 +132,11 @@ export function avatarFileProblem(file: { type: string; size: number }): string 
 export function accountErrorText(code: string): string {
   const known: Record<string, string> = {
     not_signed_in: "Your session ended. Sign in again.",
-    invalid_username: "That username cannot be used. Use 3 to 24 letters, numbers or underscores.",
+    invalid_username: "That username cannot be used. Use 3 to 24 characters, without emoji.",
     username_taken: "That username is taken. Try another.",
     birthdate_required: "Enter your birthday.",
     invalid_birthdate: "Enter a real birthday.",
-    too_young: `You must be ${MIN_AGE} or older to use sloptube.`,
+    too_young: `You must be ${MIN_AGE} or older to use PlayPulse.`,
     already_complete: "Your account is already set up.",
   };
   for (const key of Object.keys(known)) {

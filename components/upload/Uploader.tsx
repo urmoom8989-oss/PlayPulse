@@ -4,15 +4,16 @@ import Link from "next/link";
 import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { useFlag } from "@/lib/store/session";
 import { useUpload } from "@/lib/store/upload";
+import { PublishButton } from "./PublishButton";
 import {
   ACCEPT,
   DESCRIPTION_MAX,
   TITLE_MAX,
-  UPLOADS_PER_DAY,
+  VIDEO_CATEGORIES,
+  detailsProblem,
   formatBytes,
   formatSpeed,
   percentDone,
-  type Visibility,
 } from "@/lib/upload/rules";
 
 function UploadArrow({ className }: { className?: string }) {
@@ -44,6 +45,53 @@ function Card({ title, children, footer }: { title: string; children: ReactNode;
   );
 }
 
+const UPLOAD_STEPS = ["Details", "Video elements", "Visibility"] as const;
+
+function UploadSteps() {
+  const step = useUpload((s) => s.step);
+  const goToStep = useUpload((s) => s.goToStep);
+  const phase = useUpload((s) => s.phase);
+  const disabled = phase !== "draft";
+  return (
+    <nav aria-label="Upload steps" className="border-b border-divider px-4 py-4 sm:px-8">
+      <ol className="mx-auto grid max-w-[720px] grid-cols-3">
+        {UPLOAD_STEPS.map((label, index) => {
+          const current = step === index;
+          const complete = step > index;
+          return (
+            <li key={label} className="relative flex justify-center">
+              {index > 0 && (
+                <span
+                  aria-hidden
+                  className={`absolute right-1/2 top-[11px] h-px w-full ${complete ? "bg-[var(--link)]" : "bg-divider"}`}
+                />
+              )}
+              <button
+                type="button"
+                aria-current={current ? "step" : undefined}
+                disabled={disabled}
+                onClick={() => goToStep(index as 0 | 1 | 2)}
+                className={`relative flex flex-col items-center gap-1 text-[12px] font-medium ${
+                  current || complete ? "text-[var(--link)]" : "text-text-3"
+                } disabled:cursor-default`}
+              >
+                <span
+                  className={`grid h-[22px] w-[22px] place-items-center rounded-full border-2 bg-surface text-[11px] ${
+                    current || complete ? "border-[var(--link)]" : "border-divider"
+                  }`}
+                >
+                  {index + 1}
+                </span>
+                {label}
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
 function Notice({ children }: { children: ReactNode }) {
   return (
     <div role="status" className="mb-4 rounded-[2px] border border-divider bg-surface px-4 py-3 text-[14px] leading-5 text-text">
@@ -51,12 +99,6 @@ function Notice({ children }: { children: ReactNode }) {
     </div>
   );
 }
-
-const VISIBILITY_OPTIONS: { value: Visibility; label: string; hint: string }[] = [
-  { value: "private", label: "Private", hint: "Only you can watch your video" },
-  { value: "unlisted", label: "Unlisted", hint: "Anyone with the video link can watch your video" },
-  { value: "public", label: "Public", hint: "Everyone can watch your video" },
-];
 
 function DropZone({ disabled }: { disabled: boolean }) {
   const pick = useUpload((s) => s.pick);
@@ -105,9 +147,9 @@ function DropZone({ disabled }: { disabled: boolean }) {
         <UploadArrow className={`h-[60px] w-[60px] transition-transform ${dragging ? "-translate-y-1" : ""}`} />
       </button>
       <p className="mt-6 text-[15px] leading-6 text-text">
-        {dragging ? "Drop to upload" : "Drag and drop video files to upload"}
+        {dragging ? "Drop to select a video" : "Drag and drop a video to get started"}
       </p>
-      <p className="mt-1 text-[13px] leading-5 text-text-2">Your videos will be private until you publish them.</p>
+      <p className="mt-1 text-[13px] leading-5 text-text-2">Selecting a video does not start the upload.</p>
       <button type="button" disabled={disabled} onClick={() => input.current?.click()} className="btn-blue mt-7">
         Select files
       </button>
@@ -129,14 +171,106 @@ function DropZone({ disabled }: { disabled: boolean }) {
         </p>
       )}
       <p className="mt-auto pt-10 text-[12px] leading-4 text-text-3">
-        MP4, MOV, WebM or MKV, up to 2 GB each. Up to {UPLOADS_PER_DAY} uploads a day.
+        MP4, MOV, WebM or MKV, up to 5 GB each. Upload as many as you like.
       </p>
+    </div>
+  );
+}
+
+function DraftFooter() {
+  const { details, error, step, goToStep, startUpload, reset } = useUpload();
+  const problem = detailsProblem(details);
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p className="text-[13px] leading-5 text-text-2">
+        {step < 2
+          ? "Your video file will not upload until you finish the steps and choose an action."
+          : details.visibility === "public"
+            ? "Your video uploads now and will be public after processing."
+            : "Your video uploads now and stays private until you publish it."}
+      </p>
+      <div className="flex items-center gap-3">
+        <button type="button" className="btn-text" onClick={reset}>
+          Cancel
+        </button>
+        {step > 0 && (
+          <button type="button" className="btn-text" onClick={() => goToStep((step - 1) as 0 | 1 | 2)}>
+            Back
+          </button>
+        )}
+        {step < 2 ? (
+          <button
+            type="button"
+            className="btn-blue"
+            disabled={Boolean(problem)}
+            onClick={() => goToStep((step + 1) as 0 | 1 | 2)}
+          >
+            Next
+          </button>
+        ) : (
+          <button
+            type="button"
+            className="btn-blue"
+            disabled={Boolean(problem)}
+            onClick={() => void startUpload()}
+          >
+            {details.visibility === "public" ? "Publish video" : "Upload privately"}
+          </button>
+        )}
+      </div>
+      {(error || problem) && (
+        <p role="alert" className="w-full text-[13px] text-[var(--error)]">
+          {error || problem}
+        </p>
+      )}
     </div>
   );
 }
 
 function Counter({ value, max }: { value: number; max: number }) {
   return <span className={`text-[12px] ${value > max ? "text-[var(--error)]" : "text-text-3"}`}>{value}/{max}</span>;
+}
+
+function ThumbnailPicker() {
+  const file = useUpload((s) => s.thumbnailFile);
+  const preview = useUpload((s) => s.thumbnailPreview);
+  const saving = useUpload((s) => s.thumbnailSaving);
+  const error = useUpload((s) => s.thumbnailError);
+  const setThumbnailFile = useUpload((s) => s.setThumbnailFile);
+  const input = useRef<HTMLInputElement>(null);
+
+  return (
+    <section className="mt-6" aria-label="Video thumbnail">
+      <h3 className="text-[16px] font-medium leading-[22px] text-text">Thumbnail</h3>
+      <p className="mt-1 text-[13px] leading-[18px] text-text-2">Choose a JPG, PNG or WebP image up to 2 MB. Optional.</p>
+      <div className="mt-3 flex flex-wrap items-center gap-3">
+        <button type="button" className="btn-text" onClick={() => input.current?.click()} disabled={saving}>
+          {saving ? "Uploading thumbnail" : file ? "Choose another thumbnail" : "Upload thumbnail"}
+        </button>
+        {preview && (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={preview} alt="Selected video thumbnail preview" className="aspect-video w-36 rounded-[2px] object-cover" />
+        )}
+        {file && !saving && (
+          <button type="button" className="btn-text" onClick={() => setThumbnailFile(null)}>
+            Remove
+          </button>
+        )}
+      </div>
+      <input
+        ref={input}
+        type="file"
+        accept="image/jpeg,image/png,image/webp"
+        className="hidden"
+        onChange={(e) => {
+          const selected = e.target.files?.[0] ?? null;
+          e.target.value = "";
+          if (selected) setThumbnailFile(selected);
+        }}
+      />
+      {error && <p role="alert" className="mt-2 text-[13px] text-[var(--error)]">{error}</p>}
+    </section>
+  );
 }
 
 /**
@@ -174,87 +308,138 @@ function ShortChoice() {
   );
 }
 
-function DetailsForm() {
+function LocalVideoPreview({ file }: { file: File }) {
+  const video = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    const element = video.current;
+    if (!element) return;
+    const url = URL.createObjectURL(file);
+    element.src = url;
+    return () => {
+      element.pause();
+      element.removeAttribute("src");
+      element.load();
+      URL.revokeObjectURL(url);
+    };
+  }, [file]);
+
+  return <video ref={video} controls muted playsInline preload="metadata" className="aspect-video w-full bg-black object-contain" />;
+}
+
+function DetailsForm({ step }: { step: 0 | 1 | 2 }) {
   const details = useUpload((s) => s.details);
   const setDetails = useUpload((s) => s.setDetails);
+  const videoFile = useUpload((s) => s.file);
   const fileName = useUpload((s) => s.fileName);
   const phase = useUpload((s) => s.phase);
+  const active = phase === "draft";
   const titleMissing = details.title.trim() === "";
 
   return (
     <div className="grid gap-6 px-4 py-5 sm:px-6 md:grid-cols-[1fr_284px] md:gap-8">
       <div className="min-w-0">
-        <h2 className="text-[20px] font-normal leading-7 text-text">Details</h2>
+        <h2 className="text-[20px] font-normal leading-7 text-text">{UPLOAD_STEPS[step]}</h2>
 
-        <label className="mt-4 block rounded-[4px] border border-[var(--input-border)] px-3 pb-2 pt-2 focus-within:border-[var(--focus)]">
-          <span className="flex justify-between text-[12px] leading-4 text-text-2">
-            <span>Title (required)</span>
-            <Counter value={details.title.length} max={TITLE_MAX} />
-          </span>
-          <textarea
-            value={details.title}
-            maxLength={TITLE_MAX}
-            rows={2}
-            onChange={(e) => setDetails({ title: e.target.value.replace(/\n/g, " ") })}
-            placeholder="Add a title that describes your video"
-            className="mt-1 block w-full resize-none bg-transparent text-[15px] leading-[22px] text-text outline-none placeholder:text-text-3"
-          />
-        </label>
-        {titleMissing && <p className="mt-1 text-[12px] text-[var(--error)]">Your video needs a title.</p>}
+        {step === 0 && (
+          <>
+            <label className="mt-4 block rounded-[4px] border border-[var(--input-border)] px-3 pb-2 pt-2 focus-within:border-[var(--focus)]">
+              <span className="flex justify-between text-[12px] leading-4 text-text-2">
+                <span>Title (required)</span>
+                <Counter value={details.title.length} max={TITLE_MAX} />
+              </span>
+              <textarea
+                value={details.title}
+                maxLength={TITLE_MAX}
+                rows={2}
+                onChange={(e) => setDetails({ title: e.target.value.replace(/\n/g, " ") })}
+                placeholder="Add a title that describes your video"
+                className="mt-1 block w-full resize-none bg-transparent text-[15px] leading-[22px] text-text outline-none placeholder:text-text-3"
+              />
+            </label>
+            {titleMissing && <p className="mt-1 text-[12px] text-[var(--error)]">Your video needs a title.</p>}
 
-        <label className="mt-5 block rounded-[4px] border border-[var(--input-border)] px-3 pb-2 pt-2 focus-within:border-[var(--focus)]">
-          <span className="flex justify-between text-[12px] leading-4 text-text-2">
-            <span>Description</span>
-            <Counter value={details.description.length} max={DESCRIPTION_MAX} />
-          </span>
-          <textarea
-            value={details.description}
-            maxLength={DESCRIPTION_MAX}
-            rows={5}
-            onChange={(e) => setDetails({ description: e.target.value })}
-            placeholder="Tell viewers about your video"
-            className="mt-1 block w-full resize-y bg-transparent text-[15px] leading-[22px] text-text outline-none placeholder:text-text-3"
-          />
-        </label>
+            <label className="mt-5 block rounded-[4px] border border-[var(--input-border)] px-3 pb-2 pt-2 focus-within:border-[var(--focus)]">
+              <span className="flex justify-between text-[12px] leading-4 text-text-2">
+                <span>Description</span>
+                <Counter value={details.description.length} max={DESCRIPTION_MAX} />
+              </span>
+              <textarea
+                value={details.description}
+                maxLength={DESCRIPTION_MAX}
+                rows={5}
+                onChange={(e) => setDetails({ description: e.target.value })}
+                placeholder="Tell viewers about your video"
+                className="mt-1 block w-full resize-y bg-transparent text-[15px] leading-[22px] text-text outline-none placeholder:text-text-3"
+              />
+            </label>
+          </>
+        )}
 
-        <fieldset className="mt-6">
-          <legend className="text-[16px] font-medium leading-[22px] text-text">Visibility</legend>
-          <p className="mt-1 text-[13px] leading-[18px] text-text-2">Choose who can watch your video once it is ready.</p>
-          <div className="mt-3 space-y-1">
-            {VISIBILITY_OPTIONS.map((o) => (
-              <label key={o.value} className="flex cursor-pointer items-start gap-3 rounded-[2px] px-1 py-2 hover:bg-hover">
+        {step === 1 && (
+          <>
+            <label className="mt-6 block">
+              <span className="text-[16px] font-medium leading-[22px] text-text">Category</span>
+              <span className="mt-1 block text-[13px] leading-[18px] text-text-2">Choose the best fit for your video.</span>
+              <select
+                value={details.category}
+                onChange={(e) => setDetails({ category: e.target.value as (typeof VIDEO_CATEGORIES)[number] })}
+                className="mt-3 h-11 w-full rounded-[4px] border border-[var(--input-border)] bg-surface px-3 text-[14px] text-text outline-none focus:border-[var(--focus)]"
+              >
+                {VIDEO_CATEGORIES.map((category) => <option key={category} value={category}>{category}</option>)}
+              </select>
+            </label>
+            <ThumbnailPicker />
+            <ShortChoice />
+          </>
+        )}
+
+        {step === 2 && (
+          <fieldset className="mt-4 space-y-3">
+            <legend className="text-[14px] leading-5 text-text-2">Choose who can watch your video.</legend>
+            {([
+              ["private", "Private", "Only you can watch this video."],
+              ["public", "Public", "Anyone can watch once processing is complete."],
+            ] as const).map(([visibility, label, description]) => (
+              <label key={visibility} className="flex cursor-pointer items-start gap-3 rounded-[4px] border border-divider p-4 hover:bg-hover">
                 <input
                   type="radio"
-                  name="visibility"
-                  value={o.value}
-                  checked={details.visibility === o.value}
-                  onChange={() => setDetails({ visibility: o.value })}
-                  className="mt-[3px] h-[18px] w-[18px] accent-[var(--link)]"
+                  name="video-visibility"
+                  value={visibility}
+                  checked={details.visibility === visibility}
+                  onChange={() => setDetails({ visibility })}
+                  disabled={!active}
+                  className="mt-1 h-4 w-4 accent-[var(--link)]"
                 />
                 <span>
-                  <span className="block text-[14px] font-medium leading-5 text-text">{o.label}</span>
-                  <span className="block text-[13px] leading-[18px] text-text-2">{o.hint}</span>
+                  <span className="block text-[14px] font-medium text-text">{label}</span>
+                  <span className="block text-[13px] leading-5 text-text-2">{description}</span>
                 </span>
               </label>
             ))}
-          </div>
-        </fieldset>
-
-        <ShortChoice />
+            <p className="pt-2 text-[13px] leading-5 text-text-2">
+              Uploading will not begin until you choose {details.visibility === "public" ? "Publish video" : "Upload privately"}.
+            </p>
+          </fieldset>
+        )}
       </div>
 
       <aside className="min-w-0">
         <div className="overflow-hidden rounded-[2px] bg-[var(--hover)]">
-          <div className="grid aspect-video place-items-center bg-black text-[13px] text-[#aaaaaa]">
-            {phase === "finishing" ? "Finishing up" : "Uploading video"}
-          </div>
+          {videoFile ? <LocalVideoPreview file={videoFile} /> : (
+            <div className="grid aspect-video place-items-center bg-black text-[13px] text-[#aaaaaa]">
+              {phase === "draft" ? "Ready to publish" : phase === "finishing" ? "Finishing up" : "Uploading video"}
+            </div>
+          )}
           <div className="px-4 py-3">
             <p className="text-[12px] leading-4 text-text-2">Filename</p>
             <p className="mt-1 break-all text-[14px] leading-5 text-text">{fileName}</p>
           </div>
         </div>
         <p className="mt-3 text-[12px] leading-4 text-text-3">
-          Your details are saved when the upload finishes. You can keep typing while it runs.
+          {phase === "draft"
+            ? "Review the details before publishing. Your video file will not upload until you press Publish."
+            : "Details and your category are saved when the upload finishes. You can keep typing while it runs."}
         </p>
       </aside>
     </div>
@@ -302,7 +487,9 @@ function ProgressFooter() {
 }
 
 function DoneView() {
-  const { watchUrl, details, reset } = useUpload();
+  const { watchUrl, details, reset, published, publishError } = useUpload();
+  const videoId = useUpload((s) => s.videoId);
+  const thumbnailSaving = useUpload((s) => s.thumbnailSaving);
   // Only ever rendered in the browser, after an upload: window is there.
   const origin = typeof window === "undefined" ? "" : window.location.origin;
   return (
@@ -310,10 +497,26 @@ function DoneView() {
       <CheckCircle className="h-16 w-16 text-[#2ba640]" />
       <p className="mt-5 text-[20px] leading-7 text-text">Video uploaded. Processing starts soon.</p>
       <p className="mt-2 max-w-[520px] text-[14px] leading-5 text-text-2">
-        <span className="font-medium text-text">{details.title}</span> is{" "}
-        {details.visibility === "private" ? "private" : details.visibility}. It can be watched once processing is
-        finished.
+        <span className="font-medium text-text">{details.title}</span>
+        {published
+          ? " will be public once processing succeeds."
+          : " is uploaded and saved privately. Publishing will make it public after processing succeeds."}
       </p>
+      <p className="mt-1 text-[13px] text-text-2">Category: {details.category}</p>
+      <div className="mt-5">
+        {videoId && (published ? (
+          <p role="status" className="text-[14px] font-medium text-text">Published after processing succeeds.</p>
+        ) : (
+          <>
+            {publishError && <p role="alert" className="mb-2 text-[13px] text-[var(--error)]">{publishError}</p>}
+            <PublishButton videoId={videoId} successText="Published. It will be public after processing succeeds." />
+          </>
+        ))}
+      </div>
+      <div className="mt-6 w-full max-w-[520px] text-left">
+        <ThumbnailPicker />
+        {thumbnailSaving && <p role="status" className="mt-2 text-[13px] text-text-2">Uploading thumbnail...</p>}
+      </div>
       {watchUrl && (
         <div className="mt-6 w-full max-w-[420px] rounded-[2px] bg-[var(--hover)] px-4 py-3 text-left">
           <p className="text-[12px] leading-4 text-text-2">Video link</p>
@@ -336,10 +539,10 @@ function DoneView() {
 }
 
 function FailedView() {
-  const { error, reset } = useUpload();
+  const { error, reset, videoId } = useUpload();
   return (
     <div data-upload-phase="failed" className="flex min-h-[420px] flex-col items-center justify-center px-6 py-12 text-center">
-      <p className="text-[20px] leading-7 text-text">The upload did not finish</p>
+      <p className="text-[20px] leading-7 text-text">{videoId ? "The upload did not finish" : "Could not start the upload"}</p>
       <p role="alert" className="mt-2 max-w-[520px] text-[14px] leading-5 text-[var(--error)]">
         {error}
       </p>
@@ -353,6 +556,7 @@ function FailedView() {
 /** The whole /upload experience: drop zone, details while uploading, then done. */
 export function Uploader({ configured, preview = false }: { configured: boolean; preview?: boolean }) {
   const phase = useUpload((s) => s.phase);
+  const step = useUpload((s) => s.step);
   const title = useUpload((s) => s.details.title);
   const busy = phase === "signing" || phase === "uploading" || phase === "finishing";
 
@@ -388,18 +592,18 @@ export function Uploader({ configured, preview = false }: { configured: boolean;
           <Notice>
             <p className="font-medium">Uploads are not configured on this server yet</p>
             <p className="mt-1 text-text-2">
-              The site owner needs to add the four R2 settings (R2_ACCOUNT_ID, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
-              R2_BUCKET). See &quot;Uploads (R2)&quot; in the README.
+              The site owner needs to configure the S3 endpoint, credentials and bucket. See &quot;Uploads&quot; in the README.
             </p>
           </Notice>
         )}
       </div>
       <Card
         title={busy || phase === "done" ? title || "Upload videos" : "Upload videos"}
-        footer={busy ? <ProgressFooter /> : undefined}
+        footer={busy ? <ProgressFooter /> : phase === "draft" ? <DraftFooter /> : undefined}
       >
+        {(phase === "draft" || busy) && <UploadSteps />}
         {phase === "idle" && <DropZone disabled={!configured && !preview} />}
-        {busy && <DetailsForm />}
+        {(phase === "draft" || busy) && <DetailsForm step={step} />}
         {phase === "done" && <DoneView />}
         {phase === "failed" && <FailedView />}
       </Card>

@@ -27,18 +27,27 @@ export function renditionPlaylist(r) {
 
 /**
  * One ffmpeg run that decodes the source once, splits the picture into every
- * rendition plus the sprite, and writes the HLS ladder and sprite.webp.
+ * rendition plus the sprite, and writes the HLS ladder and the sprite's frames.
+ *
+ * The sprite's frames go out one by one as PNGs to `spriteFrames` (a printf
+ * pattern outside the output folder, like /work/job-x/sprite/%03d.png), and
+ * buildSpriteArgs() tiles them into sprite.webp afterwards. ffmpeg holds back
+ * every -progress line until all of its outputs have started, and a tiled
+ * sprite only starts once its last frame is in, at the end of the video: with
+ * the tile inside this run, a long upload sat at 5% until the encode was done.
  * @param {{
  *   input: string,
  *   renditions: { name: string, width: number, height: number, videoKbps: number, audioKbps: number }[],
  *   hasAudio: boolean,
- *   sprite?: { interval: number, columns: number, rows: number, width: number, height: number } | null,
+ *   sprite?: { interval: number, count: number, columns: number, rows: number, width: number, height: number } | null,
+ *   spriteFrames?: string | null,
  *   segmentSeconds?: number,
  *   preset?: string,
  * }} opts
  */
-export function buildEncodeArgs({ input, renditions, hasAudio, sprite = null, segmentSeconds = SEGMENT_SECONDS, preset = X264_PRESET }) {
+export function buildEncodeArgs({ input, renditions, hasAudio, sprite = null, spriteFrames = null, segmentSeconds = SEGMENT_SECONDS, preset = X264_PRESET }) {
   if (!renditions.length) throw new Error("no renditions");
+  if (sprite && !spriteFrames) throw new Error("a sprite needs spriteFrames");
   const outs = renditions.map((_, i) => `[s${i}]`);
   if (sprite) outs.push("[sp]");
 
@@ -50,8 +59,7 @@ export function buildEncodeArgs({ input, renditions, hasAudio, sprite = null, se
     graph.push(
       `[sp]fps=1/${sprite.interval},` +
         `scale=${sprite.width}:${sprite.height}:force_original_aspect_ratio=decrease,` +
-        `pad=${sprite.width}:${sprite.height}:(ow-iw)/2:(oh-ih)/2,setsar=1,` +
-        `tile=${sprite.columns}x${sprite.rows}[spr]`,
+        `pad=${sprite.width}:${sprite.height}:(ow-iw)/2:(oh-ih)/2,setsar=1[spr]`,
     );
   }
 
@@ -99,9 +107,26 @@ export function buildEncodeArgs({ input, renditions, hasAudio, sprite = null, se
   );
 
   if (sprite) {
-    args.push("-map", "[spr]", "-frames:v", "1", "-c:v", "libwebp", "-quality", "70", SPRITE_IMAGE);
+    args.push("-map", "[spr]", "-frames:v", String(sprite.count), "-c:v", "png", "-f", "image2", spriteFrames);
   }
   return args;
+}
+
+/**
+ * Tiles the sprite's frames from the encode (see buildEncodeArgs) into one
+ * WebP image, `columns` frames a row. A short last row is left empty, which
+ * the WebVTT file never points at.
+ * @param {{ frames: string, plan: { columns: number, rows: number }, output: string }} opts
+ */
+export function buildSpriteArgs({ frames, plan, output }) {
+  return [
+    "-hide_banner", "-nostdin", "-y", "-loglevel", "error",
+    "-framerate", "1", "-start_number", "1", "-i", frames,
+    "-vf", `tile=${plan.columns}x${plan.rows}`,
+    "-frames:v", "1",
+    "-c:v", "libwebp", "-quality", "70",
+    output,
+  ];
 }
 
 /** One thumbnail: a fast seek, one frame, 1280 wide (never wider than the source), WebP. */

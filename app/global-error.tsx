@@ -12,7 +12,7 @@ export default function GlobalError({ retry }: { error: unknown; retry: () => vo
   return (
     <html lang="en" className="h-full" suppressHydrationWarning>
       <head>
-        <title>Something went wrong | sloptube</title>
+        <title>Something went wrong | PlayPulse</title>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
       <body className="min-h-full font-sans">

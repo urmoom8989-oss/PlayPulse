@@ -1,31 +1,27 @@
-// R2 through its S3 API. Only the API routes import this file (they are
-// server only), and the tests load it directly with a mocked client.
+// S3-compatible object storage. Only server routes import this file, and the
+// tests load it directly with a mocked client.
 
 import {
   AbortMultipartUploadCommand,
   CompleteMultipartUploadCommand,
   CreateMultipartUploadCommand,
+  DeleteObjectCommand,
   HeadObjectCommand,
+  PutObjectCommand,
   S3Client,
   UploadPartCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import type { UploadStorage } from "./handlers.ts";
+import type { StorageConfig } from "./env.ts";
 
-export type R2ClientConfig = {
-  accountId: string;
-  accessKeyId: string;
-  secretAccessKey: string;
-};
-
-/** An S3 client pointed at the account's R2 endpoint. */
-export function createR2Client(config: R2ClientConfig): S3Client {
+/** An S3 client pointed at the configured object-storage endpoint. */
+export function createS3Client(config: StorageConfig): S3Client {
   return new S3Client({
-    region: "auto",
-    endpoint: `https://${config.accountId}.r2.cloudflarestorage.com`,
+    region: config.region,
+    endpoint: config.endpoint,
     credentials: { accessKeyId: config.accessKeyId, secretAccessKey: config.secretAccessKey },
-    // https://<account>.r2.cloudflarestorage.com/<bucket>/<key>, one host for every bucket.
-    forcePathStyle: true,
+    forcePathStyle: config.forcePathStyle,
     // Newer SDKs add checksum headers to every request by default. Presigned
     // part URLs must not expect them, because the browser does not send them.
     requestChecksumCalculation: "WHEN_REQUIRED",
@@ -34,11 +30,11 @@ export function createR2Client(config: R2ClientConfig): S3Client {
 }
 
 /** UploadStorage on top of an S3 client and one bucket. */
-export function createR2Storage(client: S3Client, bucket: string): UploadStorage {
+export function createS3Storage(client: S3Client, bucket: string): UploadStorage {
   return {
     async createMultipart(key, mime) {
       const out = await client.send(new CreateMultipartUploadCommand({ Bucket: bucket, Key: key, ContentType: mime }));
-      if (!out.UploadId) throw new Error("R2 did not return an upload id");
+      if (!out.UploadId) throw new Error("Object storage did not return an upload id");
       return out.UploadId;
     },
 
@@ -74,6 +70,32 @@ export function createR2Storage(client: S3Client, bucket: string): UploadStorage
         if (status === 404 || (err as { name?: string }).name === "NotFound") return null;
         throw err;
       }
+    },
+
+    presignThumbnail(key, mime) {
+      return getSignedUrl(
+        client,
+        new PutObjectCommand({ Bucket: bucket, Key: key, ContentType: mime, CacheControl: "public, max-age=300" }),
+        { expiresIn: 10 * 60 },
+      );
+    },
+
+    async thumbnailInfo(key) {
+      try {
+        const out = await client.send(new HeadObjectCommand({ Bucket: bucket, Key: key }));
+        return {
+          bytes: Number(out.ContentLength ?? 0),
+          type: out.ContentType ?? null,
+        };
+      } catch (err) {
+        const status = (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode;
+        if (status === 404 || (err as { name?: string }).name === "NotFound") return null;
+        throw err;
+      }
+    },
+
+    async deleteObject(key) {
+      await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key })).catch(() => {});
     },
   };
 }

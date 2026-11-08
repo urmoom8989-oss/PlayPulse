@@ -13,6 +13,7 @@ import {
   planParts,
   sourceKey,
   titleFromFileName,
+  VIDEO_CATEGORIES,
   videoTypeFor,
 } from "../lib/upload/rules.ts";
 
@@ -46,12 +47,12 @@ test("rejects other files", () => {
   }
 });
 
-test("files must be 1 byte to 2 GB", () => {
+test("files must be 1 byte to 5 GB", () => {
   const f = { name: "a.mp4", type: "video/mp4" };
   assert.equal(fileProblem({ ...f, size: 1 }), null);
   assert.equal(fileProblem({ ...f, size: MAX_UPLOAD_BYTES }), null);
   assert.equal(fileProblemCode({ ...f, size: MAX_UPLOAD_BYTES + 1 }), "file_too_big");
-  assert.match(fileProblem({ ...f, size: MAX_UPLOAD_BYTES + 1 }), /2 GB/);
+  assert.match(fileProblem({ ...f, size: MAX_UPLOAD_BYTES + 1 }), /5 GB/);
   assert.equal(fileProblemCode({ ...f, size: 0 }), "file_empty");
 });
 
@@ -80,7 +81,7 @@ test("parts cover every byte exactly once", () => {
     for (let i = 1; i < parts.length; i++) assert.equal(parts[i].start, parts[i - 1].end);
     assert.ok(parts.every((p) => p.end - p.start <= PART_SIZE));
   }
-  assert.equal(planParts(MAX_UPLOAD_BYTES).length, 128);
+  assert.equal(planParts(MAX_UPLOAD_BYTES).length, 320);
   assert.deepEqual(planParts(0), []);
   assert.deepEqual(planParts(-5), []);
 });
@@ -100,12 +101,14 @@ test("a key only belongs to its owner", () => {
   assert.equal(keyBelongsTo(`uploads/${OWNER}/../x/source.mp4`, OWNER), false);
 });
 
-test("details: title 1 to 100, description up to 5000, a known visibility", () => {
-  assert.equal(detailsProblem({ title: "Hi", description: "", visibility: "private" }), null);
-  assert.match(detailsProblem({ title: "  ", description: "", visibility: "private" }), /title/);
-  assert.match(detailsProblem({ title: "a".repeat(101), visibility: "public" }), /100/);
-  assert.match(detailsProblem({ title: "Hi", description: "a".repeat(5001), visibility: "public" }), /5000/);
-  assert.match(detailsProblem({ title: "Hi", description: "", visibility: "friends" }), /private/);
+test("details: title, description, visibility and category are validated", () => {
+  assert.equal(detailsProblem({ title: "Hi", description: "", visibility: "private", category: "Gaming" }), null);
+  assert.match(detailsProblem({ title: "  ", description: "", visibility: "private", category: "Other" }), /title/);
+  assert.match(detailsProblem({ title: "a".repeat(101), visibility: "public", category: "Other" }), /100/);
+  assert.match(detailsProblem({ title: "Hi", description: "a".repeat(5001), visibility: "public", category: "Other" }), /5000/);
+  assert.match(detailsProblem({ title: "Hi", description: "", visibility: "friends", category: "Other" }), /private/);
+  assert.match(detailsProblem({ title: "Hi", description: "", visibility: "private", category: "Unknown" }), /category/);
+  assert.deepEqual(VIDEO_CATEGORIES, ["Music", "Sports", "Gaming", "Movies and TV", "News", "Live", "Other"]);
 });
 
 test("progress numbers read well", () => {

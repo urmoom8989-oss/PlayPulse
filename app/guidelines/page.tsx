@@ -2,8 +2,8 @@ import Link from "next/link";
 import { PublicPage, Section } from "@/components/launch/PublicPage";
 
 export const metadata = {
-  title: "Community Guidelines | sloptube",
-  description: "What is and isn't allowed on sloptube, and what happens when something breaks the rules.",
+  title: "Community Guidelines | PlayPulse",
+  description: "What is and isn't allowed on PlayPulse, and what happens when something breaks the rules.",
   alternates: { canonical: "/guidelines" },
 };
 
@@ -13,7 +13,7 @@ export default function GuidelinesPage() {
     <PublicPage
       page="guidelines"
       title="Community Guidelines"
-      intro={<p>sloptube is for everyone 13 and older. These rules keep it that way. They cover videos, Snips, thumbnails, titles, comments and channels.</p>}
+      intro={<p>PlayPulse is for everyone 13 and older. These rules keep it that way. They cover videos, Snips, thumbnails, titles, comments and channels.</p>}
     >
       <Section id="spam" title="Spam and misleading content">
         <p>No scams, no fake giveaways, no titles or thumbnails that lie about the video, and no posting the same thing over and over. Comments with more than five links are blocked.</p>
