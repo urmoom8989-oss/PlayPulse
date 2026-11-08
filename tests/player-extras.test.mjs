@@ -167,3 +167,31 @@ test("bufferAhead reads the range under the playhead", () => {
   assert.equal(bufferAhead(ranges([[0, 10]]), 15), 0);
   assert.equal(bufferAhead(ranges([]), 0), 0);
 });
+
+test("end screen: nine videos from Up next, never the one that ended", async () => {
+  const { END_SCREEN_COUNT, endScreenVideos, nextVideo } = await import("../lib/watch/endscreen.ts");
+  const upNext = Array.from({ length: 12 }, (_, i) => ({ id: `v${i}` }));
+  assert.equal(END_SCREEN_COUNT, 9);
+  assert.deepEqual(endScreenVideos(upNext, "x").map((v) => v.id), ["v0", "v1", "v2", "v3", "v4", "v5", "v6", "v7", "v8"]);
+  assert.deepEqual(endScreenVideos([{ id: "now" }, ...upNext], "now").length, 9);
+  assert.ok(!endScreenVideos([{ id: "now" }, { id: "a" }], "now").some((v) => v.id === "now"));
+  assert.deepEqual(endScreenVideos([], "now"), []);
+  assert.equal(nextVideo([{ id: "now" }, { id: "a" }], "now").id, "a");
+  assert.equal(nextVideo([{ id: "now" }], "now"), null);
+});
+
+test("end screen: countdown with autoplay on, the wall with it off", async () => {
+  const { AUTOPLAY_COUNTDOWN_S, endChoice, secondsLeft } = await import("../lib/watch/endscreen.ts");
+  assert.equal(endChoice(true, true, 9), "countdown");
+  assert.equal(endChoice(false, true, 9), "wall");
+  assert.equal(endChoice(true, false, 0), null, "nothing to play or show: the replay button");
+  assert.equal(endChoice(false, false, 0), null);
+  assert.equal(AUTOPLAY_COUNTDOWN_S, 8);
+  assert.equal(secondsLeft(1000, 1000), 8);
+  assert.equal(secondsLeft(1000, 1100), 8);
+  assert.equal(secondsLeft(1000, 2000), 7);
+  assert.equal(secondsLeft(1000, 8999), 1);
+  assert.equal(secondsLeft(1000, 9000), 0);
+  assert.equal(secondsLeft(1000, 99000), 0);
+  assert.equal(secondsLeft(5000, 1000), 8, "a clock going back never adds time");
+});

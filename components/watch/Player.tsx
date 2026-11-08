@@ -30,17 +30,21 @@ import {
 import { resumeAt } from "@/lib/engagement/rules";
 import type { WatchEngagement } from "@/lib/engagement/types";
 import { useWatchPings } from "@/lib/engagement/useWatchPings";
+import { useRouter } from "next/navigation";
 import { useFlag } from "@/lib/store/session";
 import { useWatch } from "@/lib/store/watch";
 import { chapterAt, parseChapters } from "@/lib/watch/chapters";
+import { endChoice, endScreenVideos, nextVideo } from "@/lib/watch/endscreen";
 import { formatTime } from "@/lib/watch/format";
 import { clampTime, keyAction, stepVolume, type PlayerAction } from "@/lib/watch/keys";
 import { loadQuality, loadResume, loadVolume, saveQuality, saveResume, saveVolume } from "@/lib/watch/prefs";
 import { AUTO, levelForSaved, qualityOptions, qualitySummary, SPEEDS, speedLabel, type QualityOption } from "@/lib/watch/quality";
 import { menuPosition, watchLink } from "@/lib/watch/nerds";
 import { DOUBLE_TAP_MS, nextTap, tapSide, tapTotal, type TapSide, type TapState } from "@/lib/watch/taps";
+import type { UpNextVideo } from "@/lib/watch/types";
 import { cueAt, parseSpriteVtt, type SpriteCue } from "@/lib/watch/vtt";
 import { ChapterTrack } from "./ChapterTrack";
+import { AutoplayCountdown, EndScreenWall } from "./EndScreen";
 import { PlayerContextMenu } from "./PlayerContextMenu";
 import { StatsForNerds } from "./StatsForNerds";
 
@@ -64,6 +68,10 @@ type Props = {
   embed?: boolean;
   /** The description, for chapters on the progress bar (player extras). */
   description?: string;
+  /** Up next, for autoplay and the end screen (player extras). */
+  upNext?: UpNextVideo[];
+  /** The channel, for Up next cards that have no channel of their own. */
+  channelName?: string;
 };
 
 type Menu = null | "main" | "quality" | "speed";
@@ -91,7 +99,19 @@ function preferNative(video: HTMLVideoElement): boolean {
  * in picture and fullscreen. hls.js everywhere except Safari, which plays
  * HLS natively (and then picks the quality itself).
  */
-export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, engagement = null, embed = false, description = "" }: Props) {
+export function Player({
+  videoId,
+  src,
+  poster,
+  spriteVtt,
+  durationS,
+  startAt,
+  engagement = null,
+  embed = false,
+  description = "",
+  upNext = [],
+  channelName = "",
+}: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
@@ -161,6 +181,14 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
     () => (extras && description ? parseChapters(description, durationS ?? (duration > 0 ? duration : null)) : []),
     [extras, description, durationS, duration],
   );
+
+  // The end of the video (player extras): autoplay's countdown, or the wall.
+  const router = useRouter();
+  const autoplay = useWatch((s) => s.autoplay);
+  const syncAutoplay = useWatch((s) => s.syncAutoplay);
+  const [ending, setEnding] = useState<"countdown" | "wall" | null>(null);
+  const wall = useMemo(() => endScreenVideos(upNext, videoId), [upNext, videoId]);
+  const next = useMemo(() => nextVideo(upNext, videoId), [upNext, videoId]);
 
   // The server only hands engagement over when the flag is on for this
   // viewer, so this is known from the first render and the stream loads once.
@@ -450,6 +478,16 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
 
   const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
 
+  useEffect(() => syncAutoplay(), [syncAutoplay]);
+  // Autoplay switched off during the countdown: show the wall instead.
+  useEffect(() => {
+    if (ending === "countdown" && !autoplay) setEnding(wall.length ? "wall" : null);
+  }, [ending, autoplay, wall.length]);
+  const playNext = useCallback(() => {
+    if (next) router.push(`/watch?v=${encodeURIComponent(next.id)}`);
+  }, [next, router]);
+  const cancelAutoplay = useCallback(() => setEnding(wall.length ? "wall" : null), [wall.length]);
+
   /** Right-click: the player menu. A second right-click while it is open shows the browser's own menu. */
   const onContextMenu = (e: ReactMouseEvent<HTMLDivElement>) => {
     if (!extras) return;
@@ -631,8 +669,10 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
           setPlaying(true);
           setStarted(true);
           setEnded(false);
+          setEnding(null);
           poke();
         }}
+        onSeeking={() => setEnding(null)}
         onPause={(e) => {
           setPlaying(false);
           saveResume(videoId, e.currentTarget.currentTime, e.currentTarget.duration);
@@ -641,6 +681,7 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
           setPlaying(false);
           setEnded(true);
           saveResume(videoId, e.currentTarget.duration, e.currentTarget.duration);
+          if (extras && !embed) setEnding(endChoice(autoplay, next !== null, wall.length));
         }}
         onWaiting={() => setWaiting(true)}
         onPlaying={() => setWaiting(false)}
@@ -711,7 +752,7 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
       )}
 
       {/* The big play button, while paused. */}
-      {!playing && !error && !scrubbing && (
+      {!playing && !error && !scrubbing && ending === null && (
         <button
           type="button"
           aria-label={ended ? "Replay" : "Play"}
@@ -736,6 +777,11 @@ export function Player({ videoId, src, poster, spriteVtt, durationS, startAt, en
           </svg>
         </button>
       )}
+
+      {ending === "countdown" && next && (
+        <AutoplayCountdown video={next} channelName={channelName} onPlay={playNext} onCancel={cancelAutoplay} />
+      )}
+      {ending === "wall" && <EndScreenWall videos={wall} channelName={channelName} />}
 
       {/* The bottom chrome. */}
       <div

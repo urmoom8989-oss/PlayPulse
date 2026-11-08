@@ -6,6 +6,7 @@ const VOLUME_KEY = "sloptube.player.volume";
 const QUALITY_KEY = "sloptube.player.quality";
 const THEATER_KEY = "sloptube.player.theater";
 const RESUME_KEY = "sloptube.player.resume";
+const AUTOPLAY_KEY = "sloptube.player.autoplay";
 
 /** How many videos keep a resume position. The oldest is dropped first. */
 const RESUME_MAX = 50;
@@ -48,6 +49,15 @@ export function loadQuality(): string | null {
 
 export function saveQuality(label: string) {
   write(QUALITY_KEY, label);
+}
+
+/** Autoplay is on until someone switches it off, like YouTube. */
+export function loadAutoplay(): boolean {
+  return read(AUTOPLAY_KEY) !== "0";
+}
+
+export function saveAutoplay(on: boolean) {
+  write(AUTOPLAY_KEY, on ? null : "0");
 }
 
 export function loadTheater(): boolean {

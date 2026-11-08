@@ -277,6 +277,12 @@ the browser:
   page its codecs or connection speed.
 - **Double tap** on a phone: the left half goes back 10 seconds, the right half
   forward, and each extra tap adds 10 more. A single tap still plays or pauses.
+- **Autoplay.** The Autoplay switch above Up next works and the browser
+  remembers it (on until switched off). When a video ends with autoplay on,
+  the player shows "Up next in 8" with the next video, a ring that counts
+  down, Cancel and a play button to go at once. With autoplay off, or after
+  Cancel, the end screen is a 3 by 3 wall of nine videos from Up next. Loop
+  stops a video from ending, so it never autoplays.
 
 ### How the player gets the video
 
