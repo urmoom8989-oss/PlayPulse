@@ -203,7 +203,7 @@ export function Player({
   const router = useRouter();
   const autoplay = useWatch((s) => s.autoplay);
   const syncAutoplay = useWatch((s) => s.syncAutoplay);
-  const [ending, setEnding] = useState<"countdown" | "wall" | null>(null);
+  const [endState, setEnding] = useState<"countdown" | "wall" | null>(null);
   const wall = useMemo(() => endScreenVideos(upNext, videoId), [upNext, videoId]);
   const next = useMemo(() => nextVideo(upNext, videoId), [upNext, videoId]);
 
@@ -380,8 +380,11 @@ export function Player({
     const wrap = wrapRef.current;
     if (!wrap) return;
     const measure = () => setPlayerH(wrap.getBoundingClientRect().height);
-    measure();
-    if (typeof ResizeObserver === "undefined") return;
+    // ResizeObserver also reports the first size right after observe().
+    if (typeof ResizeObserver === "undefined") {
+      const raf = requestAnimationFrame(measure);
+      return () => cancelAnimationFrame(raf);
+    }
     const ro = new ResizeObserver(measure);
     ro.observe(wrap);
     return () => ro.disconnect();
@@ -556,10 +559,8 @@ export function Player({
   const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
 
   useEffect(() => syncAutoplay(), [syncAutoplay]);
-  // Autoplay switched off during the countdown: show the wall instead.
-  useEffect(() => {
-    if (ending === "countdown" && !autoplay) setEnding(wall.length ? "wall" : null);
-  }, [ending, autoplay, wall.length]);
+  // Autoplay switched off during the countdown: the wall shows instead.
+  const ending = endState === "countdown" && !autoplay ? (wall.length ? "wall" : null) : endState;
   const playNext = useCallback(() => {
     if (next) router.push(`/watch?v=${encodeURIComponent(next.id)}`);
   }, [next, router]);

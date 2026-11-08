@@ -69,9 +69,12 @@ export function StatsForNerds({
       const video = videoRef.current;
       if (video) setRows(nerdRows(read(videoId, video, hlsRef.current, engine, quality, playingLevel)));
     };
-    tick();
+    const first = setTimeout(tick, 0);
     const id = setInterval(tick, REFRESH_MS);
-    return () => clearInterval(id);
+    return () => {
+      clearTimeout(first);
+      clearInterval(id);
+    };
   }, [videoId, videoRef, hlsRef, engine, quality, playingLevel]);
 
   return (

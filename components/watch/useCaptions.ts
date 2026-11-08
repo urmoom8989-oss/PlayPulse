@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   captionPrefsText,
   DEFAULT_CAPTION_PREFS,
@@ -15,6 +15,8 @@ import {
   type CaptionTrack,
 } from "@/lib/watch/captions";
 import { loadCaptions, saveCaptions } from "@/lib/watch/prefs";
+
+const EMPTY: CaptionCue[] = [];
 
 /** A subtitle playlist with more files than this is cut off there. Ours have one. */
 const MAX_FILES = 50;
@@ -33,20 +35,20 @@ async function fetchText(url: string): Promise<string> {
 export function useCaptions(src: string | null, enabled: boolean) {
   const [tracks, setTracks] = useState<CaptionTrack[]>([]);
   const [prefs, setPrefs] = useState<CaptionPrefs>(DEFAULT_CAPTION_PREFS);
-  const [cues, setCues] = useState<{ trackId: string; cues: CaptionCue[] } | null>(null);
-  const cache = useRef(new Map<string, CaptionCue[]>());
+  /** The cues of every track loaded so far, by track id. */
+  const [loaded, setLoaded] = useState<Record<string, CaptionCue[]>>({});
 
-  // What this browser remembers, once it is in the browser.
-  useEffect(() => setPrefs(parseCaptionPrefs(loadCaptions())), []);
-
-  // The tracks, from the master playlist the player loads anyway.
+  // The tracks, from the master playlist the player loads anyway, and what this
+  // browser remembers about captions (only needed once there are tracks).
   useEffect(() => {
     if (!enabled || !src) return;
     let stopped = false;
     const url = new URL(src, window.location.href).toString();
     fetchText(url)
       .then((text) => {
-        if (!stopped) setTracks(parseSubtitleTracks(text, url));
+        if (stopped) return;
+        setPrefs(parseCaptionPrefs(loadCaptions()));
+        setTracks(parseSubtitleTracks(text, url));
       })
       .catch(() => {});
     return () => {
@@ -59,26 +61,21 @@ export function useCaptions(src: string | null, enabled: boolean) {
   const trackId = track?.id ?? null;
 
   // The words of the track that is on, fetched once per track.
+  const haveCues = trackId !== null && trackId in loaded;
   useEffect(() => {
-    if (!trackId) return;
-    const known = cache.current.get(trackId);
-    if (known) {
-      setCues({ trackId, cues: known });
-      return;
-    }
+    if (!trackId || haveCues) return;
     let stopped = false;
     (async () => {
       const playlist = await fetchText(trackId);
       const files = subtitleSegments(playlist, trackId).slice(0, MAX_FILES);
       const texts = await Promise.all(files.map((f) => (f === trackId ? playlist : fetchText(f))));
       const all = texts.flatMap((t) => parseCaptionVtt(t)).sort((a, b) => a.start - b.start);
-      cache.current.set(trackId, all);
-      if (!stopped) setCues({ trackId, cues: all });
+      if (!stopped) setLoaded((prev) => ({ ...prev, [trackId]: all }));
     })().catch(() => {});
     return () => {
       stopped = true;
     };
-  }, [trackId]);
+  }, [trackId, haveCues]);
 
   const update = useCallback((next: (p: CaptionPrefs) => CaptionPrefs) => {
     setPrefs((p) => {
@@ -98,7 +95,7 @@ export function useCaptions(src: string | null, enabled: boolean) {
   return {
     tracks,
     track,
-    cues: cues && cues.trackId === trackId ? cues.cues : [],
+    cues: (trackId && loaded[trackId]) || EMPTY,
     style: prefs.style,
     lang: prefs.lang,
     choose,
