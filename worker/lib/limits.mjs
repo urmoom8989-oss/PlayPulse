@@ -4,8 +4,22 @@
 /** A job is tried this many times before the video is marked failed (encode_max_attempts()). */
 export const MAX_ATTEMPTS = 3;
 
-/** A worker stops a job after 2 hours. The database takes a job back after 2 h 15 min. */
+/**
+ * A worker stops a job that runs too long. Until the probe knows the video's
+ * length the limit is 2 hours; then it is 1 hour plus twice the length, at
+ * least 2 and at most 12 hours, so a 3 hour upload gets 7 hours. The database
+ * only takes a running job back when another worker asks for work and the job
+ * started more than 2 h 15 min ago (encode_stale_after() in 006): run one
+ * worker when uploads can be that long.
+ */
 export const JOB_TIMEOUT_MS = 2 * 60 * 60 * 1000;
+export const JOB_TIMEOUT_MAX_MS = 12 * 60 * 60 * 1000;
+
+/** The time limit for a job whose video is `durationS` seconds long. */
+export function jobTimeoutMs(durationS) {
+  const d = Number.isFinite(durationS) && durationS > 0 ? durationS : 0;
+  return Math.min(JOB_TIMEOUT_MAX_MS, Math.max(JOB_TIMEOUT_MS, 60 * 60 * 1000 + d * 2 * 1000));
+}
 
 /** How long the worker waits between claim_encode_job calls when there is nothing to do. */
 export const POLL_MS = 5000;

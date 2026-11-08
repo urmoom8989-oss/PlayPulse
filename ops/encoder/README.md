@@ -42,8 +42,9 @@ Hetzner docs: [Creating a server](https://docs.hetzner.com/cloud/servers/getting
 **How fast is it?** On a CPX31 a 10 minute 1080p video takes roughly 10 to 15
 minutes: about as long as the video itself, a bit more for busy footage. A 720p
 video takes about half that. Jobs wait in line, so a busy day means a longer
-wait, not errors. Every job stops after 2 hours, which is enough for videos up
-to about 1.5 hours long at 1080p.
+wait, not errors. A job may take 1 hour plus twice the video's length (at least
+2 and at most 12 hours), so a 3 hour upload gets 7 hours before it is stopped.
+The studio's progress bar moves during the whole encode.
 
 ## 2. Log in to the server
 
@@ -216,7 +217,8 @@ deleting. Nothing to set up beyond migration 014.
   right away, without retries.
 - If the box crashes during an encode, the worker gives the job back when it
   starts again. A job stuck as `running` for more than 2 h 15 min is taken back
-  by the next worker that asks.
+  by the next worker that asks, so with uploads longer than about an hour run
+  one encoder, or a second one could take over a long encode that is still going.
 - To try a failed video again, set its `status` back to `uploaded` in the
   `videos` table. A fresh job is queued.
 - To stop the encoder: `systemctl stop sloptube-encoder`. A running job goes back

@@ -7,7 +7,7 @@ import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
-import { buildEncodeArgs, buildThumbnailArgs, createProgressParser, thumbnailName } from "../lib/ffmpeg.mjs";
+import { buildEncodeArgs, buildSpriteArgs, buildThumbnailArgs, createProgressParser, thumbnailName } from "../lib/ffmpeg.mjs";
 import { pickRenditions } from "../lib/ladder.mjs";
 import { buildProbeArgs, parseProbe } from "../lib/probe.mjs";
 import { run } from "../lib/run.mjs";
@@ -38,9 +38,11 @@ test("a 3 s generated clip becomes 360p HLS with thumbnails and a sprite", { ski
 
     const out = join(dir, "out");
     await mkdir(out);
+    const spriteFrames = join(dir, "sprite", "%03d.png");
+    await mkdir(join(dir, "sprite"));
     const times = [];
     let ended = false;
-    await run("ffmpeg", buildEncodeArgs({ input, renditions, hasAudio: true, sprite, preset: "ultrafast" }), {
+    await run("ffmpeg", buildEncodeArgs({ input, renditions, hasAudio: true, sprite, spriteFrames, preset: "ultrafast" }), {
       cwd: out,
       onStdout: createProgressParser((s) => times.push(s), () => (ended = true)),
     });
@@ -50,6 +52,7 @@ test("a 3 s generated clip becomes 360p HLS with thumbnails and a sprite", { ski
     for (const i of [0, 1, 2]) {
       await run("ffmpeg", buildThumbnailArgs({ input, atSeconds: probe.durationS * [0.1, 0.5, 0.9][i], output: join(out, thumbnailName(i)) }));
     }
+    await run("ffmpeg", buildSpriteArgs({ frames: spriteFrames, plan: sprite, output: join(out, "sprite.webp") }));
     await writeFile(join(out, "sprite.vtt"), buildVtt(sprite, probe.durationS));
 
     const master = await readFile(join(out, "master.m3u8"), "utf8");

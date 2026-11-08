@@ -9,6 +9,7 @@ import {
   SPRITE_IMAGE,
   SPRITE_VTT,
   buildEncodeArgs,
+  buildSpriteArgs,
   buildThumbnailArgs,
   createProgressParser,
   encodePercent,
@@ -16,7 +17,7 @@ import {
   thumbnailName,
 } from "./ffmpeg.mjs";
 import { pickRenditions } from "./ladder.mjs";
-import { DISK_MARGIN_BYTES, DISK_SOURCE_FACTOR, JOB_TIMEOUT_MS, PROGRESS_EVERY_MS, THUMBNAIL_AT } from "./limits.mjs";
+import { DISK_MARGIN_BYTES, DISK_SOURCE_FACTOR, JOB_TIMEOUT_MS, PROGRESS_EVERY_MS, THUMBNAIL_AT, jobTimeoutMs } from "./limits.mjs";
 import { human, seconds } from "./log.mjs";
 import { buildProbeArgs, parseProbe } from "./probe.mjs";
 import { run as realRun } from "./run.mjs";
@@ -48,6 +49,14 @@ function sourceName(key) {
   return `source.${ext.toLowerCase()}`;
 }
 
+/** A time limit in words: "7 hours", "90 minutes", "1 second". */
+export function limitText(ms) {
+  const plural = (n, unit) => `${n} ${unit}${n === 1 ? "" : "s"}`;
+  if (ms >= 60 * 60 * 1000) return plural(Math.round((ms / (60 * 60 * 1000)) * 10) / 10, "hour");
+  if (ms >= 60 * 1000) return plural(Math.round(ms / (60 * 1000)), "minute");
+  return plural(Math.max(1, Math.round(ms / 1000)), "second");
+}
+
 /** What ends up in videos.renditions: one entry per rung, smallest first. */
 export function renditionsJson(renditions) {
   return renditions.map((r) => ({
@@ -72,7 +81,8 @@ export async function processJob(job, deps) {
     config,
     run = realRun,
     diskFree = freeBytes,
-    timeoutMs = JOB_TIMEOUT_MS,
+    // A fixed limit for the tests; without it the limit follows the video's length.
+    timeoutMs = null,
     progressEveryMs = PROGRESS_EVERY_MS,
     now = () => Date.now(),
   } = deps;
@@ -80,10 +90,9 @@ export async function processJob(job, deps) {
   const started = now();
   const controller = new AbortController();
   const { signal } = controller;
-  const timer = setTimeout(
-    () => controller.abort(new JobError("took longer than 2 hours", { retry: false })),
-    timeoutMs,
-  );
+  let limit = timeoutMs ?? JOB_TIMEOUT_MS;
+  const tooLong = () => controller.abort(new JobError(`took longer than ${limitText(limit)}`, { retry: false }));
+  let timer = setTimeout(tooLong, limit);
   // A shutdown (docker stop) aborts the job; the next worker tries it again.
   const onStop = () => controller.abort(new JobError("the worker was stopped", { retry: true }));
   deps.stopSignal?.addEventListener("abort", onStop, { once: true });
@@ -131,6 +140,9 @@ export async function processJob(job, deps) {
     dir = await mkdtemp(join(config.workDir, "job-"));
     const out = join(dir, "out");
     await mkdir(out);
+    // The sprite's frames, outside `out` so they are never uploaded.
+    const spriteFrames = join(dir, "sprite", "%03d.png");
+    await mkdir(join(dir, "sprite"));
     const input = join(dir, sourceName(job.sourceKey));
 
     // 3. Download.
@@ -149,10 +161,16 @@ export async function processJob(job, deps) {
     }
     const renditions = pickRenditions(probe);
     const sprite = spritePlan(probe.durationS);
+    // Now that the length is known, a long video gets a longer limit.
+    if (timeoutMs === null) {
+      limit = jobTimeoutMs(probe.durationS);
+      clearTimeout(timer);
+      timer = setTimeout(tooLong, Math.max(0, limit - (now() - started)));
+    }
     log(
       "probe",
       { ...ids, duration: probe.durationS.toFixed(1), size: `${probe.width}x${probe.height}`, audio: probe.hasAudio },
-      `renditions ${renditions.map((r) => `${r.name}(${r.width}x${r.height})`).join(" ")}`,
+      `renditions ${renditions.map((r) => `${r.name}(${r.width}x${r.height})`).join(" ")}, time limit ${limitText(limit)}`,
     );
 
     // 5. Encode: one ffmpeg run for the whole ladder and the sprite.
@@ -160,7 +178,7 @@ export async function processJob(job, deps) {
     await progress(PROGRESS_STEPS.encodeStart, true);
     const pending = [];
     const parse = createProgressParser((s) => pending.push(progress(encodePercent(s, probe.durationS))));
-    await run("ffmpeg", buildEncodeArgs({ input, renditions, hasAudio: probe.hasAudio, sprite }), {
+    await run("ffmpeg", buildEncodeArgs({ input, renditions, hasAudio: probe.hasAudio, sprite, spriteFrames }), {
       cwd: out,
       signal,
       onStdout: parse,
@@ -169,8 +187,9 @@ export async function processJob(job, deps) {
     log("encode", ids, `${renditions.length} renditions in ${seconds(now() - t)}`);
     await progress(PROGRESS_STEPS.encodeEnd, true);
 
-    // 6. Thumbnails at 10%, 50% and 90%, and the sprite's WebVTT.
+    // 6. Thumbnails at 10%, 50% and 90%, the sprite tiled from its frames, and its WebVTT.
     t = now();
+    await run("ffmpeg", buildSpriteArgs({ frames: spriteFrames, plan: sprite, output: join(out, SPRITE_IMAGE) }), { signal });
     for (const [i, share] of THUMBNAIL_AT.entries()) {
       const at = Math.min(probe.durationS * share, Math.max(0, probe.durationS - 0.1));
       await run("ffmpeg", buildThumbnailArgs({ input, atSeconds: at, output: join(out, thumbnailName(i)) }), { signal });

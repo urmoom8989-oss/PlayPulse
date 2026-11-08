@@ -345,7 +345,7 @@ test("a job over the time limit is stopped and failed without a retry", async ()
     assert.equal(await tick(s.deps), "failed");
     const failed = s.supabase.calls.find((c) => c.name === "encode_failed").args;
     assert.equal(failed.retry, false);
-    assert.equal(failed.error, "took longer than 2 hours");
+    assert.equal(failed.error, "took longer than 1 second");
   } finally {
     await s.cleanup();
   }
