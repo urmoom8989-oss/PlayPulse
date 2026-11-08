@@ -28,7 +28,7 @@ export function HistoryRow({ video, onRemove }: { video: HistoryCard; onRemove?:
       >
         <Thumb src={video.thumbnail} alt={video.title} sizes="(min-width: 656px) 246px, 160px" />
         {video.durationS !== null && (
-          <span className="absolute bottom-1.5 right-1 rounded-sm bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 tracking-[0.5px] text-white">
+          <span className="absolute bottom-1.5 right-1 bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 tracking-[0.5px] text-white">
             {formatTime(video.durationS)}
           </span>
         )}
