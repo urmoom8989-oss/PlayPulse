@@ -84,7 +84,7 @@ function fakeSupabase({ jobs = [], claimError = null, progressAnswer = null, sdF
 }
 
 /** The real storage code on an S3 client whose send() is mocked. */
-function fakeR2({ size = BYTES } = {}) {
+function fakeR2({ size = BYTES, chunks = 1 } = {}) {
   const client = createR2Client({ accountId: "example", accessKeyId: "test-key-id", secretAccessKey: "test-secret" });
   const sent = [];
   const puts = new Map();
@@ -101,7 +101,8 @@ function fakeR2({ size = BYTES } = {}) {
       const put = puts.get(input.Key);
       if (put) return { Body: { transformToString: async () => put.text } };
       if (input.Key.startsWith("hls/")) throw Object.assign(new Error("NoSuchKey"), { name: "NoSuchKey", $metadata: { httpStatusCode: 404 } });
-      return { Body: Readable.from([Buffer.alloc(BYTES, 1)]) };
+      // The source, in `chunks` pieces.
+      return { Body: Readable.from(Array.from({ length: chunks }, () => Buffer.alloc(BYTES / chunks, 1))) };
     }
     if (name === "PutObjectCommand") {
       // Small files come as a Buffer (so a retry can send them again), big ones as a stream.
@@ -219,7 +220,7 @@ test("claim, progress, upload and done", async () => {
     // Progress only goes up, stays below 100 and passes through the encode share.
     const pcts = s.supabase.calls.filter((c) => c.name === "encode_progress").map((c) => c.args.pct);
     assert.deepEqual([...pcts].sort((a, b) => a - b), pcts);
-    assert.ok(pcts.includes(47) && pcts.includes(90) && pcts.at(-1) === 99, `progress was ${pcts}`);
+    assert.ok(pcts.includes(10) && pcts.includes(50) && pcts.includes(90) && pcts.at(-1) === 99, `progress was ${pcts}`);
 
     const done = s.supabase.calls.at(-1).args;
     assert.deepEqual(done, {
@@ -329,10 +330,10 @@ test("low quality first: 360p plays, then 720p and 1080p are added to the same m
       assert.ok(s.r2.puts.has(`hls/${VIDEO}/${k}`), `${k} was not stored`);
     }
 
-    // The bar fills once: the low part ends at 30, HD to 99.
+    // The bar fills once: the low part ends at 33, HD to 99.
     const pcts = s.supabase.calls.filter((c) => c.name === "encode_progress").map((c) => c.args.pct);
     assert.deepEqual([...pcts].sort((a, b) => a - b), pcts);
-    assert.ok(pcts.includes(25) && pcts.includes(30) && pcts.includes(92) && pcts.at(-1) === 99, `progress was ${pcts}`);
+    assert.ok(pcts.includes(28) && pcts.includes(33) && pcts.includes(92) && pcts.at(-1) === 99, `progress was ${pcts}`);
     assert.ok(s.lines.some((l) => l.startsWith("sd ") && l.includes("360p playable")), s.lines.join("\n"));
     assert.deepEqual(await readdir(s.workDir), []);
   } finally {
@@ -401,6 +402,19 @@ test("a retry of the HD part whose low master is gone fails without another retr
     const failed = s.supabase.calls.find((c) => c.name === "encode_failed").args;
     assert.equal(failed.retry, false);
     assert.match(failed.error, /low quality master playlist is gone/);
+  } finally {
+    await s.cleanup();
+  }
+});
+
+test("the bar moves while the source comes in, up to 10%", async () => {
+  const s = await setup({ jobs: [{}], chunks: 4 });
+  try {
+    assert.equal(await tick(s.deps), "done");
+    const pcts = s.supabase.calls.filter((c) => c.name === "encode_progress").map((c) => c.args.pct);
+    // 4 pieces of the file: 2, 5, 7, then 10 when it is all in; the encode starts after.
+    assert.deepEqual(pcts.slice(0, 4), [2, 5, 7, 10], `progress was ${pcts}`);
+    assert.ok(pcts[4] >= 11, `progress was ${pcts}`);
   } finally {
     await s.cleanup();
   }

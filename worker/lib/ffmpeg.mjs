@@ -217,27 +217,31 @@ export function createProgressParser(onTime, onEnd = () => {}) {
   };
 }
 
-/** The share of the job a step covers, so the studio bar moves once from 0 to 100. */
+/**
+ * The share of the job a step covers, so the studio bar moves once from 0 to
+ * 100. The download gets the first 10%, counted as the bytes come in, so a
+ * big upload on slow storage does not sit at 0%.
+ */
 export const PROGRESS_STEPS = {
-  downloaded: 3,
-  encodeStart: 5,
+  downloaded: 10,
+  encodeStart: 11,
   encodeEnd: 90,
   thumbnails: 92,
   uploadEnd: 99,
 };
 
 /**
- * Low quality first: the quick low run up to 30% (the video plays from
+ * Low quality first: the quick low run up to 33% (the video plays from
  * there), then the HD run and its upload. Owners see the HD share as
  * "HD processing".
  */
 export const SPLIT_STEPS = {
-  downloaded: 3,
-  encodeStart: 5,
-  encodeEnd: 25,
-  thumbnails: 27,
-  uploadEnd: 30,
-  hdStart: 30,
+  downloaded: 10,
+  encodeStart: 11,
+  encodeEnd: 28,
+  thumbnails: 30,
+  uploadEnd: 33,
+  hdStart: 33,
   hdEnd: 92,
   hdUploadEnd: 99,
 };

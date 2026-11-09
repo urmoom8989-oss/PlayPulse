@@ -144,7 +144,9 @@ export async function processJob(job, deps) {
 
     // 3. Download.
     let t = now();
-    await storage.download(job.sourceKey, input, signal);
+    // The bar moves while the file comes in (the first 10%), so a slow download does not look stuck.
+    // In pieces, 4 at a time, each fetched again if its connection drops.
+    await storage.download(job.sourceKey, input, signal, (got) => void progress((PROGRESS_STEPS.downloaded * got) / size), { size });
     log("download", ids, `${human(size)} in ${seconds(now() - t)}`);
     await progress(PROGRESS_STEPS.downloaded, true);
 
