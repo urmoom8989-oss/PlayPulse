@@ -178,7 +178,7 @@ export function uploadErrorText(code: string | null | undefined): string {
     case "too_young":
       return "You must be 13 or older to upload.";
     case "no_channel":
-      return "Your account does not have a channel yet.";
+      return "Create a channel first: it's in the account menu.";
     case "title_invalid":
       return "Add a title of 1 to 100 characters.";
     case "description_too_long":

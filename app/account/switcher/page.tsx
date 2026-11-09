@@ -1,28 +1,25 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { ChannelMessage } from "@/components/channel/ChannelNotices";
-import { Switcher } from "@/components/switch/Switcher";
-import { switchState } from "@/lib/switch/server";
+import { AccountsPage } from "@/components/switch/AccountsPage";
+import { accountsState } from "@/lib/switch/server";
 
-export const metadata = { title: "Your channels | PlayPulse" };
+export const metadata = { title: "Accounts | PlayPulse" };
 
 async function SwitcherGate() {
-  const state = await switchState();
+  const state = await accountsState();
   switch (state.kind) {
-    case "signed-out":
-      redirect("/login?next=/account/switcher");
     case "no-db":
-      return <ChannelMessage state="no-db" title="database not connected">Connect the database to manage channels.</ChannelMessage>;
-    case "not-set-up":
-      return <ChannelMessage state="not-set-up" title="Switching accounts isn't set up yet">Run supabase/migrations/031_switch_account.sql.</ChannelMessage>;
+      return <ChannelMessage state="no-db" title="database not connected">Connect the database to switch accounts.</ChannelMessage>;
     case "off":
       return <ChannelMessage state="off" title="Switching accounts isn't on yet">Check back soon.</ChannelMessage>;
     case "ready":
-      return <Switcher accounts={state.accounts} canCreate={state.canCreate} />;
+      if (!state.signedIn) redirect("/login?next=/account/switcher");
+      return <AccountsPage accounts={state.accounts} />;
   }
 }
 
-/** /account/switcher, like 2020's channel switcher: every channel of this login, and Create a new channel. */
+/** /account/switcher, like 2020's account switcher: every account signed in on this browser, and Add account. */
 export default function SwitcherPage() {
   return (
     <div className="mx-auto max-w-[1000px] px-4 py-6 sm:px-6">

@@ -4,7 +4,8 @@
 
 import { isMode, type CommentsMode, type CommentSort } from "./rules.ts";
 
-export type CommentAuthor = { handle: string; name: string; avatarUrl: string | null };
+/** handle is the author's channel, null when they have no channel (036): the name shows without a link. */
+export type CommentAuthor = { handle: string | null; name: string; avatarUrl: string | null };
 
 export type Comment = {
   id: string;
@@ -79,9 +80,9 @@ export function rowToComment(row: CommentRow): Comment {
     deleted,
     removed: deleted && row.removed === true,
     author:
-      deleted || !row.author_handle
+      deleted || !(row.author_handle || row.author_name)
         ? null
-        : { handle: row.author_handle, name: row.author_name || row.author_handle, avatarUrl: row.author_avatar_url ?? null },
+        : { handle: row.author_handle || null, name: row.author_name || row.author_handle || "", avatarUrl: row.author_avatar_url ?? null },
     byOwner: row.by_owner === true,
     mine: row.mine === true,
     liked: row.liked === true,

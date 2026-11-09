@@ -122,10 +122,12 @@ export function CommentItem({ comment, ctx, parentId = null }: { comment: Commen
       data-hearted={comment.hearted ? "1" : undefined}
     >
       <div className="shrink-0">
-        {author ? (
+        {author?.handle ? (
           <Link href={`/@${author.handle}`} aria-label={author.name}>
             <Avatar name={author.name} url={author.avatarUrl} size={size} />
           </Link>
+        ) : author ? (
+          <Avatar name={author.name} url={author.avatarUrl} size={size} />
         ) : (
           <span className="block rounded-full bg-skeleton" style={{ width: size, height: size }} />
         )}
@@ -147,7 +149,7 @@ export function CommentItem({ comment, ctx, parentId = null }: { comment: Commen
           <>
             <div className="flex items-start gap-2">
               <p className="min-w-0 flex-1 text-[13px] leading-[18px]">
-                {author && (
+                {author?.handle ? (
                   <Link
                     href={`/@${author.handle}`}
                     className={`mr-1 font-medium text-text ${comment.byOwner ? "rounded-full bg-[var(--sub-bg)] px-1.5 py-px" : ""}`}
@@ -155,7 +157,12 @@ export function CommentItem({ comment, ctx, parentId = null }: { comment: Commen
                   >
                     {author.name}
                   </Link>
-                )}
+                ) : author ? (
+                  // No channel (036): the account's name, without a link.
+                  <span className="mr-1 font-medium text-text" data-comment-author>
+                    {author.name}
+                  </span>
+                ) : null}
                 <span className="text-text-2" data-comment-time>
                   {pending ? t("Posting...") : agoIn(lang, comment.createdAt, ctx.now, timeAgo(comment.createdAt, ctx.now))}
                   {comment.editedAt && !pending ? " (edited)" : ""}
