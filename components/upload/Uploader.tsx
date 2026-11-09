@@ -5,6 +5,7 @@ import { useEffect, useRef, useState, type DragEvent, type ReactNode } from "rea
 import { useFlag } from "@/lib/store/session";
 import { useUpload } from "@/lib/store/upload";
 import { PublishButton } from "./PublishButton";
+import { UploadStatus } from "./UploadStatus";
 import {
   ACCEPT,
   DESCRIPTION_MAX,
@@ -495,7 +496,11 @@ function DoneView() {
   return (
     <div data-upload-phase="done" className="flex min-h-[420px] flex-col items-center justify-center px-6 py-12 text-center">
       <CheckCircle className="h-16 w-16 text-[#2ba640]" />
-      <p className="mt-5 text-[20px] leading-7 text-text">Video uploaded. Processing starts soon.</p>
+      {videoId ? (
+        <UploadStatus videoId={videoId} />
+      ) : (
+        <p className="mt-5 text-[20px] leading-7 text-text">Video uploaded. Processing starts soon.</p>
+      )}
       <p className="mt-2 max-w-[520px] text-[14px] leading-5 text-text-2">
         <span className="font-medium text-text">{details.title}</span>
         {published

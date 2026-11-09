@@ -81,3 +81,23 @@ export function processingLine(s: Pick<LiveStatus, "status" | "job" | "progress"
   if (s.job.status === "queued" && s.job.attempts > 0) return `Trying again (attempt ${s.job.attempts + 1} of 3)`;
   return "Waiting to process";
 }
+
+/**
+ * The upload page once the file is up, like the 2020 upload dialog: it says
+ * Processing right away (also while the video waits for a free encoder), then
+ * the percent, then that it can be watched while HD is made, then done.
+ */
+export function uploadStatusText(s: Pick<LiveStatus, "status" | "job" | "progress" | "hdPending" | "error">): {
+  title: string;
+  line: string | null;
+  /** The bar, or null for none. */
+  pct: number | null;
+} {
+  if (s.status === "failed") return { title: "Processing failed", line: s.error, pct: null };
+  if (s.status === "ready" && s.hdPending) {
+    return { title: "Your video can be watched now", line: processingLine(s), pct: s.progress ?? 0 };
+  }
+  if (s.status === "ready") return { title: "Processing done. Your video is ready.", line: null, pct: null };
+  const pct = s.job?.status === "running" ? (s.progress ?? s.job.progress) : 0;
+  return { title: "Processing...", line: processingLine(s) ?? "Waiting to process", pct };
+}
