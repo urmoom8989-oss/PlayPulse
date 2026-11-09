@@ -1,16 +1,18 @@
 import { Suspense } from "react";
 import { StudioNav } from "@/components/studio/StudioNav";
 import { getCurrentUser } from "@/lib/auth";
+import { botsPanelOn } from "@/lib/bots/server";
 import { statsOn } from "@/lib/stats/server";
 import { studioOn } from "@/lib/studio/server";
 
 /** The left nav, only while the studio flag is on. Off, every /studio page looks as it did before. */
 async function NavGate() {
   if (!(await studioOn())) return null;
-  const [user, stats] = await Promise.all([getCurrentUser(), statsOn()]);
+  const [user, stats, bots] = await Promise.all([getCurrentUser(), statsOn(), botsPanelOn()]);
   return (
     <StudioNav
       statsOn={stats}
+      botsOn={bots}
       channel={{
         name: user?.displayName || user?.username || "Your channel",
         handle: user?.channelHandle ?? null,

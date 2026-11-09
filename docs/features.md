@@ -454,29 +454,41 @@ stream, with live chat.
 
 ### Channel bots
 
-Behind the `bots` flag (`030_bots.sql`, off at first), for channels with
-`channels.bots_on` (set for @typicalgamer only), the encoder worker adds
-activity that reads like real people's and counts like it everywhere (the
-counts, Trending, analytics):
+Behind the `bots` flag (`030_bots.sql` and `034_bot_panel.sql`, off at first),
+for channels with `channels.bots_on` (set for @typicalgamer only). Nothing is
+added on its own: the owner orders bots in the studio's **Bots** page
+(`/studio/bots`, in the studio nav only for those channels), and the encoder
+worker delivers them. Bot activity reads like real people's and counts like it
+everywhere (the counts, Trending, analytics).
 
-- **Views** every 10 minutes, a day's worth spread out (400 a day per video by
-  default, most in the first day, fewer as a video gets older). Each is a
-  counted view of its own, with a watch time and a traffic source.
-- **Likes and dislikes** that go with the views (4.5% and 0.2%), from 300 bot
-  accounts with ordinary names (made by the migration; they cannot sign in).
-- **Subscribers**, about 12 a day, until every bot account follows the channel.
-- **Comments** now and then (0.4% of views): most quote or point at a moment in
-  the video, read from its auto-generated captions ("2:31 "no way he actually
-  built the whole castle in one night" 😂"), some name a chapter or a word from
-  the title, the rest are the usual "who's watching in November 2026?". Never
-  the same text twice on a video, nothing on videos with comments off or held.
-  Bots also like some comments.
-- **During a Premiere or live broadcast**, a crowd of 25 to 90 watching (some
-  waiting before it starts) and about 4 chat lines a minute, some about what was
-  just said.
+- **For a video** (public or unlisted, processed): how many views, likes,
+  dislikes and comments, and how fast: right away, over 1 hour, over 24 hours
+  or over 7 days. "Match likes and comments to the views" fills in the rates
+  real videos get (4.5% likes, 0.2% dislikes, 0.4% comments). At most
+  1,000,000 views, 10,000 likes, 10,000 dislikes and 1,000 comments an order.
+- **For the channel**: up to 10,000 subscribers an order, with the same choice
+  of speed.
+- **Orders** show how much is delivered, with a progress bar, and can be
+  cancelled; what was added stays. The worker delivers a little every minute,
+  spread over the window (in pieces of 10,000 views, 600 reactions, 10 comments
+  and 1,000 subscribers a minute for big "right away" orders). An order stops
+  when its video goes private, is deleted or is removed.
+- **Views** are counted views of their own, with a watch time and a traffic
+  source; a Premiere or live broadcast gets none before it starts.
+- **Likes, dislikes and subscriptions** come from bot accounts with ordinary
+  names (300 made by 030; they cannot sign in), one each per video or channel.
+  When an order needs more, the worker makes more, up to 10,000.
+- **Comments** mostly quote or point at a moment in the video, read from its
+  auto-generated captions ("2:31 "no way he actually built the whole castle in
+  one night" 😂"), some name a chapter or a word from the title, the rest are the
+  usual "who's watching in November 2026?". Never the same text twice on a
+  video, none on videos with comments off or held. Bots also like some comments.
+- **During a Premiere or live broadcast**, only when the owner ticks "Bot viewers
+  and chat" on it: a crowd of 25 to 90 watching (some waiting before it starts)
+  and about 4 chat lines a minute, some about what was just said.
 
-The rates are in the one row of `public.bot_settings`. Nobody can read the bot
-tables or call the bot functions through the API; only the worker can.
+Nobody can read the bot tables or call the worker's bot functions through the
+API; the panel's functions only answer the owner of a channel with bots.
 
 ### How the player gets the video
 

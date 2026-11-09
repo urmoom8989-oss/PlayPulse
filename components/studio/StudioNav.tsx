@@ -5,30 +5,31 @@ import { usePathname } from "next/navigation";
 import { Suspense, useEffect, type ComponentType } from "react";
 import { useUi } from "@/lib/store/ui";
 import { Avatar } from "../Avatar";
-import { AnalyticsIcon, CommentIcon, DashboardIcon, PaletteIcon, SettingsIcon, VideoLibraryIcon } from "../icons";
+import { AnalyticsIcon, BotIcon, CommentIcon, DashboardIcon, PaletteIcon, SettingsIcon, VideoLibraryIcon } from "../icons";
 
-type Item = { href: string; label: string; Icon: ComponentType<{ className?: string }>; also?: string[]; flag?: "stats" };
+type Item = { href: string; label: string; Icon: ComponentType<{ className?: string }>; also?: string[]; flag?: "stats" | "bots" };
 
 export const STUDIO_NAV: Item[] = [
   { href: "/studio", label: "Dashboard", Icon: DashboardIcon },
   { href: "/studio/content", label: "Content", Icon: VideoLibraryIcon, also: ["/studio/video", "/studio/videos"] },
   { href: "/studio/analytics", label: "Analytics", Icon: AnalyticsIcon, flag: "stats" },
   { href: "/studio/comments", label: "Comments", Icon: CommentIcon },
+  { href: "/studio/bots", label: "Bots", Icon: BotIcon, flag: "bots" },
   { href: "/studio/channel", label: "Customization", Icon: PaletteIcon },
   { href: "/studio/settings", label: "Settings", Icon: SettingsIcon },
 ];
 
-/** The items to show: Analytics only while the stats flag is on. */
-export function navItems(statsOn: boolean): Item[] {
-  return STUDIO_NAV.filter((item) => !item.flag || (item.flag === "stats" && statsOn));
+/** The items to show: Analytics only while the stats flag is on, Bots only for channels with bots (034). */
+export function navItems(statsOn: boolean, botsOn = false): Item[] {
+  return STUDIO_NAV.filter((item) => !item.flag || (item.flag === "stats" && statsOn) || (item.flag === "bots" && botsOn));
 }
 
 /** Which item a path belongs to: the longest href that matches. A video's analytics page sits under Analytics. */
-export function activeItem(path: string | null, statsOn = false): string | null {
+export function activeItem(path: string | null, statsOn = false, botsOn = false): string | null {
   if (!path) return null;
   if (statsOn && /^\/studio\/video\/[^/]+\/analytics$/.test(path)) return "/studio/analytics";
   let best: string | null = null;
-  for (const item of navItems(statsOn)) {
+  for (const item of navItems(statsOn, botsOn)) {
     for (const href of [item.href, ...(item.also ?? [])]) {
       const hit = path === href || (href !== "/studio" && path.startsWith(href + "/"));
       if (hit && (!best || href.length > best.length)) best = item.href;
@@ -39,10 +40,10 @@ export function activeItem(path: string | null, statsOn = false): string | null 
 
 export type NavChannel = { name: string; handle: string | null; avatarUrl: string | null };
 
-function Items({ active, row, statsOn }: { active: string | null; row?: boolean; statsOn: boolean }) {
+function Items({ active, row, statsOn, botsOn }: { active: string | null; row?: boolean; statsOn: boolean; botsOn: boolean }) {
   return (
     <>
-      {navItems(statsOn).map(({ href, label, Icon }) => {
+      {navItems(statsOn, botsOn).map(({ href, label, Icon }) => {
         const on = active === href;
         return (
           <Link
@@ -71,7 +72,7 @@ function Items({ active, row, statsOn }: { active: string | null; row?: boolean;
   );
 }
 
-function NavBody({ channel, active, statsOn }: { channel: NavChannel; active: string | null; statsOn: boolean }) {
+function NavBody({ channel, active, statsOn, botsOn }: { channel: NavChannel; active: string | null; statsOn: boolean; botsOn: boolean }) {
   const setStudioNav = useUi((s) => s.setStudioNav);
   useEffect(() => {
     setStudioNav(true);
@@ -97,7 +98,7 @@ function NavBody({ channel, active, statsOn }: { channel: NavChannel; active: st
           <p className="mt-4 text-[15px] font-medium leading-5 text-[var(--studio-nav-text)]">Your channel</p>
           <p className="mt-0.5 max-w-full truncate text-[13px] text-[var(--studio-nav-text-2)]">{channel.name}</p>
         </div>
-        <Items active={active} statsOn={statsOn} />
+        <Items active={active} statsOn={statsOn} botsOn={botsOn} />
       </nav>
       {/* Phones: the same items as a strip under the top bar. */}
       <nav
@@ -105,21 +106,21 @@ function NavBody({ channel, active, statsOn }: { channel: NavChannel; active: st
         data-studio-nav-row
         className="flex overflow-x-auto bg-[var(--studio-nav)] px-1 [scrollbar-width:none] tab:hidden"
       >
-        <Items active={active} row statsOn={statsOn} />
+        <Items active={active} row statsOn={statsOn} botsOn={botsOn} />
       </nav>
     </>
   );
 }
 
-function WithPath({ channel, statsOn }: { channel: NavChannel; statsOn: boolean }) {
-  return <NavBody channel={channel} active={activeItem(usePathname(), statsOn)} statsOn={statsOn} />;
+function WithPath({ channel, statsOn, botsOn }: { channel: NavChannel; statsOn: boolean; botsOn: boolean }) {
+  return <NavBody channel={channel} active={activeItem(usePathname(), statsOn, botsOn)} statsOn={statsOn} botsOn={botsOn} />;
 }
 
-/** The creator studio's dark left nav: Dashboard, Content, Analytics (with the stats flag), Comments, Customization, Settings. */
-export function StudioNav({ channel, statsOn = false }: { channel: NavChannel; statsOn?: boolean }) {
+/** The creator studio's dark left nav: Dashboard, Content, Analytics (with the stats flag), Comments, Bots (channels with bots), Customization, Settings. */
+export function StudioNav({ channel, statsOn = false, botsOn = false }: { channel: NavChannel; statsOn?: boolean; botsOn?: boolean }) {
   return (
-    <Suspense fallback={<NavBody channel={channel} active={null} statsOn={statsOn} />}>
-      <WithPath channel={channel} statsOn={statsOn} />
+    <Suspense fallback={<NavBody channel={channel} active={null} statsOn={statsOn} botsOn={botsOn} />}>
+      <WithPath channel={channel} statsOn={statsOn} botsOn={botsOn} />
     </Suspense>
   );
 }
