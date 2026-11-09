@@ -30,7 +30,7 @@ export function SpritePreview({ vtt }: { vtt: string }) {
   const [cue, setCue] = useState<{ cue: SpriteCue; index: number; sheet: { w: number; h: number } } | null>(null);
 
   useEffect(() => {
-    const card = ref.current?.closest("[data-feed-card]");
+    const card = ref.current?.closest("[data-feed-card], [data-hover-box]");
     if (!card) return;
     let delay: ReturnType<typeof setTimeout> | undefined;
     let tick: ReturnType<typeof setInterval> | undefined;

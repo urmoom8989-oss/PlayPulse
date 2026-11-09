@@ -318,6 +318,35 @@ the browser:
   the language and the look. On phones the picture in picture button makes room
   for CC.
 
+### More keyboard shortcuts
+
+Behind the `more_shortcuts` flag (`025_shortcuts_hover.sql`, off at first), all
+in the browser:
+
+- `<` and `>` (Shift+, and Shift+.) step through the gear menu's speeds, and
+  the player shows the new speed for a moment.
+- `,` and `.` go one frame (1/30 of a second) back or forward while the video
+  is paused, like the 2020 player. While it plays they do nothing.
+- `Home` and `End` jump to the start and the end.
+- `/` puts the cursor in the search box, on any page.
+- **Shift+?** opens the **Keyboard shortcuts** dialog on any page, with every
+  key in three groups (Playback, General, Subtitles and closed captions).
+  Keyboard shortcuts in the account menu (and in the three dot menu when signed
+  out) opens it too. Escape, Dismiss or a click outside closes it.
+
+None of the keys work while typing in a field or with Ctrl, Alt or Cmd held.
+
+### Hover previews
+
+Behind the `hover_previews` flag (`025_shortcuts_hover.sql`, off at first): rest
+the pointer on a thumbnail on the home page, Trending, channel pages or search
+results and, after the sprite's frames (which every card already has), the
+video itself plays in the thumbnail, muted. It starts a tenth of the way in
+(at most a minute; videos under a minute start at the beginning), at the lowest
+quality that fits the card, and everything is let go as soon as the pointer
+leaves. Nothing loads until someone hovers. Touch screens never get it (they
+have no hover), and nor do browsers set to reduced motion or data saver.
+
 ### How the player gets the video
 
 The bucket is private, so the browser cannot read it directly. The player asks

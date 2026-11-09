@@ -116,16 +116,20 @@ test("thumbnails: public URL with MEDIA_PUBLIC_URL, else the media route, never 
   assert.deepEqual(cardMedia(v, "https://media.example.com"), {
     thumbnail: "https://media.example.com/hls/ab000000-0000-4000-8000-000000000001/thumb-1.webp",
     spriteVtt: "https://media.example.com/hls/ab000000-0000-4000-8000-000000000001/sprite.vtt",
+    previewSrc: "https://media.example.com/hls/ab000000-0000-4000-8000-000000000001/master.m3u8",
   });
   assert.deepEqual(cardMedia(v, null), {
     thumbnail: "/api/media/ab000000-0000-4000-8000-000000000001/thumb-1.webp",
     spriteVtt: "/api/media/ab000000-0000-4000-8000-000000000001/sprite.vtt",
+    previewSrc: "/api/media/ab000000-0000-4000-8000-000000000001/master.m3u8",
   });
   // The encoder's own thumbnail_url wins, like on the watch page.
   assert.equal(cardMedia({ ...v, thumbnailUrl: "https://media.example.com/x.webp" }, null).thumbnail, "https://media.example.com/x.webp");
   // No sprite, no preview. No hls_key yet: the default folder.
   assert.equal(cardMedia({ ...v, spriteKey: null }, null).spriteVtt, null);
   assert.equal(cardMedia({ ...v, hlsKey: null }, null).thumbnail, "/api/media/ab000000-0000-4000-8000-000000000001/thumb-1.webp");
+  // Not encoded yet: nothing to play on hover.
+  assert.equal(cardMedia({ ...v, hlsKey: null }, null).previewSrc, null);
 });
 
 test("rowToCard maps a feed_videos row", () => {

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { SpritePreview } from "@/components/feed/SpritePreview";
+import { HoverPreview } from "@/components/feed/HoverPreview";
 import { viewsLabel } from "@/lib/feed/format";
 import type { FeedCard } from "@/lib/feed/types";
 import { formatTime, timeAgo } from "@/lib/watch/format";
@@ -38,7 +38,7 @@ export function VideoCard({
     <article className="min-w-0" data-feed-card={video.id}>
       <Link href={href} className="relative block aspect-video overflow-hidden bg-skeleton" tabIndex={-1} aria-hidden>
         <Thumb src={video.thumbnail} alt={video.title} sizes={GRID_SIZES} eager={eager} />
-        {video.spriteVtt && <SpritePreview vtt={video.spriteVtt} />}
+        <HoverPreview vtt={video.spriteVtt} src={video.previewSrc} durationS={video.durationS} />
         {rank !== undefined && (
           <span className="absolute left-0 top-0 min-w-7 bg-black/80 px-1.5 py-0.5 text-center text-[14px] font-medium leading-5 text-white">
             {rank}

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Thumb } from "@/components/Thumb";
 import { Avatar } from "@/components/Avatar";
-import { SpritePreview } from "@/components/feed/SpritePreview";
+import { HoverPreview } from "@/components/feed/HoverPreview";
 import { ThumbProgress } from "@/components/ThumbProgress";
 import { VideoCard } from "@/components/VideoCard";
 import { viewsLabel } from "@/lib/feed/format";
@@ -49,9 +49,10 @@ export function VideoResult({ video, now, words }: { video: SearchVideo; now: nu
           className="relative block aspect-video w-[246px] shrink-0 overflow-hidden bg-skeleton tab:w-[360px]"
           tabIndex={-1}
           aria-hidden
+          data-hover-box
         >
           <Thumb src={video.thumbnail} alt={video.title} sizes="(min-width: 792px) 360px, 246px" />
-          {video.spriteVtt && <SpritePreview vtt={video.spriteVtt} />}
+          <HoverPreview vtt={video.spriteVtt} src={video.previewSrc} durationS={video.durationS} />
           {video.durationS !== null && (
             <span className="absolute bottom-1 right-1 bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 tracking-[0.5px] text-white">
               {formatTime(video.durationS)}

@@ -49,7 +49,7 @@ import {
 import { chapterAt, parseChapters } from "@/lib/watch/chapters";
 import { endChoice, endScreenVideos, nextVideo } from "@/lib/watch/endscreen";
 import { formatTime } from "@/lib/watch/format";
-import { clampTime, keyAction, stepVolume, type PlayerAction } from "@/lib/watch/keys";
+import { clampTime, FRAME_S, keyAction, stepSpeed, stepVolume, type PlayerAction } from "@/lib/watch/keys";
 import { loadQuality, loadResume, loadVolume, saveQuality, saveResume, saveVolume } from "@/lib/watch/prefs";
 import { AUTO, levelForSaved, qualityOptions, qualitySummary, SPEEDS, speedLabel, type QualityOption } from "@/lib/watch/quality";
 import { menuPosition, watchLink } from "@/lib/watch/nerds";
@@ -179,6 +179,8 @@ export function Player({
   // Player extras: chapters, timestamps that jump here, the right-click menu
   // with Loop, the links and Stats for nerds, and double tap to skip on phones.
   const extras = useFlag("player_extras");
+  // The rest of the 2020 keys: < > speed, , . frames while paused, Home and End.
+  const moreKeys = useFlag("more_shortcuts");
   const [loop, setLoop] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ left: number; top: number } | null>(null);
   const [nerds, setNerds] = useState(false);
@@ -500,6 +502,19 @@ export function Player({
           return toggleCaptions();
         case "caption-size":
           return stepCaptions(action.step);
+        case "speed-step": {
+          const r = stepSpeed(video.playbackRate, action.step, SPEEDS);
+          video.playbackRate = r;
+          return flash(`${r}x`);
+        }
+        case "frame-step":
+          // Like the 2020 player: frames only step while the video is paused.
+          if (!video.paused) return;
+          return seekTo(video.currentTime + action.step * FRAME_S);
+        case "seek-edge": {
+          const d = Number.isFinite(video.duration) ? video.duration : duration;
+          return seekTo(action.edge === "start" ? 0 : d);
+        }
       }
     },
     [duration, embed, flash, seekTo, stepCaptions, toggleCaptions, toggleFullscreen, togglePip, togglePlay, toggleTheater],
@@ -517,7 +532,7 @@ export function Player({
         altKey: e.altKey,
         targetTag: target?.tagName,
         targetEditable: target?.isContentEditable,
-      });
+      }, moreKeys);
       if (!action) return;
       e.preventDefault();
       run(action);
@@ -525,7 +540,7 @@ export function Player({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [run, poke]);
+  }, [run, poke, moreKeys]);
 
   // Timestamps in the description and comments jump this player (player extras).
   useEffect(() => {

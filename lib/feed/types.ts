@@ -17,6 +17,8 @@ export type FeedCard = {
   thumbnail: string;
   /** The hover sprite's .vtt, or null when the video has none. */
   spriteVtt: string | null;
+  /** The video's HLS playlist for the hover preview, or null before it is encoded. */
+  previewSrc: string | null;
   publishedAt: string;
   views: number;
   channel: FeedChannel;
@@ -63,10 +65,14 @@ function num(v: number | string | null | undefined): number | null {
 export function cardMedia(
   v: { id: string; thumbnailUrl: string | null; hlsKey: string | null; spriteKey: string | null },
   publicBase: string | null,
-): { thumbnail: string; spriteVtt: string | null } {
+): { thumbnail: string; spriteVtt: string | null; previewSrc: string | null } {
   const id = v.id.toLowerCase();
   const urls = playbackUrls(id, v.hlsKey || `hls/${id}/master.m3u8`, v.spriteKey, publicBase);
-  return { thumbnail: v.thumbnailUrl || urls.thumbnail("thumb-1.webp"), spriteVtt: urls.spriteVtt };
+  return {
+    thumbnail: v.thumbnailUrl || urls.thumbnail("thumb-1.webp"),
+    spriteVtt: urls.spriteVtt,
+    previewSrc: v.hlsKey ? urls.src : null,
+  };
 }
 
 export function rowToCard(row: FeedRow, publicBase: string | null): FeedCard {
@@ -80,6 +86,7 @@ export function rowToCard(row: FeedRow, publicBase: string | null): FeedCard {
     durationS: num(row.duration_s),
     thumbnail: media.thumbnail,
     spriteVtt: media.spriteVtt,
+    previewSrc: media.previewSrc,
     publishedAt: row.published_at,
     views: num(row.views) ?? 0,
     channel: {
