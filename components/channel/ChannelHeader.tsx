@@ -103,7 +103,7 @@ export function ChannelHeader({
                 </Link>
               )
             ) : preview ? (
-              <span className="inline-flex h-9 items-center rounded-[2px] bg-red px-4 text-[14px] font-medium uppercase tracking-[0.007px] text-white">
+              <span className="inline-flex h-9 items-center rounded-[2px] bg-brand px-4 text-[14px] font-medium uppercase tracking-[0.007px] text-white">
                 Subscribe
               </span>
             ) : (

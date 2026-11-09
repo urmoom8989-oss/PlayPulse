@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "node:test";
-import { BOT_LIMITS, amountOf, amountsText, botErrorCode, botStatus, orderPercent, orderProblem, orderStatusText, readPanel, suggestFor, windowText } from "../lib/bots/rules.ts";
+import { MAX_AMOUNT, amountOf, amountsText, botErrorCode, botStatus, orderPercent, orderProblem, orderStatusText, readPanel, suggestFor, windowText } from "../lib/bots/rules.ts";
 
 const sql = readFileSync(new URL("../supabase/migrations/030_bots.sql", import.meta.url), "utf8");
 
@@ -50,10 +50,24 @@ test("034: orders are closed to the API; owners use the panel functions, the wor
   assert.match(sql34, /select 10000/);
 });
 
+test("035: all at once in the same call, no limits but what an int holds", () => {
+  const sql35 = readFileSync(new URL("../supabase/migrations/035_bots_at_once.sql", import.meta.url), "utf8");
+  assert.match(sql35, /if w = 0 then\s+perform public\.bot_deliver\(new_id/);
+  assert.match(sql35, /not between 0 and 2000000000/);
+  assert.doesNotMatch(sql35, /not between 0 and (1000000|10000|1000)\b/);
+  assert.match(sql35, /grant execute on function public\.bot_deliver\(uuid, bigint, bigint, bigint, bigint\) to service_role/);
+  assert.match(sql35, /revoke execute on function public\.bot_deliver\(uuid, bigint, bigint, bigint, bigint\) from public, anon, authenticated/);
+  // The first 20,000 views of an order are full views; the rest go on the count.
+  assert.match(sql35, /20000 - o\.done_views/);
+  assert.equal(MAX_AMOUNT, 2_000_000_000);
+});
+
 test("the panel's limits and words", () => {
   const ok = { views: 1000, likes: 45, dislikes: 2, comments: 4, subscribers: 0, videoId: "v", overMinutes: 1440 };
   assert.equal(orderProblem(ok), null);
-  assert.equal(orderProblem({ ...ok, views: BOT_LIMITS.views + 1 }), "bad_amount");
+  // No limit of our own: a billion views is fine, only past what the database holds is not.
+  assert.equal(orderProblem({ ...ok, views: 1_000_000_000, likes: 50_000_000, subscribers: 5_000_000 }), null);
+  assert.equal(orderProblem({ ...ok, views: MAX_AMOUNT + 1 }), "bad_amount");
   assert.equal(orderProblem({ ...ok, overMinutes: 30 }), "bad_window");
   assert.equal(orderProblem({ ...ok, views: 0, likes: 0, dislikes: 0, comments: 0 }), "empty_order");
   assert.equal(orderProblem({ views: 0, likes: 0, dislikes: 0, comments: 0, subscribers: 50, videoId: null, overMinutes: 0 }), null);
@@ -65,7 +79,7 @@ test("the panel's limits and words", () => {
   assert.equal(amountsText({ views: 1000, likes: 45, comments: 1 }), "1,000 views, 45 likes and 1 comment");
   assert.equal(amountsText({ subscribers: 20 }), "20 subscribers");
   assert.equal(windowText("2026-11-09T00:00:00Z", "2026-11-10T00:00:00Z"), "Over 24 hours");
-  assert.equal(windowText("2026-11-09T00:00:00Z", "2026-11-09T00:00:00Z"), "Right away");
+  assert.equal(windowText("2026-11-09T00:00:00Z", "2026-11-09T00:00:00Z"), "All at once");
   const amounts = { views: 100, likes: 0, dislikes: 0, comments: 0, subscribers: 0 };
   assert.equal(orderPercent({ amounts, done: { ...amounts, views: 25 } }), 25);
   const now = Date.parse("2026-11-09T12:00:00Z");
