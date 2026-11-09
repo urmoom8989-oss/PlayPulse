@@ -51,6 +51,7 @@ import { endChoice, endScreenVideos, nextVideo } from "@/lib/watch/endscreen";
 import { formatTime } from "@/lib/watch/format";
 import { clampTime, FRAME_S, keyAction, stepSpeed, stepVolume, type PlayerAction } from "@/lib/watch/keys";
 import { atLiveEdge } from "@/lib/live/state";
+import { useT } from "@/lib/i18n/client";
 import { loadQuality, loadResume, loadVolume, saveQuality, saveResume, saveVolume } from "@/lib/watch/prefs";
 import { AUTO, levelForSaved, qualityOptions, qualitySummary, SPEEDS, speedLabel, type QualityOption } from "@/lib/watch/quality";
 import { menuPosition, watchLink } from "@/lib/watch/nerds";
@@ -196,6 +197,7 @@ export function Player({
   // Player extras: chapters, timestamps that jump here, the right-click menu
   // with Loop, the links and Stats for nerds, and double tap to skip on phones.
   const extras = useFlag("player_extras");
+  const t = useT();
   // The rest of the 2020 keys: < > speed, , . frames while paused, Home and End.
   const moreKeys = useFlag("more_shortcuts");
   const [loop, setLoop] = useState(false);
@@ -1053,7 +1055,7 @@ export function Player({
                 aria-hidden
                 className={`h-2 w-2 rounded-full ${atLiveEdge(time, duration, 12) ? "bg-[#ff0000]" : "bg-[#909090]"}`}
               />
-              Live
+              {t("Live")}
             </button>
           ) : (
             <span data-time className="whitespace-nowrap px-2 text-[13px] leading-9 [text-shadow:0_0_2px_rgba(0,0,0,.5)]">
@@ -1326,12 +1328,13 @@ function CtrlButton({
   "aria-expanded"?: boolean;
   "aria-pressed"?: boolean;
 } & Record<`data-${string}`, unknown>) {
+  const t = useT();
   return (
     <button
       ref={ref}
       type="button"
-      title={label}
-      aria-label={label}
+      title={t(label)}
+      aria-label={t(label)}
       className={`relative grid h-9 w-[46px] shrink-0 place-items-center opacity-90 hover:opacity-100 ${className}`}
       {...rest}
     >
@@ -1346,16 +1349,18 @@ function MenuRow({
   onClick,
   ...rest
 }: { label: string; value: string; onClick: () => void } & Record<`data-${string}`, unknown>) {
+  const t = useT();
   return (
     <button type="button" role="menuitem" onClick={onClick} className="flex h-10 w-full items-center px-4 hover:bg-white/10" {...rest}>
-      <span className="mr-6 flex-1 text-left">{label}</span>
-      <span className="text-right font-normal">{value}</span>
+      <span className="mr-6 flex-1 text-left">{t(label)}</span>
+      <span className="text-right font-normal">{t(value)}</span>
       <ChevronRightIcon className="-mr-1.5 ml-1 h-5 w-5" />
     </button>
   );
 }
 
 function MenuBack({ label, onClick, extra = null }: { label: string; onClick: () => void; extra?: React.ReactNode }) {
+  const t = useT();
   const back = (
     <button
       type="button"
@@ -1363,7 +1368,7 @@ function MenuBack({ label, onClick, extra = null }: { label: string; onClick: ()
       className={`flex h-12 items-center px-2 text-[15px] hover:bg-white/10 ${extra ? "" : "w-full"}`}
     >
       <ChevronLeftIcon className="mr-2 h-6 w-6" />
-      {label}
+      {t(label)}
     </button>
   );
   // With something on the right (Options, in Subtitles/CC) the header is a row of two buttons.

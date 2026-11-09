@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { HoverPreview } from "@/components/feed/HoverPreview";
 import { CardBadge, onAirOrSoon } from "@/components/live/CardBadge";
+import { ViewsAgo } from "@/components/i18n/Tr";
 import { cardMeta } from "@/lib/live/state";
 import { viewsLabel } from "@/lib/feed/format";
 import type { FeedCard } from "@/lib/feed/types";
@@ -70,7 +71,9 @@ export function VideoCard({
               {video.channel.name}
             </Link>
             <span className="sm:hidden"> · </span>
-            {(onAirOrSoon(video.broadcast) && cardMeta(video.broadcast, now)) || `${viewsLabel(video.views)} · ${timeAgo(video.publishedAt, now)}`}
+            {(onAirOrSoon(video.broadcast) && cardMeta(video.broadcast, now)) || (
+              <ViewsAgo views={video.views} iso={video.publishedAt} now={now} english={[viewsLabel(video.views), timeAgo(video.publishedAt, now)]} />
+            )}
           </p>
         </div>
       </div>

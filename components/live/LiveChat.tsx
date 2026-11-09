@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n/client";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
@@ -58,6 +59,7 @@ export function LiveChat({
   /** The viewer owns the channel. */
   isOwner: boolean;
 }) {
+  const t = useT();
   const user = useSession((s) => s.user);
   const setViewers = useLive((s) => s.setViewers);
   const currentTime = useWatch((s) => s.currentTime);
@@ -160,7 +162,7 @@ export function LiveChat({
     }).catch(() => null);
     const json = (await res?.json().catch(() => null)) as { error?: string } | null;
     setSending(false);
-    if (!res?.ok) return setError(chatError(json?.error));
+    if (!res?.ok) return setError(t(chatError(json?.error)));
     setText("");
     void poll();
   }
@@ -177,7 +179,7 @@ export function LiveChat({
     }
   }
 
-  const title = live ? "Live chat" : "Chat replay";
+  const title = live ? t("Live chat") : t("Chat replay");
   if (!open) {
     return (
       <div className="mb-4 border border-divider bg-surface" data-live-chat="closed">
@@ -186,7 +188,7 @@ export function LiveChat({
           onClick={() => setOpen(true)}
           className="h-10 w-full text-[14px] font-medium uppercase tracking-[0.007px] text-text-2 hover:bg-hover"
         >
-          {live ? "Show chat" : "Show chat replay"}
+          {live ? t("Show chat") : t("Show chat replay")}
         </button>
       </div>
     );
@@ -196,12 +198,12 @@ export function LiveChat({
     <section className="mb-4 flex h-[480px] flex-col border border-divider bg-surface" data-live-chat={live ? "live" : "replay"} aria-label={title}>
       <header className="flex h-12 shrink-0 items-center justify-between border-b border-divider px-4">
         <h2 className="text-[16px] font-normal text-text">{title}</h2>
-        {!live && <span className="text-[12px] text-text-2">Messages show as the video plays</span>}
+        {!live && <span className="text-[12px] text-text-2">{t("Messages show as the video plays")}</span>}
       </header>
       <ul ref={listRef} className="min-h-0 flex-1 overflow-y-auto py-2" aria-live="polite">
         {shown.length === 0 && (
           <li className="px-6 py-4 text-center text-[13px] text-text-2">
-            {live ? (state === "upcoming" ? "Say hi while you wait." : "No messages yet.") : "No messages at this point."}
+            {live ? (state === "upcoming" ? t("Say hi while you wait.") : t("No messages yet.")) : t("No messages at this point.")}
           </li>
         )}
         {shown.map((m) => (
@@ -225,8 +227,8 @@ export function LiveChat({
                 <input
                   value={text}
                   onChange={(e) => setText(e.target.value.slice(0, 200))}
-                  placeholder="Say something..."
-                  aria-label="Chat message"
+                  placeholder={t("Say something...")}
+                  aria-label={t("Chat message")}
                   maxLength={200}
                   data-chat-input
                   className="min-w-0 flex-1 border-b border-[var(--input-border)] bg-transparent pb-1 text-[14px] text-text outline-none focus:border-b-2 focus:border-[var(--focus)]"
@@ -234,7 +236,7 @@ export function LiveChat({
                 <span className="pb-1 text-[11px] text-text-3">{text.length}/200</span>
                 <button
                   type="submit"
-                  aria-label="Send"
+                  aria-label={t("Send")}
                   disabled={!text.trim() || sending}
                   data-chat-send
                   className="grid h-8 w-8 place-items-center rounded-full text-icon disabled:opacity-40"
@@ -251,9 +253,9 @@ export function LiveChat({
           ) : (
             <p className="text-center text-[13px] text-text-2">
               <Link href={`/login?next=${encodeURIComponent(`/watch?v=${videoId}`)}`} className="font-medium uppercase text-link">
-                Sign in
+                {t("Sign in")}
               </Link>{" "}
-              to chat
+              {t("to chat")}
             </p>
           )}
         </footer>
@@ -263,7 +265,7 @@ export function LiveChat({
         onClick={() => setOpen(false)}
         className="h-10 shrink-0 border-t border-divider text-[14px] font-medium uppercase tracking-[0.007px] text-text-2 hover:bg-hover"
       >
-        {live ? "Hide chat" : "Hide chat replay"}
+        {live ? t("Hide chat") : t("Hide chat replay")}
       </button>
     </section>
   );

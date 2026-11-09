@@ -17,6 +17,8 @@ function mediaPublicBase(): string | null {
 
 /** Cards per page on the home grid and the channel Videos tab. */
 export const FEED_PAGE_SIZE = 24;
+/** Trending for a place needs this many videos with views from there; else it shows everybody's. */
+export const TRENDING_LOCAL_MIN = 8;
 
 export type FeedState =
   /** The feed flag is off: the pages keep their placeholders. */
@@ -45,7 +47,7 @@ export async function feedGate(): Promise<"no-db" | "off" | "on"> {
  */
 export async function feedState(
   kind: FeedKind,
-  opts: { cursor?: string | null; channelId?: string | null; limit?: number } = {},
+  opts: { cursor?: string | null; channelId?: string | null; limit?: number; country?: string | null } = {},
 ): Promise<FeedState> {
   const gate = await feedGate();
   if (gate !== "on") return { kind: gate };
@@ -62,6 +64,16 @@ export async function feedState(
   // shelf and tab, so the home grid and the Videos tab leave them out.
   const shortsOn = await flagOn("shorts", (await getCurrentUser())?.id ?? null);
   if (kind === "channel_shorts" && !shortsOn) return { kind: "ready", page: { cards: [], next: null }, now: Date.now() };
+  // Location (032): Trending in the viewer's place, by views from there, once
+  // there are enough of them; until then everybody's views.
+  if (kind === "trending" && opts.country) {
+    const local = await supabase.rpc("trending_in", { country: opts.country, lim: limit });
+    const rows = (!local.error && Array.isArray(local.data) ? local.data : []) as FeedRow[];
+    if (rows.length >= TRENDING_LOCAL_MIN) {
+      const publicBase = mediaPublicBase();
+      return { kind: "ready", page: { cards: await withBroadcasts(rows.map((r) => rowToCard(r, publicBase))), next: null }, now: Date.now() };
+    }
+  }
   const { data, error } = await supabase.rpc("feed_videos", {
     kind,
     cursor: cursor?.publishedAt ?? null,

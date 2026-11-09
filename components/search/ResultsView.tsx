@@ -3,6 +3,7 @@ import { SearchIcon } from "@/components/icons";
 import Link from "next/link";
 import { parseFilters, queryWords, readExact, readQuery, resultsHref, showsVideos, type SearchFilters } from "@/lib/search/query";
 import { exactHref, markCorrection } from "@/lib/search/spelling";
+import { Tr } from "@/components/i18n/Tr";
 import { searchResults } from "@/lib/search/server";
 import { ChannelResult } from "./ChannelResult";
 import { FilterPanel } from "./FilterPanel";
@@ -30,9 +31,11 @@ function Message({ state, title, hint }: { state: string; title: string; hint: s
     <div className="px-6 py-20 text-center" data-search-message>
       <SearchIcon className="mx-auto mb-4 h-24 w-24 text-text-3 opacity-60" />
       <h2 className="text-[20px] leading-7 text-text" data-search-message-title={state}>
-        {title}
+        <Tr>{title}</Tr>
       </h2>
-      <p className="mt-2 text-[14px] text-text-2">{hint}</p>
+      <p className="mt-2 text-[14px] text-text-2">
+        <Tr>{hint}</Tr>
+      </p>
     </div>
   );
 }
@@ -57,10 +60,10 @@ function Spelling({ q, filters, spelling }: { q: string; filters: SearchFilters;
     return (
       <div className="px-3 pb-2 pt-1 search:px-0" data-search-spelling="showing">
         <p className="text-[16px] leading-[22px] text-text">
-          Showing results for <Corrected typed={q} corrected={spelling.corrected} />
+          <Tr>Showing results for</Tr> <Corrected typed={q} corrected={spelling.corrected} />
         </p>
         <p className="text-[14px] leading-5 text-text-2">
-          Search instead for{" "}
+          <Tr>Search instead for</Tr>{" "}
           <Link href={exactHref(q, filters)} className="text-link hover:underline" data-search-instead>
             {q}
           </Link>
@@ -70,7 +73,7 @@ function Spelling({ q, filters, spelling }: { q: string; filters: SearchFilters;
   }
   return (
     <p className="px-3 pb-2 pt-1 text-[16px] leading-[22px] text-text search:px-0" data-search-spelling="did-you-mean">
-      Did you mean:{" "}
+      <Tr>Did you mean:</Tr>{" "}
       <Link href={resultsHref(spelling.corrected, filters)} className="text-link hover:underline" data-search-did-you-mean>
         <Corrected typed={q} corrected={spelling.corrected} />
       </Link>

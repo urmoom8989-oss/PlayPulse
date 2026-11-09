@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Tr, ViewsAgo } from "@/components/i18n/Tr";
 import { Thumb } from "@/components/Thumb";
 import { ThumbProgress } from "@/components/ThumbProgress";
 import { formatTime, shortCount, timeAgo } from "@/lib/watch/format";
@@ -28,7 +29,7 @@ function Card({ video, channel }: { video: UpNextVideo; channel: WatchChannel })
         <p className="mt-1 text-[13px] leading-[18px] text-text-2">
           {video.channelName ?? channel.name}
           <br />
-          {shortCount(video.views)} views{video.date ? ` · ${timeAgo(video.date)}` : ""}
+          <ViewsAgo views={video.views} iso={video.date} english={[`${shortCount(video.views)} views`, video.date ? timeAgo(video.date) : ""]} />
         </p>
       </div>
     </article>
@@ -56,7 +57,9 @@ export function UpNext({ videos, channel }: { videos: UpNextVideo[]; channel: Wa
   return (
     <div className="px-3 pb-6 pt-4 tab:px-0 tab:pt-0">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-[16px] font-normal text-text">Up next</h2>
+        <h2 className="text-[16px] font-normal text-text">
+          <Tr>Up next</Tr>
+        </h2>
         <AutoplaySwitch />
       </div>
       <div className="flex flex-col gap-2">

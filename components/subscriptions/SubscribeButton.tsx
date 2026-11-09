@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { BellActiveIcon, BellIcon, BellOffIcon, BellOutlineIcon } from "@/components/icons";
 import { Menu } from "@/components/Menu";
+import { useT } from "@/lib/i18n/client";
 import { useFlag, useSession } from "@/lib/store/session";
 import { useSubscriptions } from "@/lib/store/subscriptions";
 import { LEVEL_TEXT, NOTIFY_LEVELS, type NotifyLevel } from "@/lib/subscriptions/rules";
@@ -13,13 +14,14 @@ const LEVEL_ICON: Record<NotifyLevel, typeof BellIcon> = { all: BellActiveIcon, 
 
 /** The bell with the 2020 menu: All, Personalized, None (the bell_options flag). */
 function BellMenu({ channelId, notify }: { channelId: string; notify: boolean }) {
+  const t = useT();
   const level = useSubscriptions((s) => s.levels[channelId]) ?? (notify ? "all" : "none");
   const setLevel = useSubscriptions((s) => s.setLevel);
   const Icon = LEVEL_ICON[level];
   return (
     <span data-sub-bell={level} className="text-icon">
       <Menu
-        label={`Notifications: ${LEVEL_TEXT[level].label}`}
+        label={t("Notifications: {level}", { level: t(LEVEL_TEXT[level].label) })}
         width={200}
         button={<Icon className="h-6 w-6" />}
       >
@@ -41,7 +43,7 @@ function BellMenu({ channelId, notify }: { channelId: string; notify: boolean })
                   className={`flex h-10 w-full items-center gap-4 px-4 text-left text-[14px] text-text hover:bg-hover ${l === level ? "bg-[var(--active)]" : ""}`}
                 >
                   <ItemIcon className="h-6 w-6 shrink-0 text-icon" />
-                  {LEVEL_TEXT[l].label}
+                  {t(LEVEL_TEXT[l].label)}
                 </button>
               );
             })}
@@ -60,9 +62,10 @@ const grey = `${base} bg-[var(--sub-bg)] text-text-2`;
 
 /** The disabled placeholder, while the flag is off or there is no database. */
 function Placeholder({ title }: { title: string }) {
+  const t = useT();
   return (
-    <button type="button" disabled title={title} className={`${red} cursor-not-allowed opacity-60`} data-subscribe="off">
-      Subscribe
+    <button type="button" disabled title={t(title)} className={`${red} cursor-not-allowed opacity-60`} data-subscribe="off">
+      {t("Subscribe")}
     </button>
   );
 }
@@ -85,6 +88,7 @@ export function SubscribeButton({ channelId, channelName, count }: { channelId: 
   const toggle = useSubscriptions((s) => s.toggle);
   const bell = useSubscriptions((s) => s.bell);
   const bellOptions = useFlag("bell_options");
+  const t = useT();
 
   useEffect(() => {
     if (on && signedIn) seed(channelId, count);
@@ -103,7 +107,7 @@ export function SubscribeButton({ channelId, channelName, count }: { channelId: 
           router.push(`/login?next=${encodeURIComponent(here)}`);
         }}
       >
-        Subscribe
+        {t("Subscribe")}
       </button>
     );
   }
@@ -113,7 +117,7 @@ export function SubscribeButton({ channelId, channelName, count }: { channelId: 
   if (!ready) {
     return (
       <button type="button" disabled className={`${red} opacity-60`} data-subscribe="loading" aria-busy>
-        Subscribe
+        {t("Subscribe")}
       </button>
     );
   }
@@ -127,7 +131,7 @@ export function SubscribeButton({ channelId, channelName, count }: { channelId: 
         aria-pressed={false}
         onClick={() => toggle(channelId)}
       >
-        Subscribe
+        {t("Subscribe")}
       </button>
     );
   }
@@ -140,10 +144,10 @@ export function SubscribeButton({ channelId, channelName, count }: { channelId: 
         className={grey}
         data-subscribe="yes"
         aria-pressed
-        title={`Unsubscribe from ${channelName}`}
+        title={t("Unsubscribe from {name}", { name: channelName })}
         onClick={() => toggle(channelId)}
       >
-        Subscribed
+        {t("Subscribed")}
       </button>
       {bellOptions ? (
         <BellMenu channelId={channelId} notify={view.notify} />
@@ -151,9 +155,9 @@ export function SubscribeButton({ channelId, channelName, count }: { channelId: 
       <button
         type="button"
         onClick={() => bell(channelId)}
-        aria-label={view.notify ? "Turn off notifications" : "Turn on notifications"}
+        aria-label={view.notify ? t("Turn off notifications") : t("Turn on notifications")}
         aria-pressed={view.notify}
-        title={view.notify ? "All notifications" : "No notifications"}
+        title={view.notify ? t("All notifications") : t("No notifications")}
         data-sub-bell={view.notify ? "on" : "off"}
         className="grid h-10 w-10 place-items-center rounded-full text-icon hover:bg-hover"
       >

@@ -84,6 +84,31 @@ The client secret stays in the Supabase dashboard. Never put it in this reposito
 
 Until Google is switched on, the Google button says so and email sign up still works.
 
+### Language and Location
+
+Behind the `language_location` flag (`032_language_location.sql`, off at
+first), the account menu and the signed out settings menu (the three dots)
+get the 2020 rows **Language: English** and **Location: United States**:
+
+- **Language** lists English, Español, Français, Deutsch, Português and 日本語.
+  The site's own words change: the top bar, the guide, the menus, the watch
+  page (buttons, Up next, the description, comments, the player's buttons and
+  settings menu), live chat, cards, search and its filters, channel tabs,
+  Settings. Views, subscribers and "3 days ago" follow the language's own
+  numbers and dates. Titles, descriptions and comments stay as people wrote
+  them. The studio stays in English.
+- **Location** lists the biggest countries, by their name in the chosen
+  language. **Trending** becomes "Trending in Canada": the videos most watched
+  in the last 7 days by people who picked that place (each view remembers the
+  viewer's place), over their age, like the usual Trending. Until a place has
+  8 such videos, it shows everybody's Trending under the same heading.
+- Both choices are kept in cookies for a year (`pp_lang`, `pp_loc`). Without
+  them, the browser's languages decide (Spanish for `es-MX`, Mexico for its
+  region), else English and the United States.
+- The words live in `lib/i18n/dict/`, one file per language, keyed by the
+  English text; `tests/i18n.test.mjs` fails when a wrapped word has no
+  translation. A word without one shows in English.
+
 ### Switch account
 
 Behind the `switch_account` flag (`031_switch_account.sql`, off at first), one

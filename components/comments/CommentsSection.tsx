@@ -1,5 +1,7 @@
 "use client";
 
+import { useLang, useT } from "@/lib/i18n/client";
+import { compact } from "@/lib/i18n/format";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
@@ -19,17 +21,18 @@ const SORTS: { value: CommentSort; label: string }[] = [
 ];
 
 function SortMenu() {
+  const t = useT();
   const sort = useComments((s) => s.sort);
   const setSort = useComments((s) => s.setSort);
   return (
     <Menu
-      label="Sort comments"
+      label={t("Sort comments")}
       width={180}
       buttonClassName="flex h-9 items-center gap-2 rounded-sm px-2 text-[14px] font-medium uppercase tracking-[0.007px] text-text-2 hover:text-text"
       button={
         <span className="flex items-center gap-2" data-sort-button>
           <SortIcon className="h-6 w-6 text-icon" />
-          Sort by
+          {t("Sort by")}
         </span>
       }
     >
@@ -48,7 +51,7 @@ function SortMenu() {
               }}
               className={`flex h-12 w-full items-center px-4 text-left text-[14px] text-text hover:bg-hover ${sort === s.value ? "bg-active" : ""}`}
             >
-              {s.label}
+              {t(s.label)}
             </button>
           ))}
         </div>
@@ -79,6 +82,8 @@ export function CommentsSection({
   initial: CommentsInitial;
   channel: { name: string; avatarUrl: string | null };
 }) {
+  const t = useT();
+  const lang = useLang();
   const router = useRouter();
   const init = useComments((s) => s.init);
   const ready = useComments((s) => s.videoId === videoId);
@@ -145,20 +150,20 @@ export function CommentsSection({
     <section className="px-3 pb-8 pt-6 tab:px-0" data-comments data-comments-state={off ? "turned-off" : "ready"} aria-label="Comments">
       {off ? (
         <p className="border-t border-divider pt-6 text-center text-[14px] text-text-2" data-comments-off>
-          Comments are turned off.
+          {t("Comments are turned off.")}
         </p>
       ) : (
         <>
           <div className="mb-6 flex items-center gap-6">
             <h2 className="text-[16px] font-normal leading-[22px] text-text" data-comments-count>
-              {commentsHeader(view.count)}
+              {lang === "en" ? commentsHeader(view.count) : t(view.count === 1 ? "{n} Comment" : "{n} Comments", { n: compact(lang, view.count) })}
             </h2>
             <SortMenu />
           </div>
 
           {held ? (
             <p className="mb-6 text-[14px] text-text-2" data-comments-held>
-              The creator reviews comments before they show. Posting opens with moderation.
+              {t("The creator reviews comments before they show. Posting opens with moderation.")}
             </p>
           ) : initial.signedIn ? (
             <CommentBox
@@ -174,10 +179,10 @@ export function CommentsSection({
                 onClick={signIn}
                 className="min-w-0 flex-1 border-b border-divider pb-1 text-left text-[14px] leading-5 text-text-2"
               >
-                Add a public comment...
+                {t("Add a public comment...")}
               </button>
               <button type="button" onClick={signIn} className="shrink-0 rounded-sm border border-link px-3 py-1.5 text-[14px] font-medium uppercase text-link">
-                Sign in
+                {t("Sign in")}
               </button>
             </div>
           )}
@@ -205,7 +210,7 @@ export function CommentsSection({
             ))}
             {view.top.length === 0 && !loadingMore && (
               <p className="mt-6 text-[14px] text-text-2" data-comments-empty>
-                No comments yet. Be the first to say something.
+                {t("No comments yet. Be the first to say something.")}
               </p>
             )}
             {loadingMore && <Skeleton />}

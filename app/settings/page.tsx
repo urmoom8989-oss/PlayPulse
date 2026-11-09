@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { Tr } from "@/components/i18n/Tr";
 import { Suspense } from "react";
 import { DbNotConnected, FeatureOff, FormSkeleton } from "@/components/auth/AuthCard";
 import { AddEmail } from "@/components/settings/AddEmail";
@@ -79,8 +80,12 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-[1000px] px-4 py-6 sm:px-6">
       <div className="bg-surface px-4 py-6 sm:px-8">
-        <h1 className="text-[24px] font-normal leading-8 text-text">Settings</h1>
-        <p className="mb-4 mt-1 text-[14px] text-text-2">Choose how you appear on PlayPulse.</p>
+        <h1 className="text-[24px] font-normal leading-8 text-text">
+          <Tr>Settings</Tr>
+        </h1>
+        <p className="mb-4 mt-1 text-[14px] text-text-2">
+          <Tr>Choose how you appear on PlayPulse.</Tr>
+        </p>
         <Suspense fallback={<FormSkeleton />}>
           <SettingsGate />
         </Suspense>

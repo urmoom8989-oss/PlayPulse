@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n/client";
 import { useEffect } from "react";
 import { useFlag, useSession } from "@/lib/store/session";
 import { useSubscriptions } from "@/lib/store/subscriptions";
@@ -27,6 +28,7 @@ export function SubscriptionsSync() {
 
 /** The 2019 toast: a dark box at the bottom left for a few seconds. */
 function Toast() {
+  const tr = useT();
   const toast = useSubscriptions((s) => s.toast);
   const clear = useSubscriptions((s) => s.clearToast);
 
@@ -43,7 +45,7 @@ function Toast() {
       data-sub-toast
       className="fixed bottom-6 left-3 right-3 z-50 rounded-sm bg-[#323232] px-6 py-3.5 text-[14px] leading-5 text-white shadow-lg sm:left-6 sm:right-auto sm:min-w-[288px] sm:max-w-[568px]"
     >
-      {toast.text}
+      {tr(toast.text)}
     </div>
   );
 }

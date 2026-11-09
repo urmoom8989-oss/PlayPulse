@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { createContext, Suspense, useContext, type ComponentType } from "react";
 import { mainGuide, railGuide, youGuide, type GuideKey } from "@/lib/guide";
+import { useT } from "@/lib/i18n/client";
 import { useFlag, useSession } from "@/lib/store/session";
 import { useUi } from "@/lib/store/ui";
 import { GuideFooterLinks } from "./launch/SiteFooter";
@@ -63,6 +64,7 @@ function useShellFlags() {
 const PathContext = createContext<string | null>(null);
 
 function GuideLink({ item, onClick }: { item: Item; onClick?: () => void }) {
+  const t = useT();
   const active = useContext(PathContext) === item.href;
   return (
     <Link
@@ -74,7 +76,7 @@ function GuideLink({ item, onClick }: { item: Item; onClick?: () => void }) {
       }`}
     >
       <item.Icon className={`mr-6 h-6 w-6 shrink-0 ${active ? "text-[var(--mark)]" : "text-icon"}`} />
-      <span className="truncate">{item.label}</span>
+      <span className="truncate">{t(item.label)}</span>
     </Link>
   );
 }
@@ -83,16 +85,18 @@ function Section({ children }: { children: React.ReactNode }) {
   return <div className="border-b border-divider py-3">{children}</div>;
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
+function SectionTitle({ children }: { children: string }) {
+  const t = useT();
   return (
     <h2 className="mb-1 px-6 pt-2 text-[12px] font-medium uppercase leading-4 tracking-[0.3px] text-text-2">
-      {children}
+      {t(children)}
     </h2>
   );
 }
 
 /** The full 240 px guide content, shared by the docked guide and the drawer. */
 function GuideContent({ onNavigate }: { onNavigate?: () => void }) {
+  const t = useT();
   const user = useSession((s) => s.user);
   const loaded = useSession((s) => s.loaded);
   const accounts = useFlag("accounts");
@@ -135,7 +139,7 @@ function GuideContent({ onNavigate }: { onNavigate?: () => void }) {
                     height={24}
                     className="mr-6 h-6 w-6 shrink-0 rounded-full object-cover"
                   />
-                  {label}
+                  {t(label)}
                 </Link>
               ))}
             </>
@@ -147,7 +151,7 @@ function GuideContent({ onNavigate }: { onNavigate?: () => void }) {
               className="flex h-10 items-center px-6 text-[14px] hover:bg-hover"
             >
               <AddIcon className="mr-6 h-6 w-6 shrink-0 text-icon" />
-              <span>Browse channels</span>
+              <span>{t("Browse channels")}</span>
             </Link>
           )}
         </Section>
@@ -164,7 +168,7 @@ function GuideContent({ onNavigate }: { onNavigate?: () => void }) {
         <Section>
           <div className="px-8 py-1">
             <p className="text-[14px] leading-5 text-text">
-              Sign in to like videos, comment, and subscribe.
+              {t("Sign in to like videos, comment, and subscribe.")}
             </p>
             <Link
               href="/login"
@@ -172,7 +176,7 @@ function GuideContent({ onNavigate }: { onNavigate?: () => void }) {
               className="mt-3 inline-flex h-9 items-center gap-2 rounded-[2px] border border-[var(--link)] px-[11px] text-[14px] font-medium uppercase text-[var(--link)]"
             >
               <AccountCircleIcon className="h-6 w-6" />
-              Sign in
+              {t("Sign in")}
             </Link>
           </div>
         </Section>
@@ -202,11 +206,11 @@ function GuideContent({ onNavigate }: { onNavigate?: () => void }) {
 
       <GuideFooterLinks />
       <p className="px-6 py-4 text-[12px] leading-[18px] text-text-3">
-        PlayPulse is built in the open.{" "}
+        {t("PlayPulse is built in the open.")}{" "}
         <a href="https://github.com/myfilehero/sloptube" className="hover:underline">
-          Source on GitHub
+          {t("Source on GitHub")}
         </a>
-        . MIT license.
+        . {t("MIT license.")}
       </p>
     </>
   );
@@ -214,6 +218,7 @@ function GuideContent({ onNavigate }: { onNavigate?: () => void }) {
 
 /** The 72 px icon rail with tiny labels. */
 function MiniGuide() {
+  const t = useT();
   const pathname = useContext(PathContext);
   const rail = railGuide(useShellFlags()).map((key) => ITEMS[key]);
   return (
@@ -229,7 +234,7 @@ function MiniGuide() {
           >
             <Icon className={`h-6 w-6 ${active ? "text-[var(--mark)]" : "text-icon"}`} />
             <span className="mt-1.5 max-w-full truncate px-1 text-[10px] leading-[14px] text-text">
-              {label}
+              {t(label)}
             </span>
           </Link>
         );

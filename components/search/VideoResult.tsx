@@ -3,6 +3,7 @@ import { Thumb } from "@/components/Thumb";
 import { Avatar } from "@/components/Avatar";
 import { HoverPreview } from "@/components/feed/HoverPreview";
 import { CardBadge, onAirOrSoon } from "@/components/live/CardBadge";
+import { ViewsAgo } from "@/components/i18n/Tr";
 import { cardMeta } from "@/lib/live/state";
 import { ThumbProgress } from "@/components/ThumbProgress";
 import { VideoCard } from "@/components/VideoCard";
@@ -71,7 +72,9 @@ export function VideoResult({ video, now, words }: { video: SearchVideo; now: nu
             <Link href={href}>{video.title}</Link>
           </h3>
           <p className="text-[13px] leading-[18px] text-text-2">
-            {(onAirOrSoon(video.broadcast) && cardMeta(video.broadcast, now)) || `${viewsLabel(video.views)} • ${timeAgo(video.publishedAt, now)}`}
+            {(onAirOrSoon(video.broadcast) && cardMeta(video.broadcast, now)) || (
+              <ViewsAgo views={video.views} iso={video.publishedAt} now={now} english={[viewsLabel(video.views), timeAgo(video.publishedAt, now)]} sep=" • " />
+            )}
           </p>
           <Link href={channelHref} className="my-3 flex items-center gap-2 text-[13px] leading-[18px] text-text-2 hover:text-text">
             <Avatar name={video.channel.name} url={video.channel.avatarUrl} size={24} />

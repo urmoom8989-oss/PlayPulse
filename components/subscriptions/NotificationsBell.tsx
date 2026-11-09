@@ -1,6 +1,8 @@
 "use client";
 
-import { notificationText } from "@/lib/live/state";
+import { notificationKey } from "@/lib/live/state";
+import { useLang, useT } from "@/lib/i18n/client";
+import { agoIn } from "@/lib/i18n/format";
 import Link from "next/link";
 import { Thumb } from "@/components/Thumb";
 import { useCallback, useEffect, useState } from "react";
@@ -40,6 +42,8 @@ async function fetchNotifications(): Promise<FeedCard[]> {
  * opened in this browser (kept in localStorage). No push yet, just the list.
  */
 export function NotificationsBell() {
+  const t = useT();
+  const lang = useLang();
   const [items, setItems] = useState<FeedCard[] | null>(null);
   const [failed, setFailed] = useState(false);
   // localStorage is only there in the browser; the badge waits for the list anyway.
@@ -83,7 +87,7 @@ export function NotificationsBell() {
 
   return (
     <Menu
-      label={badge ? `Notifications, ${unread} new` : "Notifications"}
+      label={badge ? t("Notifications, {n} new", { n: unread }) : t("Notifications")}
       width={480}
       onOpen={opened}
       buttonClassName="relative hidden h-10 w-10 place-items-center rounded-full text-icon hover:bg-hover sm:grid"
@@ -104,7 +108,7 @@ export function NotificationsBell() {
       {(close) => (
         <div data-notifications={items ? items.length : "loading"}>
           <div className="flex h-12 items-center border-b border-divider px-4 text-[16px] leading-[22px] text-text">
-            Notifications
+            {t("Notifications")}
           </div>
           <div className="max-h-[min(640px,calc(100dvh-140px))] overflow-y-auto">
             {!items && !failed && (
@@ -122,7 +126,7 @@ export function NotificationsBell() {
             {items && items.length === 0 && (
               <div className="flex flex-col items-center px-8 py-12 text-center">
                 <BellIcon className="h-[72px] w-[72px] text-text-3" />
-                <p className="mt-4 text-[16px] font-medium text-text">Your notifications live here</p>
+                <p className="mt-4 text-[16px] font-medium text-text">{t("Your notifications live here")}</p>
                 <p className="mt-2 text-[14px] leading-5 text-text-2">
                   Subscribe to channels and turn their bell on to hear about new uploads.
                 </p>
@@ -144,9 +148,12 @@ export function NotificationsBell() {
                   <Avatar name={v.channel.name} url={v.channel.avatarUrl} size={48} />
                   <span className="min-w-0 flex-1">
                     <span className="line-clamp-3 text-[14px] leading-5 text-text">
-                      {notificationText(v.channel.name, v.title, v.broadcast)}
+                      {(() => {
+                        const { key, vars } = notificationKey(v.channel.name, v.title, v.broadcast);
+                        return t(key, vars);
+                      })()}
                     </span>
-                    <span className="mt-1 block text-[13px] leading-[18px] text-text-2">{timeAgo(v.publishedAt, now || Date.now())}</span>
+                    <span className="mt-1 block text-[13px] leading-[18px] text-text-2">{agoIn(lang, v.publishedAt, now || undefined, timeAgo(v.publishedAt, now || Date.now()))}</span>
                   </span>
                   <span className="relative h-12 w-[86px] shrink-0 overflow-hidden rounded-sm bg-skeleton">
                     <Thumb src={v.thumbnail} alt="" sizes="86px" />

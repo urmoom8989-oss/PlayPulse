@@ -89,6 +89,7 @@ again. See [`supabase/migrations/README.md`](../supabase/migrations/README.md).
 - [ ] `029_live.sql` (Premieres, live from an upload and live chat, the `premieres` and `live` flags)
 - [ ] `030_bots.sql` (channel bots for @typicalgamer, run by the encoder, the `bots` flag)
 - [ ] `031_switch_account.sql` (several channels per login, the `switch_account` flag; needs `SUPABASE_SERVICE_ROLE_KEY` on the website)
+- [ ] `032_language_location.sql` (Language and Location, Trending by country, the `language_location` flag)
 
 Then make yourself an admin (sign up on the site first):
 

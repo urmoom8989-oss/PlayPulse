@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n/client";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { ReminderIcon } from "@/components/icons";
@@ -12,6 +13,7 @@ import { formatCountdown, formatWhen, type Broadcast } from "@/lib/live/state";
  * (signed in). At zero the page reloads its data and the player takes over.
  */
 export function Countdown({ videoId, broadcast, poster }: { videoId: string; broadcast: Broadcast; poster: string | null }) {
+  const t = useT();
   const router = useRouter();
   const signedIn = useSession((s) => s.user !== null);
   const [left, setLeft] = useState<number | null>(null);
@@ -63,9 +65,9 @@ export function Countdown({ videoId, broadcast, poster }: { videoId: string; bro
         <img src={poster} alt="" className="absolute inset-0 h-full w-full object-cover opacity-40" />
       )}
       <div className="relative px-6">
-        <p className="text-[14px] font-medium uppercase tracking-[0.5px] text-[#dddddd]">{premiere ? "Premieres in" : "Live in"}</p>
+        <p className="text-[14px] font-medium uppercase tracking-[0.5px] text-[#dddddd]">{premiere ? t("Premieres in") : t("Live in")}</p>
         <p className="mt-1 text-[40px] font-normal leading-[48px] tabular-nums" data-countdown-left>
-          {left === null ? "" : left > 0 ? formatCountdown(left) : "Starting..."}
+          {left === null ? "" : left > 0 ? formatCountdown(left) : t("Starting...")}
         </p>
         <p className="mt-1 text-[14px] text-[#dddddd]">{formatWhen(broadcast.at, true)}</p>
         <button
@@ -79,7 +81,7 @@ export function Countdown({ videoId, broadcast, poster }: { videoId: string; bro
           }`}
         >
           <ReminderIcon className="h-5 w-5" />
-          {reminded ? "Reminder set" : "Set reminder"}
+          {reminded ? t("Reminder set") : t("Set reminder")}
         </button>
       </div>
     </div>

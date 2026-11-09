@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n/client";
 import { useState } from "react";
 import type { Privacy } from "@/lib/privacy/types";
 
@@ -21,6 +22,7 @@ const ROWS: { key: keyof Privacy; label: string; hint: string }[] = [
  * that save as soon as they change, and go back with a message if saving fails.
  */
 export function PrivacySettings({ initial }: { initial: Privacy }) {
+  const t = useT();
   const [privacy, setPrivacy] = useState(initial);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,7 +38,7 @@ export function PrivacySettings({ initial }: { initial: Privacy }) {
     const body = (await res?.json().catch(() => null)) as (Privacy & { error?: string }) | null;
     if (!res?.ok || !body || body.error) {
       setPrivacy(before);
-      setError("Couldn't save that. Try again.");
+      setError(t("Couldn't save that. Try again."));
       return;
     }
     setPrivacy({ subscriptionsPrivate: body.subscriptionsPrivate, playlistsPrivate: body.playlistsPrivate });
@@ -44,8 +46,8 @@ export function PrivacySettings({ initial }: { initial: Privacy }) {
 
   return (
     <section id="privacy" data-privacy-settings className="mt-8 border-t border-divider pt-6">
-      <h2 className="text-[16px] font-medium text-text">Privacy</h2>
-      <p className="mt-1 text-[14px] text-text-2">Choose who can see what you subscribe to and save.</p>
+      <h2 className="text-[16px] font-medium text-text">{t("Privacy")}</h2>
+      <p className="mt-1 text-[14px] text-text-2">{t("Choose who can see what you subscribe to and save.")}</p>
       <div className="mt-4 flex flex-col gap-4">
         {ROWS.map((r) => (
           <label key={r.key} className="flex cursor-pointer items-start gap-4">
@@ -58,8 +60,8 @@ export function PrivacySettings({ initial }: { initial: Privacy }) {
               className="mt-0.5 h-5 w-5 shrink-0 accent-[var(--link)]"
             />
             <span>
-              <span className="block text-[14px] text-text">{r.label}</span>
-              <span className="block text-[13px] leading-[18px] text-text-2">{r.hint}</span>
+              <span className="block text-[14px] text-text">{t(r.label)}</span>
+              <span className="block text-[13px] leading-[18px] text-text-2">{t(r.hint)}</span>
             </span>
           </label>
         ))}

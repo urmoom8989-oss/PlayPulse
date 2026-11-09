@@ -1,4 +1,5 @@
 import Image from "next/image";
+import { Tr } from "@/components/i18n/Tr";
 import Link from "next/link";
 import type { Channel } from "@/lib/channels/types";
 import { formatJoined, formatSubscribers } from "@/lib/channels/validation";
@@ -127,11 +128,11 @@ export function ChannelHeader({
                 onClick={() => onTab?.(t.key)}
                 className={className}
               >
-                {t.label}
+                <Tr>{t.label}</Tr>
               </button>
             ) : (
               <Link key={t.key} href={base + t.path} aria-current={active ? "page" : undefined} className={className}>
-                {t.label}
+                <Tr>{t.label}</Tr>
               </Link>
             );
           })}

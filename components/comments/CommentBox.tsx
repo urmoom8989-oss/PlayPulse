@@ -1,5 +1,6 @@
 "use client";
 
+import { useT } from "@/lib/i18n/client";
 import { useEffect, useRef, useState } from "react";
 import { Avatar } from "@/components/Avatar";
 import { BODY_MAX, bodyProblem, cleanBody } from "@/lib/comments/rules";
@@ -33,6 +34,7 @@ export function CommentBox({
   onSubmit: (body: string) => Promise<boolean> | boolean;
   onCancel?: () => void;
 }) {
+  const t = useT();
   const [text, setText] = useState(initial);
   const [open, setOpen] = useState(alwaysOpen);
   const [focused, setFocused] = useState(false);
@@ -79,8 +81,8 @@ export function CommentBox({
             ref={ref}
             rows={1}
             value={text}
-            placeholder={placeholder}
-            aria-label={placeholder}
+            placeholder={t(placeholder)}
+            aria-label={t(placeholder)}
             onFocus={() => {
               setFocused(true);
               setOpen(true);
@@ -103,7 +105,7 @@ export function CommentBox({
               </span>
             )}
             <button type="button" onClick={cancel} className="btn-text" data-comment-cancel>
-              Cancel
+              {t("Cancel")}
             </button>
             <button
               type="button"
@@ -112,7 +114,7 @@ export function CommentBox({
               data-comment-submit
               className="h-9 rounded-sm bg-link px-4 text-[14px] font-medium uppercase tracking-[0.007px] text-white disabled:cursor-default disabled:bg-[var(--sub-bg)] disabled:text-text-3"
             >
-              {submitLabel}
+              {t(submitLabel)}
             </button>
           </div>
         )}
