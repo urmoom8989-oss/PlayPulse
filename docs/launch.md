@@ -82,6 +82,7 @@ again. See [`supabase/migrations/README.md`](../supabase/migrations/README.md).
 - [ ] `022_upload_categories_publish.sql` (categories, thumbnails and explicit publishing)
 - [ ] `023_open_uploads_usernames.sql` (no daily upload limit, usernames with any characters but emoji)
 - [ ] `024_player_extras.sql` (the `player_extras` flag: chapters, autoplay, end screens, captions)
+- [ ] `025_upload_any_size.sql` (no upload size limit of our own: up to 5 TiB, the storage's limit)
 
 Then make yourself an admin (sign up on the site first):
 

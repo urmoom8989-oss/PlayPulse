@@ -1,4 +1,4 @@
--- 025_shortcuts_hover.sql
+-- 026_shortcuts_hover.sql
 -- Two browser-only features, so this file only adds their flags (off until the
 -- owner switches them on):
 --
@@ -9,7 +9,7 @@
 --   in the thumbnail (after the sprite frames), at the lowest quality that fits
 --   the card. Not on touch screens, nor with reduced motion or data saver on.
 --
--- Run after 024_player_extras.sql. Safe to run more than once.
+-- Run after 025_upload_any_size.sql. Safe to run more than once.
 
 insert into public.feature_flags (key, label, description, mode)
 values

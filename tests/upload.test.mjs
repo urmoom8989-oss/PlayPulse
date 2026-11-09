@@ -2,7 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   MAX_UPLOAD_BYTES,
+  MAX_PARTS,
   PART_SIZE,
+  partSizeFor,
   detailsProblem,
   fileProblem,
   fileProblemCode,
@@ -47,12 +49,15 @@ test("rejects other files", () => {
   }
 });
 
-test("files must be 1 byte to 5 GB", () => {
+test("any size up to what storage keeps in one file (5 TiB)", () => {
   const f = { name: "a.mp4", type: "video/mp4" };
   assert.equal(fileProblem({ ...f, size: 1 }), null);
+  assert.equal(fileProblem({ ...f, size: 6 * 1024 * MB }), null, "6 GB, over the old 5 GB limit");
+  assert.equal(fileProblem({ ...f, size: 500 * 1024 * MB }), null, "500 GB");
+  assert.equal(MAX_UPLOAD_BYTES, 5 * 1024 * 1024 * MB);
   assert.equal(fileProblem({ ...f, size: MAX_UPLOAD_BYTES }), null);
   assert.equal(fileProblemCode({ ...f, size: MAX_UPLOAD_BYTES + 1 }), "file_too_big");
-  assert.match(fileProblem({ ...f, size: MAX_UPLOAD_BYTES + 1 }), /5 GB/);
+  assert.match(fileProblem({ ...f, size: MAX_UPLOAD_BYTES + 1 }), /5 TB/);
   assert.equal(fileProblemCode({ ...f, size: 0 }), "file_empty");
 });
 
@@ -79,9 +84,9 @@ test("parts cover every byte exactly once", () => {
     assert.equal(parts[0].start, 0);
     assert.equal(parts.at(-1).end, bytes);
     for (let i = 1; i < parts.length; i++) assert.equal(parts[i].start, parts[i - 1].end);
-    assert.ok(parts.every((p) => p.end - p.start <= PART_SIZE));
+    assert.ok(parts.every((p) => p.end - p.start <= partSizeFor(bytes)));
   }
-  assert.equal(planParts(MAX_UPLOAD_BYTES).length, 320);
+  assert.ok(planParts(MAX_UPLOAD_BYTES).length <= MAX_PARTS);
   assert.deepEqual(planParts(0), []);
   assert.deepEqual(planParts(-5), []);
 });
@@ -120,4 +125,16 @@ test("progress numbers read well", () => {
   assert.equal(percentDone(0, 100), 0);
   assert.equal(percentDone(999, 1000), 99);
   assert.equal(percentDone(1000, 1000), 100);
+});
+
+test("very big files get bigger parts, never more than 10,000", () => {
+  const GB = 1024 * MB;
+  assert.equal(partSizeFor(10 * GB), PART_SIZE);
+  assert.equal(partSizeFor(PART_SIZE * MAX_PARTS), PART_SIZE);
+  for (const size of [200 * GB, 1024 * GB, MAX_UPLOAD_BYTES]) {
+    const part = partSizeFor(size);
+    assert.ok(part > PART_SIZE && part % MB === 0, String(size));
+    assert.ok(planParts(size).length <= MAX_PARTS, String(size));
+    assert.equal(planParts(size).at(-1).end, size);
+  }
 });
