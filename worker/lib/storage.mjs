@@ -84,6 +84,17 @@ export function createStorage(client, bucket) {
       }
     },
 
+    /** A small object as text (captions for the bots), or null when it does not exist. */
+    async getText(key, signal) {
+      try {
+        const out = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }), { abortSignal: signal });
+        return out.Body ? await out.Body.transformToString("utf-8") : null;
+      } catch (err) {
+        if (isNotFound(err)) return null;
+        throw err;
+      }
+    },
+
     async download(key, path, signal) {
       const out = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }), { abortSignal: signal });
       if (!out.Body) throw new Error("R2 sent no body");

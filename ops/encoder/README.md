@@ -229,6 +229,20 @@ The image builds whisper.cpp from a pinned release (`WHISPER_VERSION` in the
 Dockerfile) and checks the speech model against the SHA-1 in whisper.cpp's
 `models/README.md`.
 
+## Channel bots
+
+The worker also runs the channel bots (`supabase/migrations/030_bots.sql`,
+`lib/bots.mjs`) beside the encodes, with the same service role key and
+bucket: no new settings. They only do anything while the `bots` flag is not
+`off`, and only for channels with `bots_on` (the migration sets it for
+@typicalgamer). Every 10 minutes they add each of those videos' views, the
+likes and dislikes that go with them, now and then a comment about a moment in
+the video (read from its captions in the bucket, `hls/<video>/captions/`) and
+a few subscribers. While one of its Premieres or live broadcasts is on, every
+15 seconds they keep a crowd watching and post a few chat lines. The rates are
+in the one row of `public.bot_settings`. The log shows a `bots` line each
+round.
+
 ## Emptying the trash in R2
 
 Videos deleted in the studio stay in the trash for 30 days. Then the daily

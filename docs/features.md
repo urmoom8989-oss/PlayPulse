@@ -386,6 +386,32 @@ stream, with live chat.
 - Watching now counts signed in viewers by account and everybody else by the
   `sv` cookie, for 30 seconds after their last ping (every 15 seconds).
 
+### Channel bots
+
+Behind the `bots` flag (`030_bots.sql`, off at first), for channels with
+`channels.bots_on` (set for @typicalgamer only), the encoder worker adds
+activity that reads like real people's and counts like it everywhere (the
+counts, Trending, analytics):
+
+- **Views** every 10 minutes, a day's worth spread out (400 a day per video by
+  default, most in the first day, fewer as a video gets older). Each is a
+  counted view of its own, with a watch time and a traffic source.
+- **Likes and dislikes** that go with the views (4.5% and 0.2%), from 300 bot
+  accounts with ordinary names (made by the migration; they cannot sign in).
+- **Subscribers**, about 12 a day, until every bot account follows the channel.
+- **Comments** now and then (0.4% of views): most quote or point at a moment in
+  the video, read from its auto-generated captions ("2:31 "no way he actually
+  built the whole castle in one night" 😂"), some name a chapter or a word from
+  the title, the rest are the usual "who's watching in November 2026?". Never
+  the same text twice on a video, nothing on videos with comments off or held.
+  Bots also like some comments.
+- **During a Premiere or live broadcast**, a crowd of 25 to 90 watching (some
+  waiting before it starts) and about 4 chat lines a minute, some about what was
+  just said.
+
+The rates are in the one row of `public.bot_settings`. Nobody can read the bot
+tables or call the bot functions through the API; only the worker can.
+
 ### How the player gets the video
 
 The bucket is private, so the browser cannot read it directly. The player asks
