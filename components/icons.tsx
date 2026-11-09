@@ -1,7 +1,7 @@
 // Filled icons in the Material style used by the 2019 to 2020 YouTube layout.
 // Paths are from Google's Material Icons (Apache License 2.0).
 
-import { MARK_BLOB, MARK_VIEWBOX, MARK_WAVE, SNIPS_DROP, SNIPS_WAVE } from "@/lib/brand";
+import { MARK_LINE, MARK_STROKE, MARK_VIEWBOX, SNIPS_DROP, SNIPS_WAVE } from "@/lib/brand";
 
 type IconProps = { className?: string };
 
@@ -177,12 +177,11 @@ export const CommentIcon = icon(
   "M21.99 4c0-1.1-.89-2-1.99-2H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h14l4 4-.01-18zM18 14H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z",
 );
 
-/** The PlayPulse mark: a teal pulse with two drips and a wave (lib/brand.ts). */
+/** The PlayPulse mark: a teal heartbeat that runs through a play triangle (lib/brand.ts). */
 export function LogoMark({ className }: IconProps) {
   return (
     <svg viewBox={MARK_VIEWBOX} className={className} aria-hidden>
-      <path d={MARK_BLOB} fill="var(--mark)" />
-      <path d={MARK_WAVE} fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+      <path d={MARK_LINE} fill="none" stroke="var(--mark)" strokeWidth={MARK_STROKE} strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }

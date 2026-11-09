@@ -14,7 +14,7 @@ export function ChannelMessage({
 }) {
   return (
     <div data-channel-state={state} className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
-      <LogoMark className="h-16 w-[90px] opacity-40 grayscale" />
+      <LogoMark className="h-16 w-16 opacity-40 grayscale" />
       <h1 className="mt-6 text-[20px] font-normal text-text">{title}</h1>
       {children && <div className="mt-2 max-w-[480px] text-[14px] leading-5 text-text-2">{children}</div>}
       <Link href="/" className="btn-blue mt-6">

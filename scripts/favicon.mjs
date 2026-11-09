@@ -10,11 +10,11 @@ import { writeFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
-import { markSvg } from "../lib/brand.ts";
+import { BRAND, FAVICON_STROKE, markSvg } from "../lib/brand.ts";
 
 const root = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const sizes = [48, 32];
-const pngs = await Promise.all(sizes.map((size) => sharp(Buffer.from(markSvg(size))).png().toBuffer()));
+const pngs = await Promise.all(sizes.map((size) => sharp(Buffer.from(markSvg(size, BRAND.mark, FAVICON_STROKE))).png().toBuffer()));
 
 // ICONDIR (6 bytes), one ICONDIRENTRY (16 bytes) per image, then the PNGs.
 const head = Buffer.alloc(6 + 16 * pngs.length);

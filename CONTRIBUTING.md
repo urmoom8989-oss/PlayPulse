@@ -82,6 +82,6 @@ one step at a time. See "Feature flags" in the [README](README.md).
 - Plain words in UI text and docs. No em dashes.
 - The look follows the 2019 to 2020 video site layout: light by default with a dark
   theme toggle. Colors live as CSS variables in `app/globals.css`.
-- The logo and names are our own: the green slop mark (`lib/brand.ts`, redraw
+- The logo and names are our own: the teal pulse line mark (`lib/brand.ts`, redraw
   the favicon with `node scripts/favicon.mjs`) and "Snips" for short vertical
   videos. Please do not bring back a red play button or another site's names.
