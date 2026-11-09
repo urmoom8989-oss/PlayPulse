@@ -35,12 +35,12 @@ export function createDb(supabase) {
 
     /**
      * When the worker starts: gives back the jobs its slots were running
-     * before it stopped (037). 0 when the database does not have it yet.
+     * before it stopped (037). null when the database does not have 037 yet.
      */
     async release(worker) {
       const { data, error } = await supabase.rpc("encode_release", { worker });
       if (error) {
-        if (error.code === "PGRST202" || error.code === "42883") return 0;
+        if (error.code === "PGRST202" || error.code === "42883") return null;
         throw rpcError("encode_release", error);
       }
       return Number(data) || 0;

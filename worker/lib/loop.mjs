@@ -117,11 +117,15 @@ async function slotLoop(deps, slot) {
 /** Runs ENCODE_SLOTS slots until the stop signal aborts. */
 export async function runLoop(deps) {
   const { pollMs = POLL_MS, log } = deps;
-  const slots = Math.max(1, deps.config.encodeSlots ?? 1);
   const cleaned = await cleanWorkDir(deps.config.workDir);
   await markIdle(deps.config.stateDir);
   // Jobs this worker's slots were running before a restart go back in the queue at once.
-  const released = deps.db.release ? await deps.db.release(deps.config.workerName).catch(() => 0) : 0;
+  const released = deps.db.release ? await deps.db.release(deps.config.workerName).catch(() => 0) : null;
+  // Without 037's heartbeats, a second slot could take over a long encode: one at a time then.
+  const slots = released === null ? 1 : Math.max(1, deps.config.encodeSlots ?? 1);
+  if (released === null && (deps.config.encodeSlots ?? 1) > 1) {
+    log("start", {}, "037_parallel_encodes.sql is not run yet: one video at a time until it is (then restart the worker)");
+  }
   log(
     "start",
     { worker: deps.config.workerName, slots },

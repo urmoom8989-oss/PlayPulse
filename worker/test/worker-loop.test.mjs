@@ -618,6 +618,30 @@ test("two slots process two videos at the same time, each under its own name, wi
   }
 });
 
+test("without 037 in the database, the worker keeps to one video at a time", async () => {
+  const s = await setup({ jobs: [{}] });
+  try {
+    const stop = new AbortController();
+    const db = s.deps.db;
+    const names = [];
+    const old = {
+      ...db,
+      release: async () => null,
+      claim: async (w) => {
+        names.push(w);
+        const job = await db.claim(w);
+        if (!job) stop.abort();
+        return job;
+      },
+    };
+    await runLoop({ ...s.deps, db: old, config: { ...s.deps.config, encodeSlots: 2 }, stopSignal: stop.signal, pollMs: 10 });
+    assert.ok(names.every((n) => n === "test-box"), names.join(", "));
+    assert.ok(s.lines.some((l) => l.includes("037_parallel_encodes.sql is not run yet")));
+  } finally {
+    await s.cleanup();
+  }
+});
+
 test("slot names: the worker's own with one slot, /n with more", async () => {
   const { slotName } = await import("../lib/loop.mjs");
   assert.equal(slotName("box", 1, 1), "box");
