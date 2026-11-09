@@ -30,6 +30,15 @@ export const BOTS_EVERY_MS = 5 * 1000;
 export const BOTS_LIVE_EVERY_MS = 15 * 1000;
 /** The most comments one order gets in one round (bot_deliver() adds any number of the rest at once). */
 export const ROUND_CAP = { comments: 100 };
+/** Tries for one comment that is not on the video yet, before the round stops writing them. */
+export const COMMENT_TRIES = 40;
+/**
+ * Comments that could not be written because there was nothing new to say
+ * keep being tried this long after the order's window ends (the captions of a
+ * new video may come in meanwhile, with new moments to talk about), then are
+ * dropped so the order can finish.
+ */
+export const COMMENTS_GIVE_UP_AFTER_MS = 6 * 60 * 60 * 1000;
 /** bot_grow() makes at most this many accounts a call; the pool never passes POOL_MAX (034_bot_panel.sql). */
 export const GROW_BY = 250;
 export const POOL_MAX = 10000;
@@ -102,12 +111,16 @@ export function createBotDb(supabase) {
   };
 }
 
-/** Each video's caption cues, read from storage once per hour. */
-export function createCueCache(storage, { now = Date.now, ttlMs = 60 * 60 * 1000 } = {}) {
+/**
+ * Each video's caption cues, read from storage once per hour. A video without
+ * captions is looked at again after a few minutes: a new upload gets them a
+ * little after it is ready.
+ */
+export function createCueCache(storage, { now = Date.now, ttlMs = 60 * 60 * 1000, missingTtlMs = 5 * 60 * 1000 } = {}) {
   const cache = new Map();
   return async function cuesFor(video) {
     const hit = cache.get(video.id);
-    if (hit && now() - hit.at < ttlMs) return hit.cues;
+    if (hit && now() - hit.at < (hit.cues.length ? ttlMs : missingTtlMs)) return hit.cues;
     let cues = [];
     const folder = String(video.hls_key || `hls/${video.id}/master.m3u8`).replace(/\/[^/]*$/, "");
     for (const lang of ["en", "es", "fr", "de", "pt", "ja"]) {
@@ -180,7 +193,7 @@ async function deliverOrder(o, { db, cuesFor, log, now, rand, pool }) {
     let result = o.comments_mode === "on" ? "" : "closed";
     while (got.comments < due.comments && result !== "closed") {
       result = "duplicate";
-      for (let tries = 0; tries < 8 && result === "duplicate"; tries++) {
+      for (let tries = 0; tries < COMMENT_TRIES && result === "duplicate"; tries++) {
         const body = makeComment({ title: o.title, description: o.description, cues, now: now(), rand });
         if (!body || said.has(body.toLowerCase())) continue;
         result = await db.postComment(o.video_id, body);
@@ -193,7 +206,8 @@ async function deliverOrder(o, { db, cuesFor, log, now, rand, pool }) {
         break;
       } else break;
     }
-    if (result === "closed" || (result === "duplicate" && share >= 1)) {
+    const longPast = share >= 1 && now() - (Date.parse(o.ends_at) || 0) >= COMMENTS_GIVE_UP_AFTER_MS;
+    if (result === "closed" || (result === "duplicate" && longPast)) {
       // Comments are off or held on the video, or there is nothing new left to
       // say about it: the rest of its comments are skipped, so the order can finish.
       log("bots", { order: String(o.id).slice(0, 8) }, result === "closed" ? "comments are not on for this video, its comments are skipped" : "nothing new to say about this video, the rest of its comments are skipped");
