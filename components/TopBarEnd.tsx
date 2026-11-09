@@ -2,6 +2,8 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { getCurrentUser, toSessionUser } from "@/lib/auth";
 import { evaluateAllFlags } from "@/lib/flags";
+import { getPrefs } from "@/lib/i18n/server";
+import { tFor } from "@/lib/i18n/t";
 import { readSupabaseConfig } from "@/lib/supabase/env";
 import { AvatarMenu } from "./AvatarMenu";
 import { DbStatus } from "./DbStatus";
@@ -23,17 +25,19 @@ export async function TopBarEnd() {
   const user = await getCurrentUser();
   const flags = await evaluateAllFlags(user?.id ?? null);
   const sessionUser = user ? toSessionUser(user) : null;
+  const { lang, location } = await getPrefs();
+  const t = tFor(lang);
 
   return (
     <>
-      <SessionProvider config={config} user={sessionUser} flags={flags} />
+      <SessionProvider config={config} user={sessionUser} flags={flags} lang={lang} location={location} />
       {!config && <DbStatus />}
       {flags.upload && (
         <Link
           href={sessionUser ? "/upload" : "/login?next=/upload"}
           prefetch={false}
-          aria-label="Upload"
-          title="Upload"
+          aria-label={t("Upload")}
+          title={t("Upload")}
           className={iconLink}
         >
           <UploadIcon className="h-6 w-6" />
@@ -47,22 +51,22 @@ export async function TopBarEnd() {
       ) : (
         <>
           <SignedOutMenu />
-          {flags.accounts && <SignInButton />}
+          {flags.accounts && <SignInButton label={t("Sign in")} />}
         </>
       )}
     </>
   );
 }
 
-export function SignInButton() {
+export function SignInButton({ label = "Sign in" }: { label?: string }) {
   return (
     <Link
       href="/login"
-      aria-label="Sign in"
+      aria-label={label}
       className="ml-1 inline-flex h-9 shrink-0 items-center gap-2 rounded-[2px] border border-[var(--link)] px-[11px] text-[14px] font-medium uppercase text-[var(--link)]"
     >
       <AccountCircleIcon className="h-6 w-6" />
-      <span className="hidden sm:inline">Sign in</span>
+      <span className="hidden sm:inline">{label}</span>
     </Link>
   );
 }

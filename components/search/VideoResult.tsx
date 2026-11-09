@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { Thumb } from "@/components/Thumb";
 import { Avatar } from "@/components/Avatar";
-import { SpritePreview } from "@/components/feed/SpritePreview";
+import { HoverPreview } from "@/components/feed/HoverPreview";
+import { CardBadge, onAirOrSoon } from "@/components/live/CardBadge";
+import { ViewsAgo } from "@/components/i18n/Tr";
+import { cardMeta } from "@/lib/live/state";
 import { ThumbProgress } from "@/components/ThumbProgress";
 import { VideoCard } from "@/components/VideoCard";
 import { viewsLabel } from "@/lib/feed/format";
@@ -49,13 +52,18 @@ export function VideoResult({ video, now, words }: { video: SearchVideo; now: nu
           className="relative block aspect-video w-[246px] shrink-0 overflow-hidden bg-skeleton tab:w-[360px]"
           tabIndex={-1}
           aria-hidden
+          data-hover-box
         >
           <Thumb src={video.thumbnail} alt={video.title} sizes="(min-width: 792px) 360px, 246px" />
-          {video.spriteVtt && <SpritePreview vtt={video.spriteVtt} />}
-          {video.durationS !== null && (
-            <span className="absolute bottom-1 right-1 bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 tracking-[0.5px] text-white">
-              {formatTime(video.durationS)}
-            </span>
+          <HoverPreview vtt={video.spriteVtt} src={video.previewSrc} durationS={video.durationS} />
+          {onAirOrSoon(video.broadcast) ? (
+            <CardBadge broadcast={video.broadcast} />
+          ) : (
+            video.durationS !== null && (
+              <span className="absolute bottom-1 right-1 bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 tracking-[0.5px] text-white">
+                {formatTime(video.durationS)}
+              </span>
+            )
           )}
           <ThumbProgress videoId={video.id} />
         </Link>
@@ -64,7 +72,9 @@ export function VideoResult({ video, now, words }: { video: SearchVideo; now: nu
             <Link href={href}>{video.title}</Link>
           </h3>
           <p className="text-[13px] leading-[18px] text-text-2">
-            {viewsLabel(video.views)} • {timeAgo(video.publishedAt, now)}
+            {(onAirOrSoon(video.broadcast) && cardMeta(video.broadcast, now)) || (
+              <ViewsAgo views={video.views} iso={video.publishedAt} now={now} english={[viewsLabel(video.views), timeAgo(video.publishedAt, now)]} sep=" • " />
+            )}
           </p>
           <Link href={channelHref} className="my-3 flex items-center gap-2 text-[13px] leading-[18px] text-text-2 hover:text-text">
             <Avatar name={video.channel.name} url={video.channel.avatarUrl} size={24} />

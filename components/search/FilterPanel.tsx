@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Tr } from "@/components/i18n/Tr";
 import { CloseIcon, TuneIcon } from "@/components/icons";
 import { FILTER_GROUPS, isActive, resultsHref, toggleFilter, type SearchFilters } from "@/lib/search/query";
 
@@ -16,13 +17,13 @@ export function FilterPanel({ q, filters }: { q: string; filters: SearchFilters 
         data-search-filter-button
       >
         <TuneIcon className="h-6 w-6" />
-        Filter
+        <Tr>Filter</Tr>
       </summary>
       <div className="grid grid-cols-2 gap-x-6 gap-y-6 pb-6 pt-2 search:grid-cols-4" data-search-filter-panel>
         {FILTER_GROUPS.map((group) => (
           <section key={group.key} className="min-w-0">
             <h4 className="border-b border-divider pb-3 text-[12px] font-medium uppercase leading-4 tracking-[0.3px] text-text">
-              {group.label}
+              <Tr>{group.label}</Tr>
             </h4>
             <ul className="mt-2">
               {group.options.map((o) => {
@@ -38,7 +39,9 @@ export function FilterPanel({ q, filters }: { q: string; filters: SearchFilters 
                       title={removable ? "Remove" : undefined}
                       className={`flex items-center gap-1 py-2 text-[14px] leading-5 ${on ? "font-medium text-text" : "text-text-2 hover:text-text"}`}
                     >
-                      <span className="min-w-0">{o.label}</span>
+                      <span className="min-w-0">
+                        <Tr>{o.label}</Tr>
+                      </span>
                       {removable && <CloseIcon className="h-4 w-4 shrink-0" />}
                     </Link>
                   </li>

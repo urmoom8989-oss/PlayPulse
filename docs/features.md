@@ -84,6 +84,54 @@ The client secret stays in the Supabase dashboard. Never put it in this reposito
 
 Until Google is switched on, the Google button says so and email sign up still works.
 
+### Language and Location
+
+Behind the `language_location` flag (`032_language_location.sql`, off at
+first), the account menu and the signed out settings menu (the three dots)
+get the 2020 rows **Language: English** and **Location: United States**:
+
+- **Language** lists English, Español, Français, Deutsch, Português and 日本語.
+  The site's own words change: the top bar, the guide, the menus, the watch
+  page (buttons, Up next, the description, comments, the player's buttons and
+  settings menu), live chat, cards, search and its filters, channel tabs,
+  Settings. Views, subscribers and "3 days ago" follow the language's own
+  numbers and dates. Titles, descriptions and comments stay as people wrote
+  them. The studio stays in English.
+- **Location** lists the biggest countries, by their name in the chosen
+  language. **Trending** becomes "Trending in Canada": the videos most watched
+  in the last 7 days by people who picked that place (each view remembers the
+  viewer's place), over their age, like the usual Trending. Until a place has
+  8 such videos, it shows everybody's Trending under the same heading.
+- Both choices are kept in cookies for a year (`pp_lang`, `pp_loc`). Without
+  them, the browser's languages decide (Spanish for `es-MX`, Mexico for its
+  region), else English and the United States.
+- The words live in `lib/i18n/dict/`, one file per language, keyed by the
+  English text; `tests/i18n.test.mjs` fails when a wrapped word has no
+  translation. A word without one shows in English.
+
+### Switch account
+
+Behind the `switch_account` flag (`031_switch_account.sql`, off at first), one
+login can have several channels, like 2020's brand accounts:
+
+- **Switch account** in the account menu lists every channel of this login
+  (picture, name, handle, subscribers, a check on the current one). A click
+  signs this browser in as that channel and reloads the site. Comments, likes,
+  subscriptions, uploads and the studio are then that channel's own.
+- **Add or manage channels** opens `/account/switcher` ("Use PlayPulse as..."),
+  with a card per channel and **Create a new channel**, which asks for a name,
+  makes the channel and switches to it. Up to 20 extra channels per login.
+- Each extra channel is an account of its own with no password and no real
+  email address (never shown); the only way in is switching from an account in
+  the same group. The site checks the group in the database
+  (`can_switch_to`), then signs in with the service role like Sign in with
+  Yapin' does: a one time token redeemed on the server at once.
+- It needs `SUPABASE_SERVICE_ROLE_KEY` on the website (the same setting Sign in
+  with Yapin' uses). Without it the list still shows, but switching and making
+  channels say so.
+- Delete the extra channels (switch to each, Settings, Delete account) before
+  deleting the main account: once it is gone they cannot be reached.
+
 ## Channels
 
 Every account has a channel at `/@handle` with Home, Videos and About tabs, and
@@ -321,6 +369,97 @@ the browser:
   the language and the look. On phones the picture in picture button makes room
   for CC.
 
+### More keyboard shortcuts
+
+Behind the `more_shortcuts` flag (`026_shortcuts_hover.sql`, off at first), all
+in the browser:
+
+- `<` and `>` (Shift+, and Shift+.) step through the gear menu's speeds, and
+  the player shows the new speed for a moment.
+- `,` and `.` go one frame (1/30 of a second) back or forward while the video
+  is paused, like the 2020 player. While it plays they do nothing.
+- `Home` and `End` jump to the start and the end.
+- `/` puts the cursor in the search box, on any page.
+
+None of the keys work while typing in a field or with Ctrl, Alt or Cmd held.
+
+### Hover previews
+
+Behind the `hover_previews` flag (`026_shortcuts_hover.sql`, off at first): rest
+the pointer on a thumbnail on the home page, Trending, channel pages or search
+results and, after the sprite's frames (which every card already has), the
+video itself plays in the thumbnail, muted. It starts a tenth of the way in
+(at most a minute; videos under a minute start at the beginning), at the lowest
+quality that fits the card, and everything is let go as soon as the pointer
+leaves. Nothing loads until someone hovers. Touch screens never get it (they
+have no hover), and nor do browsers set to reduced motion or data saver.
+
+### Premieres and live
+
+Behind the `premieres` and `live` flags (`029_live.sql`, both off at first). A
+ready upload can be broadcast: everybody watches it at the same point, like a
+stream, with live chat.
+
+- **Premiere** (any channel): in **Studio > Video details > Premiere and
+  live**, pick when it starts and **Schedule Premiere**. A private video
+  becomes public, so the watch page and the cards show it, but nobody gets the
+  video files before it starts.
+- **Live** (only channels with `channels.can_go_live`, which the file sets for
+  @typicalgamer): **Go live now**, or **Schedule live** for later. It streams
+  the upload as a live broadcast.
+- **Before it starts**, the player's place shows the thumbnail with "Premieres
+  in 1:05:09" (or "Live in"), the date and **Set reminder**. The line under the
+  title says how many are waiting. Live chat is open as a waiting room. At zero
+  the page loads the player by itself. A reminder puts the broadcast in the top
+  bar's bell once it starts (for a day). **Cancel** in the studio takes it back
+  to a plain upload until it starts.
+- **While it is on**, the media route hands out the playlists cut at "now" (only
+  the segments that have aired, as a growing EVENT playlist, never cached), so
+  the player starts at the live edge, can rewind to the start, and the bar
+  shows **LIVE** instead of the time: red at the live edge, grey when behind
+  (a click goes back to live). The line under the title says "40 watching now ·
+  Started streaming 5 minutes ago" (or "Premiere in progress"). There are no
+  captions while it is on.
+- **Live chat** on the right, above Up next: signed in people post up to 200
+  characters, no links, the word list from moderation applies, at most one
+  message every 2 seconds and 20 a minute. The channel's owner shows with a
+  yellow badge and can remove any message; authors can remove their own.
+  Without websockets it asks for new messages every 2.5 seconds.
+- **Afterwards** it is a normal video ("Streamed live on ..." or "Premiered
+  ..."), and **Show chat replay** plays the chat back as the video reaches the
+  moment each message was sent.
+- Cards show **PREMIERE** or **UPCOMING** with "Premieres in 2 hours", and a red
+  **LIVE NOW** (or **PREMIERING NOW**) with "12 watching", in place of the
+  duration and views.
+- Watching now counts signed in viewers by account and everybody else by the
+  `sv` cookie, for 30 seconds after their last ping (every 15 seconds).
+
+### Channel bots
+
+Behind the `bots` flag (`030_bots.sql`, off at first), for channels with
+`channels.bots_on` (set for @typicalgamer only), the encoder worker adds
+activity that reads like real people's and counts like it everywhere (the
+counts, Trending, analytics):
+
+- **Views** every 10 minutes, a day's worth spread out (400 a day per video by
+  default, most in the first day, fewer as a video gets older). Each is a
+  counted view of its own, with a watch time and a traffic source.
+- **Likes and dislikes** that go with the views (4.5% and 0.2%), from 300 bot
+  accounts with ordinary names (made by the migration; they cannot sign in).
+- **Subscribers**, about 12 a day, until every bot account follows the channel.
+- **Comments** now and then (0.4% of views): most quote or point at a moment in
+  the video, read from its auto-generated captions ("2:31 "no way he actually
+  built the whole castle in one night" 😂"), some name a chapter or a word from
+  the title, the rest are the usual "who's watching in November 2026?". Never
+  the same text twice on a video, nothing on videos with comments off or held.
+  Bots also like some comments.
+- **During a Premiere or live broadcast**, a crowd of 25 to 90 watching (some
+  waiting before it starts) and about 4 chat lines a minute, some about what was
+  just said.
+
+The rates are in the one row of `public.bot_settings`. Nobody can read the bot
+tables or call the bot functions through the API; only the worker can.
+
 ### How the player gets the video
 
 The bucket is private, so the browser cannot read it directly. The player asks
@@ -457,6 +596,37 @@ To set it up:
    guide keeps its old note and `/feed/subscriptions` shows a placeholder.
 2. Switch the `subscriptions` flag to `test` or `everyone`.
 
+### Bell options
+
+Behind the `bell_options` flag (`028_bell_privacy.sql`, off at first), the bell
+next to SUBSCRIBED opens the 2020 menu instead of switching on and off:
+
+- **All**: every upload of the channel shows in the top bar's bell.
+- **Personalized** (new subscriptions start here while the flag is on): the
+  channel's uploads show only when you watched one of its videos in the last
+  30 days, or subscribed in the last 14.
+- **None**: nothing from the channel.
+
+The bell's icon shows the choice (with rings, plain, or crossed out) and a
+small message confirms it. Bells set before the flag keep what they were: on is
+All, off is None. Each pick counts toward the 60 changes an hour.
+
+### Privacy
+
+Behind the `privacy_settings` flag (`028_bell_privacy.sql`, off at first),
+**Settings** gets a **Privacy** section with two switches that save as soon as
+they change:
+
+- **Keep all my subscriptions private** (on at first, like 2020). Turned off,
+  the channels you subscribe to show on your channel's new **CHANNELS** tab
+  (`/@handle/channels`) with their picture, subscribers and SUBSCRIBE.
+  Turned on, the tab says the channel features no other channels (and tells
+  you, on your own channel, where to change it).
+- **Keep all my saved playlists private** (on at first). There are no saved
+  playlists yet; the choice is kept for when there are.
+
+Nobody can read these two settings through the API except their owner.
+
 `node scripts/subscriptions-shots.mjs` starts `next dev` against a small local
 stand in for Supabase with a made up signed in viewer and ten made up
 channels, checks subscribe and unsubscribe (with the count moving before the
@@ -504,6 +674,25 @@ Signed out searches are counted per address: the app passes on the address
 from `X-Forwarded-For`, which Caddy sets (see `ops/app/`). Somebody calling
 the database directly can make up that header, so the per address limit only
 holds for visits through the site.
+
+### Spelling correction
+
+Behind the `search_spelling` flag (`027_search_spelling.sql`, off at first):
+
+- When a search finds nothing but a close spelling finds something, the page
+  shows that spelling's results under **Showing results for** *the fix*, with
+  **Search instead for** *what you typed* (that link adds `&exact=1`, so it is
+  not corrected again).
+- When a search finds something and a close spelling exists, **Did you mean:**
+  *the fix* sits above the results as a link.
+- The fix only uses words that are really on the site: the titles and tags of
+  public videos and the names and handles of channels, kept in the
+  `search_words` table, rebuilt every 30 minutes with pg_cron (or by running
+  `select public.refresh_search_words();`). A word counts as close when it is
+  one edit away (two for longer words), the same letters with two swapped, or
+  very similar. Short words, numbers and words that are already on the site are
+  never changed. The changed words show in bold italic.
+- Each correction counts toward the 240 suggestion requests a minute.
 
 `node scripts/search-shots.mjs` starts `next dev` against a small local stand
 in for Supabase with made up channels and videos, checks the suggestions

@@ -6,6 +6,7 @@ import { addRecent, parseRecent, RECENT_KEY, removeRecent } from "@/lib/search/r
 import { normalizeQuery, resultsHref } from "@/lib/search/query";
 import { SUGGEST_DEBOUNCE_MS } from "@/lib/search/rules";
 import { dedupeSuggestions, splitSuggestion } from "@/lib/search/suggest";
+import { useT } from "@/lib/i18n/client";
 import { useFlag } from "@/lib/store/session";
 import { ArrowBackIcon, CloseIcon, HistoryIcon, MicIcon, SearchIcon } from "./icons";
 
@@ -77,6 +78,7 @@ function SearchForm({
   autoFocus?: boolean;
   onDone?: () => void;
 }) {
+  const t = useT();
   const router = useRouter();
   const on = useFlag("search");
   const id = useId();
@@ -153,7 +155,7 @@ function SearchForm({
     <ul
       id={listId}
       role="listbox"
-      aria-label={empty ? "Recent searches" : "Suggestions"}
+      aria-label={empty ? t("Recent searches") : t("Suggestions")}
       data-search-list={empty ? "recent" : "suggest"}
       // Keep the focus in the box while a row is clicked.
       onMouseDown={(e) => e.preventDefault()}
@@ -194,7 +196,7 @@ function SearchForm({
             {item.kind === "recent" && (
               <button
                 type="button"
-                aria-label={`Remove ${item.text} from recent searches`}
+                aria-label={t("Remove {q} from recent searches", { q: item.text })}
                 data-search-remove
                 onClick={(e) => {
                   e.stopPropagation();
@@ -214,14 +216,14 @@ function SearchForm({
   return (
     <form role="search" action="/results" onSubmit={onSubmit} className="relative flex h-10 min-w-0 flex-1 items-stretch">
       <label htmlFor={id} className="sr-only">
-        Search
+        {t("Search")}
       </label>
       <input
         ref={input}
         id={id}
         name="search_query"
         type="search"
-        placeholder="Search"
+        placeholder={t("Search")}
         autoFocus={autoFocus}
         autoComplete="off"
         autoCorrect="off"
@@ -253,7 +255,7 @@ function SearchForm({
       />
       <button
         type="submit"
-        aria-label="Search"
+        aria-label={t("Search")}
         className="grid h-10 w-[65px] shrink-0 place-items-center rounded-r-[2px] border border-l-0 border-[var(--search-btn-border)] bg-[var(--search-btn)] text-icon hover:text-text"
       >
         <SearchIcon className="h-5 w-5" />
@@ -271,6 +273,7 @@ function SearchForm({
  * narrow windows.
  */
 export function SearchBox({ initialQuery = "" }: { initialQuery?: string }) {
+  const t = useT();
   const [open, setOpen] = useState(false);
   // Feature 18: no search box until the search flag is on (the spacer keeps the right side right).
   const on = useFlag("search");
@@ -288,9 +291,9 @@ export function SearchBox({ initialQuery = "" }: { initialQuery?: string }) {
           </div>
           <button
             type="button"
-            aria-label="Search with your voice"
+            aria-label={t("Search with your voice")}
             disabled
-            title="Voice search is not part of PlayPulse yet"
+            title={t("Voice search is not part of PlayPulse yet")}
             className="ml-2 grid h-10 w-10 shrink-0 place-items-center rounded-full text-icon"
           >
             <MicIcon className="h-6 w-6" />
@@ -301,7 +304,7 @@ export function SearchBox({ initialQuery = "" }: { initialQuery?: string }) {
       <div className="flex flex-1 justify-end search:hidden">
         <button
           type="button"
-          aria-label="Search"
+          aria-label={t("Search")}
           data-search-open
           onClick={() => setOpen(true)}
           className="grid h-10 w-10 place-items-center rounded-full text-icon hover:bg-hover"
@@ -314,7 +317,7 @@ export function SearchBox({ initialQuery = "" }: { initialQuery?: string }) {
         <div className="absolute inset-0 z-10 flex items-center gap-2 bg-surface px-2 search:hidden" data-search-box="overlay">
           <button
             type="button"
-            aria-label="Back"
+            aria-label={t("Back")}
             onClick={() => setOpen(false)}
             className="grid h-10 w-10 shrink-0 place-items-center rounded-full text-icon hover:bg-hover"
           >

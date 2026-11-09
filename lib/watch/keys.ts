@@ -11,7 +11,10 @@ export type PlayerAction =
   | { type: "theater" }
   | { type: "pip" }
   | { type: "captions" }
-  | { type: "caption-size"; step: 1 | -1 };
+  | { type: "caption-size"; step: 1 | -1 }
+  | { type: "speed-step"; step: 1 | -1 }
+  | { type: "frame-step"; step: 1 | -1 }
+  | { type: "seek-edge"; edge: "start" | "end" };
 
 export type KeyInput = {
   key: string;
@@ -49,11 +52,15 @@ function isTyping(e: KeyInput): boolean {
  *   c               subtitles and closed captions on or off
  *   + and -         captions bigger or smaller
  *   0 to 9          jump to 0% to 90%
+ * With `more` (the more_shortcuts flag), the rest of the 2020 keys:
+ *   < and >         slower or faster (Shift+, and Shift+.)
+ *   , and .         one frame back or forward, while paused
+ *   Home, End       the start or the end of the video
  * Returns null for any other key, and when a modifier is held (so browser
  * shortcuts like Ctrl+L keep working) or the person is typing. Space on a
  * focused button or link presses that button, as everywhere else.
  */
-export function keyAction(e: KeyInput): PlayerAction | null {
+export function keyAction(e: KeyInput, more: boolean = false): PlayerAction | null {
   if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e)) return null;
   const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
   if ((key === " " || key === "Spacebar") && isControl(e)) return null;
@@ -92,7 +99,36 @@ export function keyAction(e: KeyInput): PlayerAction | null {
       return { type: "caption-size", step: -1 };
   }
   if (/^[0-9]$/.test(key)) return { type: "seek-percent", percent: Number(key) * 10 };
+  if (!more) return null;
+  switch (key) {
+    case "<":
+      return { type: "speed-step", step: -1 };
+    case ">":
+      return { type: "speed-step", step: 1 };
+    case ",":
+      return { type: "frame-step", step: -1 };
+    case ".":
+      return { type: "frame-step", step: 1 };
+    case "Home":
+      return { type: "seek-edge", edge: "start" };
+    case "End":
+      return { type: "seek-edge", edge: "end" };
+  }
   return null;
+}
+
+/** One frame, for , and . (the 2020 player stepped by 1/30 of a second). */
+export const FRAME_S = 1 / 30;
+
+/**
+ * The next speed up or down the list (the gear menu's speeds), or the same
+ * speed at either end. A speed that is not on the list goes to its neighbour.
+ */
+export function stepSpeed(rate: number, step: 1 | -1, speeds: readonly number[]): number {
+  if (speeds.length === 0) return rate;
+  if (step > 0) return speeds.find((s) => s > rate + 1e-9) ?? speeds[speeds.length - 1];
+  for (let i = speeds.length - 1; i >= 0; i--) if (speeds[i] < rate - 1e-9) return speeds[i];
+  return speeds[0];
 }
 
 /** Where a seek lands: never before 0, never past the end. */

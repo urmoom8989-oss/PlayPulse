@@ -2,6 +2,7 @@
 // Everything here is safe to show: no keys, no owner ids.
 // Only relative imports, so Node can load this file directly.
 
+import type { CardBroadcast } from "../live/types.ts";
 import { playbackUrls } from "../watch/media.ts";
 
 /** channel_shorts: one channel's shorts (feature 11), newest first. */
@@ -17,11 +18,15 @@ export type FeedCard = {
   thumbnail: string;
   /** The hover sprite's .vtt, or null when the video has none. */
   spriteVtt: string | null;
+  /** The video's HLS playlist for the hover preview, or null before it is encoded. */
+  previewSrc: string | null;
   publishedAt: string;
   views: number;
   channel: FeedChannel;
   /** Vertical and a minute or less (feature 11). */
   isShort: boolean;
+  /** A Premiere or live broadcast (028), added after the rows are read. */
+  broadcast?: CardBroadcast | null;
 };
 
 export type FeedPage = { cards: FeedCard[]; next: string | null };
@@ -63,10 +68,14 @@ function num(v: number | string | null | undefined): number | null {
 export function cardMedia(
   v: { id: string; thumbnailUrl: string | null; hlsKey: string | null; spriteKey: string | null },
   publicBase: string | null,
-): { thumbnail: string; spriteVtt: string | null } {
+): { thumbnail: string; spriteVtt: string | null; previewSrc: string | null } {
   const id = v.id.toLowerCase();
   const urls = playbackUrls(id, v.hlsKey || `hls/${id}/master.m3u8`, v.spriteKey, publicBase);
-  return { thumbnail: v.thumbnailUrl || urls.thumbnail("thumb-1.webp"), spriteVtt: urls.spriteVtt };
+  return {
+    thumbnail: v.thumbnailUrl || urls.thumbnail("thumb-1.webp"),
+    spriteVtt: urls.spriteVtt,
+    previewSrc: v.hlsKey ? urls.src : null,
+  };
 }
 
 export function rowToCard(row: FeedRow, publicBase: string | null): FeedCard {
@@ -80,6 +89,7 @@ export function rowToCard(row: FeedRow, publicBase: string | null): FeedCard {
     durationS: num(row.duration_s),
     thumbnail: media.thumbnail,
     spriteVtt: media.spriteVtt,
+    previewSrc: media.previewSrc,
     publishedAt: row.published_at,
     views: num(row.views) ?? 0,
     channel: {

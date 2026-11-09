@@ -18,6 +18,9 @@ import { formatDate, formatViews } from "@/lib/watch/format";
 import type { WatchVideo } from "@/lib/watch/types";
 import { SubscribeButton } from "@/components/subscriptions/SubscribeButton";
 import { SubscriberCount } from "@/components/subscriptions/SubscriberCount";
+import { BroadcastMeta } from "@/components/live/BroadcastMeta";
+import { useLang, useT } from "@/lib/i18n/client";
+import { dateIn, viewsIn } from "@/lib/i18n/format";
 import { LikeButtons } from "./LikeButtons";
 import { ShareDialog } from "./ShareDialog";
 import { TimestampText } from "./TimestampText";
@@ -70,6 +73,7 @@ function VisibilityNote({ visibility }: { visibility: WatchVideo["visibility"] }
 
 /** The description, folded to three lines with SHOW MORE, like 2019. Timestamps are links with player extras. */
 function Description({ text, videoId }: { text: string; videoId: string }) {
+  const t = useT();
   const extras = useFlag("player_extras");
   const [open, setOpen] = useState(false);
   const [long, setLong] = useState(false);
@@ -79,7 +83,7 @@ function Description({ text, videoId }: { text: string; videoId: string }) {
     if (el) setLong(el.scrollHeight > el.clientHeight + 1);
   }, [text]);
 
-  if (!text) return <p className="text-[14px] leading-5 text-text-2">No description</p>;
+  if (!text) return <p className="text-[14px] leading-5 text-text-2">{t("No description")}</p>;
   return (
     <div data-description={open ? "open" : "closed"}>
       <div
@@ -94,7 +98,7 @@ function Description({ text, videoId }: { text: string; videoId: string }) {
           onClick={() => setOpen(!open)}
           className="mt-2 text-[13px] font-medium uppercase tracking-[0.007px] text-text-2 hover:text-text"
         >
-          {open ? "Show less" : "Show more"}
+          {open ? t("Show less") : t("Show more")}
         </button>
       )}
     </div>
@@ -112,6 +116,8 @@ export function VideoInfo({
   engagement?: WatchEngagement | null;
   children?: ReactNode;
 }) {
+  const t = useT();
+  const lang = useLang();
   const [sharing, setSharing] = useState(false);
   const moderation = useFlag("moderation");
   const report = useReport("video", video.id);
@@ -126,15 +132,25 @@ export function VideoInfo({
       <div className="flex flex-wrap items-center justify-between gap-y-1 border-b border-divider pb-2 pt-1">
         <p className="py-1 text-[14px] leading-5 text-text-2" data-watch-meta>
           <VisibilityNote visibility={video.visibility} />
-          {formatViews(video.views)} · {formatDate(video.date)}
+          {video.broadcast && video.broadcast.state !== "ended" ? (
+            <BroadcastMeta videoId={video.id} broadcast={video.broadcast} />
+          ) : video.broadcast ? (
+            <>
+              {viewsIn(lang, video.views, formatViews(video.views))} · <BroadcastMeta videoId={video.id} broadcast={video.broadcast} />
+            </>
+          ) : (
+            <>
+              {viewsIn(lang, video.views, formatViews(video.views))} · {dateIn(lang, video.date, formatDate(video.date))}
+            </>
+          )}
         </p>
         <div className="-mx-1.5 flex items-center sm:mx-0">
           <LikeButtons key={video.id} videoId={video.id} engagement={engagement} />
-          <ActionButton Icon={ShareIcon} label="Share" onClick={() => setSharing(true)} mirror data-share />
-          <ActionButton Icon={PlaylistAddIcon} label="Save" title="Saving to a playlist arrives in a later feature." />
+          <ActionButton Icon={ShareIcon} label={t("Share")} onClick={() => setSharing(true)} mirror data-share />
+          <ActionButton Icon={PlaylistAddIcon} label={t("Save")} title={t("Saving to a playlist arrives in a later feature.")} />
           {moderation && !video.isOwner ? (
             <Menu
-              label="More actions"
+              label={t("More actions")}
               width={180}
               button={<MoreHorizIcon className="h-6 w-6" />}
               buttonClassName="grid h-9 w-9 place-items-center rounded-full text-icon hover:bg-hover hover:text-text"
@@ -142,7 +158,7 @@ export function VideoInfo({
               {(close) => report.item(close)}
             </Menu>
           ) : (
-            <ActionButton Icon={MoreHorizIcon} label="More actions" count="" title="More arrives later." />
+            <ActionButton Icon={MoreHorizIcon} label={t("More actions")} count="" title={t("More arrives later.")} />
           )}
         </div>
       </div>
@@ -162,7 +178,7 @@ export function VideoInfo({
           </div>
           {video.isOwner ? (
             <Link href="/studio/videos" className="btn-blue shrink-0">
-              Edit video
+              {t("Edit video")}
             </Link>
           ) : (
             <SubscribeButton channelId={video.channel.id} channelName={video.channel.name} count={video.channel.subscriberCount} />

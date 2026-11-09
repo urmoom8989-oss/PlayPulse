@@ -1,10 +1,13 @@
 import { redirect } from "next/navigation";
+import { Tr } from "@/components/i18n/Tr";
 import { Suspense } from "react";
 import { DbNotConnected, FeatureOff, FormSkeleton } from "@/components/auth/AuthCard";
 import { AddEmail } from "@/components/settings/AddEmail";
 import { Connections } from "@/components/settings/Connections";
+import { PrivacySettings } from "@/components/settings/PrivacySettings";
 import { SettingsForm, type SettingsProfile } from "@/components/settings/SettingsForm";
 import { accountsState } from "@/lib/accounts/server";
+import { myPrivacy } from "@/lib/privacy/server";
 import { connectionState } from "@/lib/yapin/server";
 
 export const metadata = { title: "Settings | PlayPulse" };
@@ -50,10 +53,20 @@ async function SettingsGate() {
         }}
       />
       <Suspense fallback={null}>
+        <PrivacySection />
+      </Suspense>
+      <Suspense fallback={null}>
         <YapinConnection />
       </Suspense>
     </>
   );
+}
+
+/** Settings > Privacy, with the privacy_settings flag. */
+async function PrivacySection() {
+  const state = await myPrivacy();
+  if (state.kind !== "ready") return null;
+  return <PrivacySettings initial={state.privacy} />;
 }
 
 /** Settings > Connections, with the yapin flag on and the Yapin' app set on the server (feature 16). */
@@ -67,8 +80,12 @@ export default function SettingsPage() {
   return (
     <div className="mx-auto max-w-[1000px] px-4 py-6 sm:px-6">
       <div className="bg-surface px-4 py-6 sm:px-8">
-        <h1 className="text-[24px] font-normal leading-8 text-text">Settings</h1>
-        <p className="mb-4 mt-1 text-[14px] text-text-2">Choose how you appear on PlayPulse.</p>
+        <h1 className="text-[24px] font-normal leading-8 text-text">
+          <Tr>Settings</Tr>
+        </h1>
+        <p className="mb-4 mt-1 text-[14px] text-text-2">
+          <Tr>Choose how you appear on PlayPulse.</Tr>
+        </p>
         <Suspense fallback={<FormSkeleton />}>
           <SettingsGate />
         </Suspense>

@@ -2,6 +2,7 @@ import "server-only";
 import { cache } from "react";
 import type { SessionUser } from "@/lib/store/session";
 import { createClient } from "@/lib/supabase/server";
+import { isChannelAccountEmail } from "@/lib/switch/rules";
 import { isPlaceholderEmail } from "@/lib/yapin/rules";
 
 export type CurrentUser = SessionUser & {
@@ -31,7 +32,8 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser | null> => {
   const id = data.claims.sub;
   const claimed = typeof data.claims.email === "string" ? data.claims.email : null;
   const emailPlaceholder = isPlaceholderEmail(claimed);
-  const email = emailPlaceholder ? null : claimed;
+  // An extra channel's account (Switch account) has no mailbox of its own.
+  const email = emailPlaceholder || isChannelAccountEmail(claimed) ? null : claimed;
 
   const [{ data: profile }, { data: channel }] = await Promise.all([
     supabase.from("profiles").select(PROFILE_COLUMNS).eq("id", id).maybeSingle(),

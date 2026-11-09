@@ -12,6 +12,7 @@ import { createS3Client } from "@/lib/upload/s3";
 import { playbackUrls, readPublicBase, type MediaContext, type MediaVideo } from "./media";
 import { createMediaStorage } from "./s3";
 import type { UpNextVideo, WatchRendition, WatchVideo } from "./types";
+import { broadcastState, isBroadcastKind, type Broadcast } from "@/lib/live/state";
 import { relatedCards } from "@/lib/feed/server";
 import { engagementFor } from "@/lib/engagement/server";
 import type { WatchEngagement } from "@/lib/engagement/types";
@@ -65,6 +66,9 @@ export type WatchRow = {
   channel_name: string;
   channel_avatar_url: string | null;
   channel_subscriber_count: number | null;
+  /** From 028 on. */
+  broadcast_kind?: string | null;
+  broadcast_at?: string | null;
 };
 
 function toRenditions(value: unknown): WatchRendition[] {
@@ -80,8 +84,24 @@ function num(v: number | string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-export function rowToVideo(row: WatchRow, publicBase: string | null): WatchVideo {
-  const urls = row.hls_key ? playbackUrls(row.id, row.hls_key, row.preview_sprite_key, publicBase) : null;
+/** The broadcast from a watch_video() row, as of `now`; reminded and viewers come later. */
+export function rowBroadcast(row: WatchRow, now: number): Broadcast | null {
+  if (!isBroadcastKind(row.broadcast_kind) || !row.broadcast_at) return null;
+  return {
+    kind: row.broadcast_kind,
+    at: row.broadcast_at,
+    state: broadcastState(row.broadcast_at, num(row.duration_s), now),
+    reminded: false,
+    viewers: 0,
+  };
+}
+
+export function rowToVideo(row: WatchRow, publicBase: string | null, now: number = Date.now()): WatchVideo {
+  const broadcast = rowBroadcast(row, now);
+  // While a broadcast is on (or coming), playlists must come through the media
+  // route, which cuts them at "now": never straight from the public bucket.
+  const base = broadcast && broadcast.state !== "ended" ? null : publicBase;
+  const urls = row.hls_key ? playbackUrls(row.id, row.hls_key, row.preview_sprite_key, base) : null;
   return {
     id: row.id,
     title: row.title,
@@ -102,6 +122,7 @@ export function rowToVideo(row: WatchRow, publicBase: string | null): WatchVideo
       avatarUrl: row.channel_avatar_url,
       subscriberCount: row.channel_subscriber_count ?? 0,
     },
+    broadcast,
   };
 }
 
@@ -167,15 +188,32 @@ export const watchPageState = cache(async function watchPageState(v: string | nu
     };
     return { kind: "owner-processing", video, live, processingOn };
   }
-  if (!video.src) return { kind: "missing" };
+  // Before a Premiere or live broadcast starts, viewers get the page without the files.
+  if (!video.src && video.broadcast?.state !== "upcoming") return { kind: "missing" };
 
-  const [upNext, engagement, comments] = await Promise.all([
+  const [upNext, engagement, comments, broadcast] = await Promise.all([
     upNextFor(supabase, row, publicBase, user?.id ?? null),
     engagementFor(row.id),
     commentsFor(row.id),
+    video.broadcast ? broadcastFor(supabase, row.id, video.broadcast) : null,
   ]);
-  return { kind: "ready", video, upNext, preview: false, engagement, comments };
+  return { kind: "ready", video: { ...video, broadcast }, upNext, preview: false, engagement, comments };
 });
+
+/** The broadcast with the viewer's reminder and how many are watching (watch_broadcast()). */
+async function broadcastFor(
+  supabase: NonNullable<Awaited<ReturnType<typeof createClient>>>,
+  id: string,
+  fallback: Broadcast,
+): Promise<Broadcast> {
+  const { data, error } = await supabase.rpc("watch_broadcast", { video_id: id });
+  const row = (!error && Array.isArray(data) ? data[0] : null) as
+    | { kind: string; at: string; state: string; reminded: boolean; viewers: number }
+    | null;
+  if (!row || !isBroadcastKind(row.kind)) return fallback;
+  const state = row.state === "upcoming" || row.state === "live" || row.state === "ended" ? row.state : fallback.state;
+  return { kind: row.kind, at: row.at, state, reminded: row.reminded === true, viewers: Number(row.viewers) || 0 };
+}
 
 /**
  * Up next. With the feed flag on: related_videos() (same channel first, then

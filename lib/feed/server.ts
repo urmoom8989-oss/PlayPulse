@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { readPublicBase } from "@/lib/watch/media";
 import { decodeCursor, encodeCursor } from "./cursor";
 import { TRENDING_COUNT } from "./score";
+import { withBroadcasts } from "@/lib/live/server";
 import { rowToCard, type FeedCard, type FeedKind, type FeedPage, type FeedRow } from "./types";
 
 /** The public bucket domain, when set (see the Watch page section of the README). */
@@ -16,6 +17,8 @@ function mediaPublicBase(): string | null {
 
 /** Cards per page on the home grid and the channel Videos tab. */
 export const FEED_PAGE_SIZE = 24;
+/** Trending for a place needs this many videos with views from there; else it shows everybody's. */
+export const TRENDING_LOCAL_MIN = 8;
 
 export type FeedState =
   /** The feed flag is off: the pages keep their placeholders. */
@@ -44,7 +47,7 @@ export async function feedGate(): Promise<"no-db" | "off" | "on"> {
  */
 export async function feedState(
   kind: FeedKind,
-  opts: { cursor?: string | null; channelId?: string | null; limit?: number } = {},
+  opts: { cursor?: string | null; channelId?: string | null; limit?: number; country?: string | null } = {},
 ): Promise<FeedState> {
   const gate = await feedGate();
   if (gate !== "on") return { kind: gate };
@@ -61,6 +64,16 @@ export async function feedState(
   // shelf and tab, so the home grid and the Videos tab leave them out.
   const shortsOn = await flagOn("shorts", (await getCurrentUser())?.id ?? null);
   if (kind === "channel_shorts" && !shortsOn) return { kind: "ready", page: { cards: [], next: null }, now: Date.now() };
+  // Location (032): Trending in the viewer's place, by views from there, once
+  // there are enough of them; until then everybody's views.
+  if (kind === "trending" && opts.country) {
+    const local = await supabase.rpc("trending_in", { country: opts.country, lim: limit });
+    const rows = (!local.error && Array.isArray(local.data) ? local.data : []) as FeedRow[];
+    if (rows.length >= TRENDING_LOCAL_MIN) {
+      const publicBase = mediaPublicBase();
+      return { kind: "ready", page: { cards: await withBroadcasts(rows.map((r) => rowToCard(r, publicBase))), next: null }, now: Date.now() };
+    }
+  }
   const { data, error } = await supabase.rpc("feed_videos", {
     kind,
     cursor: cursor?.publishedAt ?? null,
@@ -73,7 +86,7 @@ export async function feedState(
 
   const rows = (Array.isArray(data) ? data : []) as FeedRow[];
   const publicBase = mediaPublicBase();
-  const cards = rows.map((r) => rowToCard(r, publicBase));
+  const cards = await withBroadcasts(rows.map((r) => rowToCard(r, publicBase)));
   const last = rows[rows.length - 1];
   const next =
     kind !== "trending" && last && rows.length === limit ? encodeCursor({ publishedAt: last.published_at, id: last.id }) : null;
@@ -90,5 +103,5 @@ export async function relatedCards(videoId: string, limit = 12): Promise<FeedCar
   const { data, error } = await supabase.rpc("related_videos", { video_id: videoId, lim: limit });
   if (error) return null;
   const publicBase = mediaPublicBase();
-  return ((Array.isArray(data) ? data : []) as FeedRow[]).map((r) => rowToCard(r, publicBase));
+  return withBroadcasts(((Array.isArray(data) ? data : []) as FeedRow[]).map((r) => rowToCard(r, publicBase)));
 }

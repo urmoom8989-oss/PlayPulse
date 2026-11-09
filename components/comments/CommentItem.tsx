@@ -1,5 +1,7 @@
 "use client";
 
+import { useLang, useT } from "@/lib/i18n/client";
+import { agoIn, compact } from "@/lib/i18n/format";
 import Link from "next/link";
 import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
@@ -59,19 +61,20 @@ function CreatorHeart({ channel, onClick }: { channel: CommentContext["channel"]
 }
 
 function DeleteDialog({ onCancel, onDelete, mine }: { onCancel: () => void; onDelete: () => void; mine: boolean }) {
+  const t = useT();
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-black/50 p-4" role="dialog" aria-modal aria-label="Delete comment">
       <div className="w-full max-w-[400px] rounded-sm bg-surface p-6" style={{ boxShadow: "var(--menu-shadow)" }}>
         <h2 className="text-[16px] font-medium text-text">Delete comment</h2>
         <p className="mt-3 text-[14px] leading-5 text-text-2">
-          {mine ? "Delete your comment permanently?" : "Delete this comment from your video permanently?"}
+          {mine ? t("Delete your comment permanently?") : t("Delete this comment from your video permanently?")}
         </p>
         <div className="mt-6 flex justify-end gap-2">
           <button type="button" className="btn-text" onClick={onCancel}>
-            Cancel
+            {t("Cancel")}
           </button>
           <button type="button" className="btn-text !text-link" onClick={onDelete} data-confirm-delete>
-            Delete
+            {t("Delete")}
           </button>
         </div>
       </div>
@@ -85,6 +88,8 @@ function DeleteDialog({ onCancel, onDelete, mine }: { onCancel: () => void; onDe
  * Top level comments also carry their replies ("View N replies").
  */
 export function CommentItem({ comment, ctx, parentId = null }: { comment: Comment; ctx: CommentContext; parentId?: string | null }) {
+  const t = useT();
+  const lang = useLang();
   const isReply = parentId !== null;
   const [replying, setReplying] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -136,7 +141,7 @@ export function CommentItem({ comment, ctx, parentId = null }: { comment: Commen
 
         {comment.deleted ? (
           <p className="py-1 text-[14px] leading-5 text-text-2" data-comment-deleted={comment.removed ? "removed" : "deleted"}>
-            {comment.removed ? "This comment was removed by moderation." : "This comment was deleted."}
+            {comment.removed ? t("This comment was removed by moderation.") : t("This comment was deleted.")}
           </p>
         ) : (
           <>
@@ -152,14 +157,14 @@ export function CommentItem({ comment, ctx, parentId = null }: { comment: Commen
                   </Link>
                 )}
                 <span className="text-text-2" data-comment-time>
-                  {pending ? "Posting..." : timeAgo(comment.createdAt, ctx.now)}
+                  {pending ? t("Posting...") : agoIn(lang, comment.createdAt, ctx.now, timeAgo(comment.createdAt, ctx.now))}
                   {comment.editedAt && !pending ? " (edited)" : ""}
                 </span>
               </p>
               {!pending && !editing && (
                 <div className="-mr-2 -mt-1.5 opacity-100 transition-opacity tab:opacity-0 tab:group-hover/comment:opacity-100 tab:focus-within:opacity-100 has-[[aria-expanded=true]]:opacity-100" data-comment-menu>
                   <Menu
-                    label="Comment actions"
+                    label={t("Comment actions")}
                     width={200}
                     button={<MoreIcon className="h-5 w-5" />}
                     buttonClassName="grid h-8 w-8 place-items-center rounded-full text-icon hover:bg-hover"
@@ -174,7 +179,7 @@ export function CommentItem({ comment, ctx, parentId = null }: { comment: Commen
                               void moderate(comment.id, comment.pinned ? "unpin" : "pin");
                             }}
                           >
-                            {comment.pinned ? "Unpin" : "Pin"}
+                            {comment.pinned ? t("Unpin") : t("Pin")}
                           </MenuItem>
                         )}
                         {ctx.isOwner && (
@@ -185,7 +190,7 @@ export function CommentItem({ comment, ctx, parentId = null }: { comment: Commen
                               void moderate(comment.id, comment.hearted ? "unheart" : "heart");
                             }}
                           >
-                            {comment.hearted ? "Remove heart" : "Heart"}
+                            {comment.hearted ? t("Remove heart") : t("Heart")}
                           </MenuItem>
                         )}
                         {comment.mine && (
@@ -196,7 +201,7 @@ export function CommentItem({ comment, ctx, parentId = null }: { comment: Commen
                               setEditing(true);
                             }}
                           >
-                            Edit
+                            {t("Edit")}
                           </MenuItem>
                         )}
                         {canDelete && (
@@ -207,7 +212,7 @@ export function CommentItem({ comment, ctx, parentId = null }: { comment: Commen
                               setConfirming(true);
                             }}
                           >
-                            Delete
+                            {t("Delete")}
                           </MenuItem>
                         )}
                         {!comment.mine &&
@@ -221,7 +226,7 @@ export function CommentItem({ comment, ctx, parentId = null }: { comment: Commen
                                 showToast("Reporting arrives with moderation.");
                               }}
                             >
-                              Report
+                              {t("Report")}
                             </MenuItem>
                           ))}
                       </>
@@ -258,7 +263,7 @@ export function CommentItem({ comment, ctx, parentId = null }: { comment: Commen
                 <button
                   type="button"
                   onClick={signedInOr(() => void like(comment.id))}
-                  aria-label="Like"
+                  aria-label={t("Like")}
                   aria-pressed={comment.liked}
                   data-comment-like
                   data-on={comment.liked ? "1" : undefined}
@@ -275,7 +280,7 @@ export function CommentItem({ comment, ctx, parentId = null }: { comment: Commen
                   className={`${action} ml-1 font-medium uppercase hover:text-text`}
                   data-comment-reply
                 >
-                  Reply
+                  {t("Reply")}
                 </button>
                 {comment.hearted && (
                   <CreatorHeart
@@ -327,12 +332,13 @@ export function CommentItem({ comment, ctx, parentId = null }: { comment: Commen
 }
 
 function DislikeButton({ signedIn, signIn }: { signedIn: boolean; signIn: () => void }) {
+  const t = useT();
   const [on, setOn] = useState(false);
   return (
     <button
       type="button"
       onClick={() => (signedIn ? setOn(!on) : signIn())}
-      aria-label="Dislike"
+      aria-label={t("Dislike")}
       aria-pressed={on}
       data-comment-dislike
       className={`${action} hover:text-text`}
@@ -344,6 +350,8 @@ function DislikeButton({ signedIn, signIn }: { signedIn: boolean; signIn: () => 
 
 /** "View N replies" and the replies under it, with the line that joins them to the comment. */
 function Replies({ comment, ctx }: { comment: Comment; ctx: CommentContext }) {
+  const t = useT();
+  const lang = useLang();
   const state = useComments((s) => s.thread.replies[comment.id]);
   const loading = useComments((s) => s.loadingReplies[comment.id] === true);
   const load = useComments((s) => s.loadReplies);
@@ -365,7 +373,15 @@ function Replies({ comment, ctx }: { comment: Comment; ctx: CommentContext }) {
           data-view-replies
         >
           {open ? <ArrowDropUpIcon className="h-6 w-6" /> : <ArrowDropDownIcon className="h-6 w-6" />}
-          {open ? (comment.replyCount === 1 ? "Hide reply" : `Hide ${comment.replyCount.toLocaleString("en-US")} replies`) : viewRepliesLabel(comment.replyCount)}
+          {lang === "en"
+            ? open
+              ? comment.replyCount === 1
+                ? "Hide reply"
+                : `Hide ${comment.replyCount.toLocaleString("en-US")} replies`
+              : viewRepliesLabel(comment.replyCount)
+            : open
+              ? t(comment.replyCount === 1 ? "Hide reply" : "Hide {n} replies", { n: compact(lang, comment.replyCount) })
+              : t(comment.replyCount === 1 ? "View reply" : "View {n} replies", { n: compact(lang, comment.replyCount) })}
         </button>
       )}
       {shown.length > 0 && (
@@ -388,7 +404,7 @@ function Replies({ comment, ctx }: { comment: Comment; ctx: CommentContext }) {
           data-more-replies
         >
           <ArrowDropDownIcon className="h-6 w-6" />
-          Show more replies
+          {t("Show more replies")}
         </button>
       )}
     </div>

@@ -4,6 +4,7 @@ import { connection } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { decodeCursor, encodeCursor } from "@/lib/feed/cursor";
 import { flagOn } from "@/lib/flags";
+import { getPrefs } from "@/lib/i18n/server";
 import { readSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { readPublicBase } from "@/lib/watch/media";
@@ -84,7 +85,7 @@ export async function react(videoId: string, kind: Reaction | null): Promise<Rea
  * or broken (route handlers only, where cookies can be set). Answers the
  * hash that goes to the database, never the cookie itself.
  */
-async function viewerKey(): Promise<string> {
+export async function viewerKey(): Promise<string> {
   const store = await cookies();
   let value = store.get(VIEWER_COOKIE)?.value;
   if (!isViewerCookie(value)) {
@@ -108,7 +109,9 @@ export async function ping(videoId: string, positionS: number, playedS: number, 
   if (gate === "no-db") return { error: "no_db" };
   if (gate === "off") return { error: "engagement_off" };
   const key = await viewerKey();
-  const supabase = await createClient({ headers: { "x-viewer-key": key } });
+  // Location (032): the view counts toward Trending in the viewer's place.
+  const { location } = await getPrefs();
+  const supabase = await createClient({ headers: { "x-viewer-key": key, "x-viewer-country": location } });
   if (!supabase) return { error: "no_db" };
   const args = { video_id: videoId, position_s: positionS, played_s: playedS };
   // source needs migration 015; before it, the three argument call still counts the view.

@@ -7,9 +7,11 @@
 // all to R2 under hls/<video>/ and calls encode_done. Then it writes the
 // video's auto-generated captions with whisper.cpp. One job at a time.
 // Between jobs it empties the R2 folders of videos the studio trash purged.
+// Beside all that, the channel bots run (lib/bots.mjs, the bots flag).
 //
 // Settings come from the environment, see lib/env.mjs and ops/encoder/README.md.
 //   node index.mjs
+import { createBotDb, runBots } from "./lib/bots.mjs";
 import { checkCaptions } from "./lib/captions.mjs";
 import { createDb, createSupabase } from "./lib/db.mjs";
 import { readConfig } from "./lib/env.mjs";
@@ -47,11 +49,10 @@ for (const sig of ["SIGTERM", "SIGINT"]) {
   });
 }
 
-await runLoop({
-  db: createDb(createSupabase(config.supabaseUrl, config.serviceRoleKey)),
-  storage: createStorage(createR2Client(config.r2), config.bucket),
-  log,
-  config,
-  stopSignal: stop.signal,
-});
+const supabase = createSupabase(config.supabaseUrl, config.serviceRoleKey);
+const storage = createStorage(createR2Client(config.r2), config.bucket);
+await Promise.all([
+  runLoop({ db: createDb(supabase), storage, log, config, stopSignal: stop.signal }),
+  runBots({ db: createBotDb(supabase), storage, log, stopSignal: stop.signal }),
+]);
 process.exit(0);

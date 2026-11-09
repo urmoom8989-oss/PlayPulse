@@ -49,7 +49,9 @@ import {
 import { chapterAt, parseChapters } from "@/lib/watch/chapters";
 import { endChoice, endScreenVideos, nextVideo } from "@/lib/watch/endscreen";
 import { formatTime } from "@/lib/watch/format";
-import { clampTime, keyAction, stepVolume, type PlayerAction } from "@/lib/watch/keys";
+import { clampTime, FRAME_S, keyAction, stepSpeed, stepVolume, type PlayerAction } from "@/lib/watch/keys";
+import { atLiveEdge } from "@/lib/live/state";
+import { useT } from "@/lib/i18n/client";
 import { loadQuality, loadResume, loadVolume, saveQuality, saveResume, saveVolume } from "@/lib/watch/prefs";
 import { AUTO, levelForSaved, qualityOptions, qualitySummary, SPEEDS, speedLabel, type QualityOption } from "@/lib/watch/quality";
 import { menuPosition, watchLink } from "@/lib/watch/nerds";
@@ -87,6 +89,12 @@ type Props = {
   upNext?: UpNextVideo[];
   /** The channel, for Up next cards that have no channel of their own. */
   channelName?: string;
+  /**
+   * A Premiere or live broadcast that is on (028): the media route serves a
+   * growing playlist, the player starts at the live edge, and LIVE replaces
+   * the time until `endsAt` (ms). After that it is a normal video.
+   */
+  live?: { endsAt: number } | null;
 };
 
 type Menu = null | "main" | "quality" | "speed" | "subtitles" | "caption-options" | `caption-${CaptionSetting}`;
@@ -128,6 +136,7 @@ export function Player({
   description = "",
   upNext = [],
   channelName = "",
+  live = null,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -167,6 +176,15 @@ export function Player({
   const [cues, setCues] = useState<SpriteCue[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [resumed, setResumed] = useState(false);
+  // While a broadcast is on: LIVE instead of the time. Off once it has ended.
+  const [liveOver, setLiveOver] = useState(false);
+  const liveEndsAt = live?.endsAt ?? null;
+  const onAir = liveEndsAt !== null && !liveOver;
+  useEffect(() => {
+    if (liveEndsAt === null) return;
+    const t = setTimeout(() => setLiveOver(true), Math.max(0, liveEndsAt - Date.now()) + 1000);
+    return () => clearTimeout(t);
+  }, [liveEndsAt]);
   // A short note after a key press (volume, mute, subtitles), also read out by screen readers.
   const [note, setNote] = useState<string | null>(null);
   const noteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -179,6 +197,9 @@ export function Player({
   // Player extras: chapters, timestamps that jump here, the right-click menu
   // with Loop, the links and Stats for nerds, and double tap to skip on phones.
   const extras = useFlag("player_extras");
+  const t = useT();
+  // The rest of the 2020 keys: < > speed, , . frames while paused, Home and End.
+  const moreKeys = useFlag("more_shortcuts");
   const [loop, setLoop] = useState(false);
   const [ctxMenu, setCtxMenu] = useState<{ left: number; top: number } | null>(null);
   const [nerds, setNerds] = useState(false);
@@ -230,8 +251,9 @@ export function Player({
     let cancelled = false;
     let hls: Hls | null = null;
     const saved = loadQuality();
-    const start = startAt > 0 ? startAt : (serverStart ?? loadResume(videoId));
-    setResumed(startAt <= 0 && serverStart !== null && serverStart > 0);
+    // A broadcast that is on starts at the live edge, never at a saved position.
+    const start = liveEndsAt !== null ? 0 : startAt > 0 ? startAt : (serverStart ?? loadResume(videoId));
+    setResumed(liveEndsAt === null && startAt <= 0 && serverStart !== null && serverStart > 0);
     const v = loadVolume();
     video.volume = v.volume;
     video.muted = v.muted;
@@ -306,7 +328,7 @@ export function Player({
       hls?.destroy();
       hlsRef.current = null;
     };
-  }, [src, startAt, videoId, serverStart]);
+  }, [src, startAt, videoId, serverStart, liveEndsAt]);
 
   // "Resumed" fades a moment after playback starts.
   useEffect(() => {
@@ -422,6 +444,15 @@ export function Player({
     setTime(video.currentTime);
   }, [duration]);
 
+  /** LIVE: back to the live edge (hls.js knows it; Safari uses the end of what can be seeked). */
+  const goLive = useCallback(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const edge = hlsRef.current?.liveSyncPosition ?? (video.seekable.length ? video.seekable.end(video.seekable.length - 1) - 3 : null);
+    if (edge !== null && Number.isFinite(edge)) seekTo(edge);
+    if (video.paused) video.play().catch(() => {});
+  }, [seekTo]);
+
   const toggleFullscreen = useCallback(() => {
     const wrap = wrapRef.current;
     const video = videoRef.current as (HTMLVideoElement & { webkitEnterFullscreen?: () => void }) | null;
@@ -500,6 +531,19 @@ export function Player({
           return toggleCaptions();
         case "caption-size":
           return stepCaptions(action.step);
+        case "speed-step": {
+          const r = stepSpeed(video.playbackRate, action.step, SPEEDS);
+          video.playbackRate = r;
+          return flash(`${r}x`);
+        }
+        case "frame-step":
+          // Like the 2020 player: frames only step while the video is paused.
+          if (!video.paused) return;
+          return seekTo(video.currentTime + action.step * FRAME_S);
+        case "seek-edge": {
+          const d = Number.isFinite(video.duration) ? video.duration : duration;
+          return seekTo(action.edge === "start" ? 0 : d);
+        }
       }
     },
     [duration, embed, flash, seekTo, stepCaptions, toggleCaptions, toggleFullscreen, togglePip, togglePlay, toggleTheater],
@@ -517,7 +561,7 @@ export function Player({
         altKey: e.altKey,
         targetTag: target?.tagName,
         targetEditable: target?.isContentEditable,
-      });
+      }, moreKeys);
       if (!action) return;
       e.preventDefault();
       run(action);
@@ -525,7 +569,7 @@ export function Player({
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [run, poke]);
+  }, [run, poke, moreKeys]);
 
   // Timestamps in the description and comments jump this player (player extras).
   useEffect(() => {
@@ -770,7 +814,7 @@ export function Player({
           const v = e.currentTarget;
           setTime(v.currentTime);
           setStoreTime(v.currentTime);
-          if (Math.abs(v.currentTime - lastSaved.current) >= RESUME_EVERY_S) {
+          if (!onAir && Math.abs(v.currentTime - lastSaved.current) >= RESUME_EVERY_S) {
             lastSaved.current = v.currentTime;
             saveResume(videoId, v.currentTime, v.duration);
           }
@@ -999,9 +1043,25 @@ export function Player({
             </div>
           </div>
 
-          <span data-time className="whitespace-nowrap px-2 text-[13px] leading-9 [text-shadow:0_0_2px_rgba(0,0,0,.5)]">
-            {formatTime(time)} / {formatTime(duration)}
-          </span>
+          {onAir ? (
+            <button
+              type="button"
+              data-live-edge={atLiveEdge(time, duration, 12) ? "on" : "behind"}
+              onClick={goLive}
+              title={atLiveEdge(time, duration, 12) ? "You're watching live" : "Skip ahead to live broadcast"}
+              className="flex items-center gap-1.5 whitespace-nowrap px-2 text-[13px] font-medium uppercase leading-9 [text-shadow:0_0_2px_rgba(0,0,0,.5)]"
+            >
+              <span
+                aria-hidden
+                className={`h-2 w-2 rounded-full ${atLiveEdge(time, duration, 12) ? "bg-[#ff0000]" : "bg-[#909090]"}`}
+              />
+              {t("Live")}
+            </button>
+          ) : (
+            <span data-time className="whitespace-nowrap px-2 text-[13px] leading-9 [text-shadow:0_0_2px_rgba(0,0,0,.5)]">
+              {formatTime(time)} / {formatTime(duration)}
+            </span>
+          )}
           {currentChapter && (
             <span
               data-chapter-title
@@ -1268,12 +1328,13 @@ function CtrlButton({
   "aria-expanded"?: boolean;
   "aria-pressed"?: boolean;
 } & Record<`data-${string}`, unknown>) {
+  const t = useT();
   return (
     <button
       ref={ref}
       type="button"
-      title={label}
-      aria-label={label}
+      title={t(label)}
+      aria-label={t(label)}
       className={`relative grid h-9 w-[46px] shrink-0 place-items-center opacity-90 hover:opacity-100 ${className}`}
       {...rest}
     >
@@ -1288,16 +1349,18 @@ function MenuRow({
   onClick,
   ...rest
 }: { label: string; value: string; onClick: () => void } & Record<`data-${string}`, unknown>) {
+  const t = useT();
   return (
     <button type="button" role="menuitem" onClick={onClick} className="flex h-10 w-full items-center px-4 hover:bg-white/10" {...rest}>
-      <span className="mr-6 flex-1 text-left">{label}</span>
-      <span className="text-right font-normal">{value}</span>
+      <span className="mr-6 flex-1 text-left">{t(label)}</span>
+      <span className="text-right font-normal">{t(value)}</span>
       <ChevronRightIcon className="-mr-1.5 ml-1 h-5 w-5" />
     </button>
   );
 }
 
 function MenuBack({ label, onClick, extra = null }: { label: string; onClick: () => void; extra?: React.ReactNode }) {
+  const t = useT();
   const back = (
     <button
       type="button"
@@ -1305,7 +1368,7 @@ function MenuBack({ label, onClick, extra = null }: { label: string; onClick: ()
       className={`flex h-12 items-center px-2 text-[15px] hover:bg-white/10 ${extra ? "" : "w-full"}`}
     >
       <ChevronLeftIcon className="mr-2 h-6 w-6" />
-      {label}
+      {t(label)}
     </button>
   );
   // With something on the right (Options, in Subtitles/CC) the header is a row of two buttons.

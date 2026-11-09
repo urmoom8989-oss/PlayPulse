@@ -1,5 +1,6 @@
 // The hover preview on feed cards: after a second on a card, the sprite's
-// frames play in the thumbnail. Only the small sprite image loads, never video.
+// frames play in the thumbnail (only the small sprite image loads). With the
+// hover_previews flag the video itself then plays, muted, over the frames.
 // No imports, so Node can load this file directly.
 
 /** Hover this long before the preview starts. */
@@ -53,4 +54,25 @@ export function tileStyle(tile: Tile, sheet: { w: number; h: number }): { backgr
   const posX = sheet.w > tile.w ? (tile.x / (sheet.w - tile.w)) * 100 : 0;
   const posY = sheet.h > tile.h ? (tile.y / (sheet.h - tile.h)) * 100 : 0;
   return { backgroundSize: `${pct(sizeX)} ${pct(sizeY)}`, backgroundPosition: `${pct(posX)} ${pct(posY)}` };
+}
+
+/** With hover_previews: the video starts this long after the pointer comes (the frames show first). */
+export const HOVER_VIDEO_DELAY_MS = 1200;
+
+/**
+ * Where the hover video starts: the beginning for short videos, else a tenth
+ * of the way in (past most intros), at most 60 seconds in.
+ */
+export function hoverStart(durationS: number | null | undefined): number {
+  const d = Number(durationS);
+  if (!Number.isFinite(d) || d < 60) return 0;
+  return Math.round(Math.min(60, d / 10));
+}
+
+/**
+ * Should this browser play hover videos? Not with a touch screen as the main
+ * pointer (no hover), not when the person asked for less motion or less data.
+ */
+export function hoverVideoAllowed(env: { finePointer: boolean; reducedMotion: boolean; saveData: boolean }): boolean {
+  return env.finePointer && !env.reducedMotion && !env.saveData;
 }

@@ -2,13 +2,22 @@
 // in Supabase, the flag and object storage, so the tests run this with fakes.
 // Only relative imports, so Node can load this file directly.
 
+import { isMasterPlaylist, stripSubtitles, truncateMediaPlaylist } from "../live/playlist.ts";
+import { broadcastState, elapsedSeconds } from "../live/state.ts";
 import { mediaBase, rewritePlaylist } from "./playlist.ts";
 
 /** How long presigned object links the route redirects to work, in seconds. */
 export const MEDIA_URL_TTL_S = 10 * 60;
 
 /** What watch_video() says about the video, as far as the route cares. */
-export type MediaVideo = { status: string; is_owner: boolean | null; hls_key: string | null };
+export type MediaVideo = {
+  status: string;
+  is_owner: boolean | null;
+  hls_key: string | null;
+  /** From 028 on: a Premiere or live broadcast, and the video's length. */
+  broadcast_at?: string | null;
+  duration_s?: number | string | null;
+};
 
 export type MediaStorage = {
   /** The object as text, or null when it does not exist. */
@@ -18,6 +27,8 @@ export type MediaStorage = {
 };
 
 export type MediaContext = {
+  /** The clock, for broadcasts. Date.now unless a test sets it. */
+  now?: () => number;
   /** null when the Supabase settings are missing. */
   db: { watchVideo(id: string): Promise<MediaVideo | null> } | null;
   /** Is the watch flag on for the person asking? */
@@ -90,13 +101,23 @@ export async function serveMedia(videoId: string, parts: string[], ctx: MediaCon
   if (!ctx.storage) return fail(503, "media_not_configured");
 
   const key = `${folder}/${file.path}`;
+  // While a broadcast is on, playlists are cut at "now" (lib/live/playlist.ts).
+  const now = (ctx.now ?? Date.now)();
+  const durationS = Number(video.duration_s);
+  const onAir =
+    !!video.broadcast_at &&
+    broadcastState(video.broadcast_at, Number.isFinite(durationS) ? durationS : 0, now) === "live";
   // Owners may watch private videos: never let a shared cache keep their answers.
-  const cache = video.is_owner ? "private, no-store" : "private, max-age=60";
+  const cache = video.is_owner || onAir ? "private, no-store" : "private, max-age=60";
   try {
     if (file.ext in PROXIED) {
       const text = await ctx.storage.getText(key);
       if (text === null) return fail(404, "not_found");
-      const body = file.ext === "m3u8" ? rewritePlaylist(text, file.path, mediaBase(id)) : text;
+      let source = text;
+      if (onAir && file.ext === "m3u8" && video.broadcast_at) {
+        source = isMasterPlaylist(text) ? stripSubtitles(text) : truncateMediaPlaylist(text, elapsedSeconds(video.broadcast_at, now));
+      }
+      const body = file.ext === "m3u8" ? rewritePlaylist(source, file.path, mediaBase(id)) : source;
       return { status: 200, headers: { "content-type": PROXIED[file.ext], "cache-control": cache }, body };
     }
     const url = await ctx.storage.presign(key, MEDIA_URL_TTL_S);

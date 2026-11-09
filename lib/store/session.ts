@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { Lang } from "@/lib/i18n/langs";
 import type { SupabaseConfig } from "@/lib/supabase/env";
 
 /** What the browser knows about the signed in person. Never secrets. */
@@ -20,11 +21,18 @@ type SessionState = {
   user: SessionUser | null;
   /** Feature flags already evaluated for this person: key to on or off. */
   flags: Record<string, boolean>;
+  /** Language and Location (032): what the site speaks and whose Trending it shows. */
+  lang: Lang;
+  location: string;
   setSession: (s: {
     config: SupabaseConfig | null;
     user: SessionUser | null;
     flags: Record<string, boolean>;
+    lang?: Lang;
+    location?: string;
   }) => void;
+  /** A new choice in the menu, shown at once. */
+  setPrefs: (p: { lang?: Lang; location?: string }) => void;
 };
 
 export const useSession = create<SessionState>((set) => ({
@@ -32,7 +40,10 @@ export const useSession = create<SessionState>((set) => ({
   config: null,
   user: null,
   flags: {},
-  setSession: (s) => set({ ...s, loaded: true }),
+  lang: "en",
+  location: "US",
+  setSession: (s) => set((old) => ({ ...s, lang: s.lang ?? old.lang, location: s.location ?? old.location, loaded: true })),
+  setPrefs: (p) => set((old) => ({ lang: p.lang ?? old.lang, location: p.location ?? old.location })),
 }));
 
 /** Client side flag check. Use flagOn() from lib/flags.ts on the server. */

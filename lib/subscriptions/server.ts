@@ -6,8 +6,9 @@ import { rowToCard, type FeedPage, type FeedRow } from "@/lib/feed/types";
 import { flagOn } from "@/lib/flags";
 import { readSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { broadcastAlerts, withBroadcasts } from "@/lib/live/server";
 import { readPublicBase } from "@/lib/watch/media";
-import { subErrorCode, type SubAction } from "./rules";
+import { levelOf, subErrorCode, type NotifyLevel, type SubAction } from "./rules";
 import { rowToGuideChannel, type GuideChannel, type MySubscriptionRow, type SubResult } from "./types";
 import { NOTIFICATION_COUNT } from "./unread";
 
@@ -73,16 +74,28 @@ export async function subscriptionsFeed(
   return {
     kind: "ready",
     page: {
-      cards: rows.map((r) => rowToCard(r, publicBase)),
+      cards: await withBroadcasts(rows.map((r) => rowToCard(r, publicBase))),
       next: last && rows.length === limit ? encodeCursor({ publishedAt: last.published_at, id: last.id }) : null,
     },
     now: Date.now(),
   };
 }
 
-/** The notifications menu: the last uploads from channels with the bell on. */
-export function notificationsFeed() {
-  return subscriptionsFeed({ onlyNotify: true, limit: NOTIFICATION_COUNT });
+/**
+ * The notifications menu: the last uploads from channels with the bell on,
+ * and broadcasts the person set a reminder for once they start (028).
+ */
+export async function notificationsFeed(): Promise<SubsFeedState> {
+  const [uploads, alerts] = await Promise.all([
+    subscriptionsFeed({ onlyNotify: true, limit: NOTIFICATION_COUNT }),
+    broadcastAlerts(NOTIFICATION_COUNT),
+  ]);
+  if (uploads.kind !== "ready" || alerts.length === 0) return uploads;
+  const seen = new Set(alerts.map((c) => c.id));
+  const cards = [...alerts, ...uploads.page.cards.filter((c) => !seen.has(c.id))]
+    .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
+    .slice(0, NOTIFICATION_COUNT);
+  return { ...uploads, page: { ...uploads.page, cards } };
 }
 
 export type MySubsState =
@@ -105,6 +118,7 @@ export async function changeSubscription(
   action: SubAction,
   channelId: string,
   on: boolean,
+  level: NotifyLevel = "all",
 ): Promise<SubResult | { error: string }> {
   const gate = await subscriptionsGate();
   if (gate === "no-db") return { error: "no_db" };
@@ -112,6 +126,17 @@ export async function changeSubscription(
   if (gate === "signed-out") return { error: "not_signed_in" };
   const supabase = await createClient();
   if (!supabase) return { error: "no_db" };
+
+  if (action === "level") {
+    const { data, error } = await supabase.rpc("set_notify_level", { channel_id: channelId, level });
+    if (error) return { error: notSetUp(error.code) ? "not_set_up" : subErrorCode(error.message) };
+    const row = (Array.isArray(data) ? data[0] : data) as
+      | { subscribed: boolean; notify_level: string; subscriber_count: number | null }
+      | undefined;
+    if (!row) return { error: "failed" };
+    const now = levelOf(row.notify_level, true);
+    return { subscribed: row.subscribed === true, notify: now !== "none", count: Number(row.subscriber_count) || 0, level: now };
+  }
 
   const call =
     action === "subscribe"

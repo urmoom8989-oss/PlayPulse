@@ -78,7 +78,7 @@ export async function watchPageMetadata(v: string | null): Promise<Metadata> {
 }
 
 /** /@handle and its tabs. */
-export async function channelPageMetadata(segment: string, tab: "home" | "videos" | "shorts" | "about"): Promise<Metadata> {
+export async function channelPageMetadata(segment: string, tab: "home" | "videos" | "shorts" | "channels" | "about"): Promise<Metadata> {
   const state = await channelByHandle(segment);
   if (state.kind === "ready") return channelMetadata(seoChannel(state.channel), await siteOrigin(), siteConfig.siteName, tab);
   return { title: channelTitle(segment, tab === "home" ? undefined : tab[0].toUpperCase() + tab.slice(1)), robots: hidden };
