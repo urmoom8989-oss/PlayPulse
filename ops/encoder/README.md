@@ -79,6 +79,7 @@ R2_BUCKET=
 # Optional:
 # WORKER_NAME=encoder-1
 # ENCODE_SLOTS=2
+# START_WAIT_S=20
 # MEDIA_PUBLIC_URL=https://media.example.com
 # SITE_URL=https://tube.example.com
 ```
@@ -95,6 +96,7 @@ Where each value comes from:
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | [Manage R2 API Tokens](https://dash.cloudflare.com/?to=/:account/r2/api-tokens), **Create API token** with **Object Read & Write** on the video bucket only. A separate token for the encoder makes it easy to revoke. |
 | `R2_BUCKET` | the name of the video bucket, the same as the website uses |
 | `WORKER_NAME` | optional, shown in the `encode_jobs.worker` column. Defaults to the server's name. Give every encoder box its own. With more than one slot each slot adds `/1`, `/2`. |
+| `START_WAIT_S` | optional. Seconds the worker waits at start before it takes a job, default 20. During an update the old worker runs a few seconds longer and gives its jobs back when it stops; without the wait both could work on the same video. |
 | `ENCODE_SLOTS` | optional. How many videos the box processes at once, 1 to 4, default 2. A 1080p encode uses about 3 of 8 CPUs and under 1 GB of memory, so 2 fit an 8 CPU, 8 GB box. People with nothing processing go first, so one person's long upload does not hold up everybody else's. Needs migration 037: until it is run the worker keeps to one video at a time (restart it after running 037). |
 | `MEDIA_PUBLIC_URL` | optional. If you connect a [custom domain to the bucket](https://developers.cloudflare.com/r2/buckets/public-buckets/), put it here and `thumbnail_url` is filled in. Without it the site serves the thumbnail through `/api/media`. Use the same value on the website (see "Watch page" in the main README). |
 | `SITE_URL` | optional. The website's address, like `https://tube.example.com`, without a slash at the end. The encoder needs it for the links in Yapin' announcements (feature 16, see "Yapin'" in the main README). Without it no announcements are posted. |

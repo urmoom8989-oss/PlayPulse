@@ -806,3 +806,43 @@ test("slot names: the worker's own with one slot, /n with more", async () => {
   assert.equal(slotName("box", 1, 2), "box/1");
   assert.equal(slotName("box", 2, 2), "box/2");
 });
+
+test("at start the worker waits for the encoder it replaces before it takes a job", async () => {
+  const s = await setup({ jobs: [{}] });
+  try {
+    const stop = new AbortController();
+    const order = [];
+    const db = {
+      ...s.deps.db,
+      release: async () => (order.push("release"), 0),
+      claim: async (w) => {
+        order.push("claim");
+        const job = await s.deps.db.claim(w);
+        if (!job) stop.abort();
+        return job;
+      },
+    };
+    const started = Date.now();
+    await runLoop({ ...s.deps, db, config: { ...s.deps.config, startWaitMs: 60 }, stopSignal: stop.signal, pollMs: 10 });
+    assert.ok(Date.now() - started >= 60, "waited first");
+    assert.equal(order[0], "release");
+    assert.ok(s.lines.findIndex((l) => l.includes("waiting 0.06s")) < s.lines.findIndex((l) => l.startsWith("claim ")));
+    assert.equal(s.supabase.rows[0].status, "done");
+  } finally {
+    await s.cleanup();
+  }
+});
+
+test("stopped while it waits at start, the worker takes nothing", async () => {
+  const s = await setup({ jobs: [{}] });
+  try {
+    const stop = new AbortController();
+    setTimeout(() => stop.abort(), 20);
+    await runLoop({ ...s.deps, config: { ...s.deps.config, startWaitMs: 5000 }, stopSignal: stop.signal, pollMs: 10 });
+    assert.ok(!s.supabase.calls.some((c) => c.name === "claim_encode_job"));
+    assert.equal(s.supabase.rows[0].status, "queued");
+    assert.ok(s.lines.at(-1).startsWith("stop "));
+  } finally {
+    await s.cleanup();
+  }
+});

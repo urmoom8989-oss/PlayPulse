@@ -75,3 +75,12 @@ test("env: CAPTIONS_THREADS, or the CPU count up to 8", () => {
   assert.equal(captionThreads("1.5", 4), 4);
   assert.equal(captionThreads("", 0), 1);
 });
+
+test("env: START_WAIT_S, 20 seconds unless set, at most 2 minutes", () => {
+  const base = { ...DB, R2_ACCOUNT_ID: "acct", R2_ACCESS_KEY_ID: "k", R2_SECRET_ACCESS_KEY: "s", R2_BUCKET: "videos" };
+  assert.equal(readConfig(base).startWaitMs, 20000);
+  assert.equal(readConfig({ ...base, START_WAIT_S: "0" }).startWaitMs, 0);
+  assert.equal(readConfig({ ...base, START_WAIT_S: "45" }).startWaitMs, 45000);
+  assert.equal(readConfig({ ...base, START_WAIT_S: "900" }).startWaitMs, 120000);
+  assert.equal(readConfig({ ...base, START_WAIT_S: "soon" }).startWaitMs, 20000);
+});
