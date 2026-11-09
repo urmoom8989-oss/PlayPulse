@@ -97,7 +97,7 @@ Where each value comes from:
 | `R2_BUCKET` | the name of the video bucket, the same as the website uses |
 | `WORKER_NAME` | optional, shown in the `encode_jobs.worker` column. Defaults to the server's name. Give every encoder box its own. With more than one slot each slot adds `/1`, `/2`. |
 | `START_WAIT_S` | optional. Seconds the worker waits at start before it takes a job, default 20. During an update the old worker runs a few seconds longer and gives its jobs back when it stops; without the wait both could work on the same video. |
-| `ENCODE_SLOTS` | optional. How many videos the box processes at once, 1 to 4, default 2. A 1080p encode uses about 3 of 8 CPUs and under 1 GB of memory, so 2 fit an 8 CPU, 8 GB box. People with nothing processing go first, so one person's long upload does not hold up everybody else's. Needs migration 037: until it is run the worker keeps to one video at a time (restart it after running 037). |
+| `ENCODE_SLOTS` | optional, 1 to 4, default 2. With migration 039 (smart order) slot 1 makes each new upload's 360p, one after the other, and slot 2 makes 720p and up, one video at a time, at the lowest CPU priority, so it gets the whole box while no upload is waiting and steps aside when one comes in. With 1 the box does both in turn, every waiting 360p first. Two encodes at the same priority each ran about 3.5 times slower on an 8 CPU box, which is why HD steps aside. Without 039 the slots each take any video (037); without 037, one at a time. |
 | `MEDIA_PUBLIC_URL` | optional. If you connect a [custom domain to the bucket](https://developers.cloudflare.com/r2/buckets/public-buckets/), put it here and `thumbnail_url` is filled in. Without it the site serves the thumbnail through `/api/media`. Use the same value on the website (see "Watch page" in the main README). |
 | `SITE_URL` | optional. The website's address, like `https://tube.example.com`, without a slash at the end. The encoder needs it for the links in Yapin' announcements (feature 16, see "Yapin'" in the main README). Without it no announcements are posted. |
 | `CAPTIONS` | optional. `off` turns the auto-generated captions off. The image sets everything else they need. |
@@ -195,6 +195,12 @@ Everything for a video lives under `hls/<video id>/` in the bucket:
 | `sprite.webp`, `sprite.vtt` | the hover preview: one 160x90 frame every 5 s (at most 100), and the WebVTT that maps time to tile (`videos.preview_sprite_key`) |
 | `captions/<lang>.vtt`, `captions/<lang>.m3u8` | the auto-generated captions as WebVTT, and the HLS subtitle playlist that `master.m3u8` names. `<lang>` is the language the speech model heard, like `en`. Only when somebody speaks. |
 
+- **Smart order** (migration 039). The quick lane makes every new upload's
+  360p, thumbnails and sprite, one after the other, then hands the HD part
+  back to the queue (`sd ... HD queued` in the log). The HD lane makes 720p and
+  up with the faster `superfast` preset, one video at a time, at the lowest CPU
+  priority (nice 19), followed by the captions. A 3 hour HD encode no longer
+  holds up a new upload's 360p.
 - **Low quality first.** An upload of 720p or more is made in two runs: the
   sizes below 720p, the thumbnails and the sprite first, so the video plays at
   360p within minutes, then 720p and up, added to the same `master.m3u8` when

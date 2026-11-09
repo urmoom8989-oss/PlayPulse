@@ -96,6 +96,7 @@ again. See [`supabase/migrations/README.md`](../supabase/migrations/README.md).
 - [ ] `036_optional_channels.sql` (channels are a choice: Create a channel in the account menu, the `optional_channels` flag)
 - [ ] `037_parallel_encodes.sql` (several videos processing at once, people with nothing processing first)
 - [ ] `038_sd_first.sql` (low quality first: a video plays at 360p while 720p and up are still being made)
+- [ ] `039_smart_order.sql` (smart order: every new upload's 360p before anyone's HD, HD at a low CPU priority)
 
 Then make yourself an admin (sign up on the site first):
 

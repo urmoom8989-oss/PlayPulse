@@ -13,16 +13,41 @@ function rpcError(name, error) {
   return new Error(`${name}: ${error.message ?? "database error"}`);
 }
 
+/** The database does not have this function (or not with these arguments): an older migration. */
+function isMissingFunction(error) {
+  return error?.code === "PGRST202" || error?.code === "42883";
+}
+
+/** Without 039, claims leave the lane out; the worker asks again with it this often. */
+export const LANE_RECHECK_MS = 10 * 60 * 1000;
+
 /** The queue, on top of a Supabase client. */
-export function createDb(supabase) {
+export function createDb(supabase, { now = Date.now } = {}) {
+  // Whether claim_encode_job takes a lane (039): unknown until the first claim.
+  let laneSupport = null;
+  let laneCheckedAt = -Infinity;
   return {
-    /** The next job for this worker, or null when there is nothing to do. */
-    async claim(worker) {
-      const { data, error } = await supabase.rpc("claim_encode_job", { worker });
+    /**
+     * The next job. With 039 a lane picks which ("sd": videos that still need
+     * their low quality, "hd": the HD part of videos that play already, null:
+     * any, low quality first) and the job may hand its HD part back
+     * (handoff). Without 039 the lane is left out and the job runs whole.
+     */
+    async claim(worker, lane = null) {
+      let { data, error } = { data: null, error: null };
+      const tryLanes = laneSupport !== false || now() - laneCheckedAt >= LANE_RECHECK_MS;
+      if (tryLanes) {
+        ({ data, error } = await supabase.rpc("claim_encode_job", { worker, lane }));
+        laneCheckedAt = now();
+        laneSupport = !(error && isMissingFunction(error));
+      }
+      if (!laneSupport) ({ data, error } = await supabase.rpc("claim_encode_job", { worker }));
       if (error) throw rpcError("claim_encode_job", error);
       const row = Array.isArray(data) ? data[0] : data;
       if (!row?.job_id) return null;
       return {
+        // 039: the low quality hands the HD part back to the queue.
+        handoff: laneSupport === true,
         jobId: row.job_id,
         videoId: row.video_id,
         ownerId: row.owner_id,
@@ -64,6 +89,21 @@ export function createDb(supabase) {
     },
 
     /** 038: the low renditions are up, the video plays; the job goes on with HD. */
+    /** 039: like sdReady, and the job goes back to the queue for the HD lane. */
+    async sdHandoff(jobId, r) {
+      const { error } = await supabase.rpc("encode_sd_handoff", {
+        job_id: jobId,
+        duration_s: r.durationS,
+        width: r.width,
+        height: r.height,
+        hls_key: r.hlsKey,
+        thumbnail_url: r.thumbnailUrl,
+        preview_sprite_key: r.previewSpriteKey,
+        renditions: r.renditions,
+      });
+      if (error) throw rpcError("encode_sd_handoff", error);
+    },
+
     async sdReady(jobId, r) {
       const { error } = await supabase.rpc("encode_sd_ready", {
         job_id: jobId,

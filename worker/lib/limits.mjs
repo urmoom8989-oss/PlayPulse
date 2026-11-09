@@ -72,6 +72,12 @@ export const DISK_MARGIN_BYTES = 1024 * 1024 * 1024;
 
 /** x264 speed. veryfast keeps a shared vCPU box near real time with good enough quality. */
 export const X264_PRESET = "veryfast";
+/**
+ * 720p and up (the HD run of low quality first): about a quarter faster than
+ * veryfast at the same bitrates, the same file sizes and a picture that is
+ * hard to tell apart.
+ */
+export const X264_HD_PRESET = "superfast";
 
 /**
  * How often an idle worker drains storage_cleanup (014_studio.sql): the R2

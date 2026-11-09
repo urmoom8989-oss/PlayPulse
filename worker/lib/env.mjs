@@ -21,7 +21,8 @@ export const S3_ENV = ["S3_ENDPOINT", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"
  * Optional:
  *   WORKER_NAME       shown in encode_jobs.worker (default: the host name); with
  *                     ENCODE_SLOTS above 1 each slot adds "/1", "/2"...
- *   ENCODE_SLOTS      how many videos are processed at once (default 2, 1 to 4)
+ *   ENCODE_SLOTS      how many lanes (default 2, 1 to 4); with 039 slot 2 is the HD
+ *                     lane, at the lowest CPU priority, and the others make low quality
  *   START_WAIT_S      seconds to wait at start before taking jobs (default 20, 0 to 120),
  *                     so the encoder this one replaces has stopped and given its jobs back
  *   WORK_DIR          where sources are downloaded and encoded (default: the system temp folder)

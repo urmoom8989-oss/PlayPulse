@@ -125,10 +125,12 @@ test("038: low quality first, the status says HD is still being made", async () 
   assert.equal("hdPending" in odd.body, false);
 
   assert.equal(processingLine({ status: "ready", hdPending: true, job: running, progress: 64 }), "HD processing, 64%");
-  assert.equal(processingLine({ status: "ready", hdPending: true, job: { status: "queued", progress: 0, attempts: 1 }, progress: 0 }), "HD processing");
+  assert.equal(processingLine({ status: "ready", hdPending: true, job: { status: "queued", progress: 33, attempts: 0 }, progress: 33 }), "HD waiting to process");
+  assert.equal(processingLine({ status: "ready", hdPending: true, job: null, progress: 100 }), "HD processing");
   assert.equal(processingLine({ status: "ready", hdPending: false, job: running, progress: 100 }), null);
   assert.equal(progressFor("ready", running, true), 64);
-  assert.equal(progressFor("ready", { status: "queued", progress: 30, attempts: 1 }, true), 0);
+  // Handed to the HD lane (039): the bar stays where the low quality left it.
+  assert.equal(progressFor("ready", { status: "queued", progress: 33, attempts: 0 }, true), 33);
   assert.equal(progressFor("ready", null, true), 100);
   assert.equal(isWaiting({ status: "ready", hdPending: true }), true);
   assert.equal(isWaiting({ status: "ready" }), false);
@@ -184,4 +186,21 @@ test("the upload page says Processing right away, then follows the encoder", () 
     pct: null,
   });
   assert.equal(uploadStatusText({ status: "failed", job: null, progress: null, error: "not a video" }).line, "not a video");
+});
+
+test("039: smart order, two lanes and the HD part handed back", async () => {
+  const { readFileSync } = await import("node:fs");
+  const sql = readFileSync(new URL("../supabase/migrations/039_smart_order.sql", import.meta.url), "utf8");
+  assert.match(sql, /create function public\.claim_encode_job\(worker text, lane text default null\)/);
+  assert.match(sql, /when 'sd' then v\.status in \('uploaded', 'processing'\)/);
+  assert.match(sql, /when 'hd' then v\.status = 'ready' and v\.hd_pending/);
+  // Low quality for everyone before anyone's HD, then people with nothing processing.
+  assert.match(sql, /order by \(v\.status = 'ready' and v\.hd_pending\),\s+exists \(/);
+  assert.match(sql, /progress = case when hd then j\.progress else 0 end/);
+  assert.match(sql, /set status = 'queued',\s+worker = null,\s+attempts = 0/);
+  assert.match(sql, /raise exception 'Run 038_sd_first\.sql first/);
+  for (const fn of ["encode_sd_handoff(uuid, numeric, int, int, text, text, text, jsonb)", "claim_encode_job(text, text)"]) {
+    assert.ok(sql.includes(`revoke execute on function public.${fn} from public, anon, authenticated`), fn);
+    assert.ok(sql.includes(`grant execute on function public.${fn} to service_role`), fn);
+  }
 });
