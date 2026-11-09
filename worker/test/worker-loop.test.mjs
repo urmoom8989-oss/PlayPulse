@@ -93,8 +93,9 @@ function fakeR2({ size = BYTES } = {}) {
     }
     if (name === "GetObjectCommand") return { Body: Readable.from([Buffer.alloc(BYTES, 1)]) };
     if (name === "PutObjectCommand") {
+      // Small files come as a Buffer (so a retry can send them again), big ones as a stream.
       const chunks = [];
-      for await (const c of input.Body) chunks.push(c);
+      for await (const c of Buffer.isBuffer(input.Body) ? [input.Body] : input.Body) chunks.push(c);
       const body = Buffer.concat(chunks);
       puts.set(input.Key, { type: input.ContentType, cache: input.CacheControl, bytes: body.length, text: body.toString("utf8") });
       return {};
