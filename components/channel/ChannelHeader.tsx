@@ -51,10 +51,13 @@ export function ChannelHeader({
   onTab,
   shorts = false,
   channelsTab = false,
+  analytics = false,
 }: {
   channel: Channel;
   tab: ChannelTab;
   isOwner?: boolean;
+  /** The owner's Analytics button, with the studio and stats flags on. */
+  analytics?: boolean;
   /** Studio preview: links and buttons do nothing. */
   preview?: boolean;
   bannerPlaceholder?: string;
@@ -93,14 +96,21 @@ export function ChannelHeader({
               )}
             </p>
           </div>
-          <div className="flex shrink-0 gap-2">
+          <div className="flex shrink-0 flex-wrap gap-2">
             {isOwner ? (
               preview ? (
                 <span className="btn-blue">Customize channel</span>
               ) : (
-                <Link href="/studio/channel" className="btn-blue">
-                  Customize channel
-                </Link>
+                <>
+                  {analytics && (
+                    <Link href="/studio/analytics" className="btn-blue" data-channel-analytics>
+                      Analytics
+                    </Link>
+                  )}
+                  <Link href="/studio/channel" className="btn-blue">
+                    Customize channel
+                  </Link>
+                </>
               )
             ) : preview ? (
               <span className="inline-flex h-9 items-center rounded-[2px] bg-brand px-4 text-[14px] font-medium uppercase tracking-[0.007px] text-white">

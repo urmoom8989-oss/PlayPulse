@@ -1010,7 +1010,8 @@ are plain inline SVG (no chart library) with a tooltip on hover or touch, in
 both themes. Every page has a range menu: the last 7, 28 or 90 days, or
 lifetime (from the day the channel or the video was made). Days are UTC days.
 
-- **Channel analytics** (`/studio/analytics`, Analytics in the studio nav):
+- **Channel analytics** (`/studio/analytics`, Analytics in the studio nav, or
+  the owner's **Analytics** button next to Customize channel on their channel page):
   views, watch time in hours, subscribers gained and lost, and the estimated
   audience (unique viewers with a counted view). A daily line of views, daily
   bars of watch time, the top 10 videos by views in the range, the current
