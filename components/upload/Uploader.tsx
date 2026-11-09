@@ -171,7 +171,7 @@ function DropZone({ disabled }: { disabled: boolean }) {
         </p>
       )}
       <p className="mt-auto pt-10 text-[12px] leading-4 text-text-3">
-        MP4, MOV, WebM or MKV, up to 5 GB each. Upload as many as you like.
+        MP4, MOV, WebM or MKV, any size. Upload as many as you like.
       </p>
     </div>
   );
