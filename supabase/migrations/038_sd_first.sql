@@ -18,6 +18,15 @@
 --
 -- Run after 037_parallel_encodes.sql. Safe to run more than once.
 
+-- The claim below uses 037's heartbeats: stop here, changing nothing, without them.
+do $$
+begin
+  if to_regprocedure('public.encode_job_stopped(public.encode_jobs)') is null then
+    raise exception 'Run 037_parallel_encodes.sql first, then this file.';
+  end if;
+end;
+$$;
+
 alter table public.videos add column if not exists hd_pending boolean not null default false;
 
 create or replace function public.encode_sd_ready(
