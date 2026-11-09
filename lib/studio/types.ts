@@ -33,6 +33,9 @@ export type StudioRow = {
   removedReason?: string | null;
   /** The owner's appeal since the removal: open, dismissed (turned down), or null. */
   appeal?: "open" | "dismissed" | "actioned" | null;
+  /** A failed video: the encoder's last error, and whether Retry can work (033, the retry_failed flag). */
+  failReason?: string | null;
+  canRetry?: boolean;
 };
 
 const num = (v: unknown) => (Number.isFinite(Number(v)) ? Number(v) : 0);
