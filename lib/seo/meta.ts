@@ -157,11 +157,17 @@ export function embedMetadata(v: SeoVideo, origin: string, siteName = "PlayPulse
 }
 
 /** The metadata of /@handle: the channel's name, description, avatar and canonical link. */
-export function channelMetadata(c: SeoChannel, origin: string, siteName = "PlayPulse", tab: "home" | "videos" | "shorts" | "about" = "home"): Metadata {
+export function channelMetadata(
+  c: SeoChannel,
+  origin: string,
+  siteName = "PlayPulse",
+  tab: "home" | "videos" | "shorts" | "channels" | "about" = "home",
+): Metadata {
   const url = absoluteUrl(origin, channelPath(c.handle));
   const description = clip(c.description || `${c.name} on ${siteName}. ${c.videoCount} video${c.videoCount === 1 ? "" : "s"}.`);
   const image = c.avatarUrl ? absoluteUrl(origin, c.avatarUrl) : null;
-  const tabTitle = tab === "home" ? "" : ` | ${tab === "about" ? "About" : tab === "videos" ? "Videos" : "Snips"}`;
+  const tabNames = { about: "About", videos: "Videos", shorts: "Snips", channels: "Channels" } as const;
+  const tabTitle = tab === "home" ? "" : ` | ${tabNames[tab]}`;
   return {
     title: `${c.name}${tabTitle} | ${siteName}`,
     description,

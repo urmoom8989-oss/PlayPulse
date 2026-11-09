@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { subErrorMessage, type SubAction } from "@/lib/subscriptions/rules";
+import { LEVEL_TEXT, subErrorMessage, type NotifyLevel, type SubAction } from "@/lib/subscriptions/rules";
 import {
   initialToggle,
   isDirty,
@@ -31,6 +31,9 @@ type SubsState = {
   seed: (channelId: string, count: number) => void;
   toggle: (channelId: string) => void;
   bell: (channelId: string) => void;
+  /** The bell's All / Personalized / None (bell_options), set at once and sent. */
+  levels: Record<string, NotifyLevel>;
+  setLevel: (channelId: string, level: NotifyLevel) => Promise<void>;
   showToast: (text: string) => void;
   clearToast: (id: number) => void;
   /** Back to idle, when the person signs out. */
@@ -91,6 +94,7 @@ export const useSubscriptions = create<SubsState>((set, get) => {
     status: "idle",
     channels: [],
     toggles: {},
+    levels: {},
     toast: null,
 
     load: async () => {
@@ -104,7 +108,8 @@ export const useSubscriptions = create<SubsState>((set, get) => {
           for (const [id, t] of Object.entries(toggles)) {
             toggles[id] = reduceToggle(t, { type: "sync", server: { ...membership(channels, id), count: t.server.count } });
           }
-          return { status: "ready", channels, toggles };
+          const levels = Object.fromEntries(channels.map((c) => [c.id, c.level])) as Record<string, NotifyLevel>;
+          return { status: "ready", channels, toggles, levels };
         });
       } catch {
         set((s) => ({ status: s.status === "ready" ? "ready" : "error" }));
@@ -131,9 +136,36 @@ export const useSubscriptions = create<SubsState>((set, get) => {
       void pump(channelId);
     },
 
+    setLevel: async (channelId, level) => {
+      const before = get().levels[channelId];
+      if (before === level) return;
+      set((s) => ({ levels: { ...s.levels, [channelId]: level } }));
+      try {
+        const res = await fetch("/api/subscriptions", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ channelId, action: "level", level }),
+        });
+        const body = (await res.json().catch(() => ({}))) as Partial<SubResult> & { error?: string };
+        if (!res.ok || typeof body.subscribed !== "boolean") throw new Error(body.error ?? "failed");
+        const now = body.level ?? level;
+        set((s) => {
+          const t = s.toggles[channelId];
+          const toggles = t
+            ? { ...s.toggles, [channelId]: reduceToggle(t, { type: "sync", server: { subscribed: true, notify: now !== "none", count: Number(body.count) || t.server.count } }) }
+            : s.toggles;
+          return { levels: { ...s.levels, [channelId]: now }, toggles };
+        });
+        get().showToast(LEVEL_TEXT[now].toast);
+      } catch (err) {
+        set((s) => ({ levels: before ? { ...s.levels, [channelId]: before } : s.levels }));
+        get().showToast(subErrorMessage(err instanceof Error ? err.message : "failed"));
+      }
+    },
+
     showToast: (text) => set({ toast: { id: ++toastId, text } }),
     clearToast: (id) => set((s) => (s.toast?.id === id ? { toast: null } : s)),
 
-    reset: () => set({ status: "idle", channels: [], toggles: {} }),
+    reset: () => set({ status: "idle", channels: [], toggles: {}, levels: {} }),
   };
 });

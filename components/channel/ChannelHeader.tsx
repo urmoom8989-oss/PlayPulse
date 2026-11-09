@@ -7,12 +7,13 @@ import { ChannelReport } from "../moderation/ChannelReport";
 import { SubscribeButton } from "../subscriptions/SubscribeButton";
 import { SubscriberCount } from "../subscriptions/SubscriberCount";
 
-export type ChannelTab = "home" | "videos" | "shorts" | "about";
+export type ChannelTab = "home" | "videos" | "shorts" | "channels" | "about";
 
 const allTabs: { key: ChannelTab; label: string; path: string }[] = [
   { key: "home", label: "Home", path: "" },
   { key: "videos", label: "Videos", path: "/videos" },
   { key: "shorts", label: "Snips", path: "/shorts" },
+  { key: "channels", label: "Channels", path: "/channels" },
   { key: "about", label: "About", path: "/about" },
 ];
 
@@ -48,6 +49,7 @@ export function ChannelHeader({
   bannerPlaceholder,
   onTab,
   shorts = false,
+  channelsTab = false,
 }: {
   channel: Channel;
   tab: ChannelTab;
@@ -59,9 +61,11 @@ export function ChannelHeader({
   onTab?: (tab: ChannelTab) => void;
   /** The Snips tab, only with the shorts flag on (feature 11). */
   shorts?: boolean;
+  /** The Channels tab (the channel's public subscriptions), with the privacy_settings flag. */
+  channelsTab?: boolean;
 }) {
   const base = `/@${channel.handle}`;
-  const tabs = allTabs.filter((t) => t.key !== "shorts" || shorts);
+  const tabs = allTabs.filter((t) => (t.key !== "shorts" || shorts) && (t.key !== "channels" || channelsTab));
 
   return (
     <div className="bg-surface">

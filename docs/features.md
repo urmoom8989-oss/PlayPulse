@@ -479,6 +479,37 @@ To set it up:
    guide keeps its old note and `/feed/subscriptions` shows a placeholder.
 2. Switch the `subscriptions` flag to `test` or `everyone`.
 
+### Bell options
+
+Behind the `bell_options` flag (`027_bell_privacy.sql`, off at first), the bell
+next to SUBSCRIBED opens the 2020 menu instead of switching on and off:
+
+- **All**: every upload of the channel shows in the top bar's bell.
+- **Personalized** (new subscriptions start here while the flag is on): the
+  channel's uploads show only when you watched one of its videos in the last
+  30 days, or subscribed in the last 14.
+- **None**: nothing from the channel.
+
+The bell's icon shows the choice (with rings, plain, or crossed out) and a
+small message confirms it. Bells set before the flag keep what they were: on is
+All, off is None. Each pick counts toward the 60 changes an hour.
+
+### Privacy
+
+Behind the `privacy_settings` flag (`027_bell_privacy.sql`, off at first),
+**Settings** gets a **Privacy** section with two switches that save as soon as
+they change:
+
+- **Keep all my subscriptions private** (on at first, like 2020). Turned off,
+  the channels you subscribe to show on your channel's new **CHANNELS** tab
+  (`/@handle/channels`) with their picture, subscribers and SUBSCRIBE.
+  Turned on, the tab says the channel features no other channels (and tells
+  you, on your own channel, where to change it).
+- **Keep all my saved playlists private** (on at first). There are no saved
+  playlists yet; the choice is kept for when there are.
+
+Nobody can read these two settings through the API except their owner.
+
 `node scripts/subscriptions-shots.mjs` starts `next dev` against a small local
 stand in for Supabase with a made up signed in viewer and ten made up
 channels, checks subscribe and unsubscribe (with the count moving before the

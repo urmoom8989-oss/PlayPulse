@@ -14,7 +14,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       { source: "/@:handle", destination: "/c/:handle" },
-      { source: "/@:handle/:tab(videos|shorts|about)", destination: "/c/:handle/:tab" },
+      { source: "/@:handle/:tab(videos|shorts|channels|about)", destination: "/c/:handle/:tab" },
     ];
   },
   // /embed/<id> (feature 16) may be framed by Yapin', yapper.website and this

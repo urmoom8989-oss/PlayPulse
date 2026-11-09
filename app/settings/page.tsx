@@ -3,8 +3,10 @@ import { Suspense } from "react";
 import { DbNotConnected, FeatureOff, FormSkeleton } from "@/components/auth/AuthCard";
 import { AddEmail } from "@/components/settings/AddEmail";
 import { Connections } from "@/components/settings/Connections";
+import { PrivacySettings } from "@/components/settings/PrivacySettings";
 import { SettingsForm, type SettingsProfile } from "@/components/settings/SettingsForm";
 import { accountsState } from "@/lib/accounts/server";
+import { myPrivacy } from "@/lib/privacy/server";
 import { connectionState } from "@/lib/yapin/server";
 
 export const metadata = { title: "Settings | PlayPulse" };
@@ -50,10 +52,20 @@ async function SettingsGate() {
         }}
       />
       <Suspense fallback={null}>
+        <PrivacySection />
+      </Suspense>
+      <Suspense fallback={null}>
         <YapinConnection />
       </Suspense>
     </>
   );
+}
+
+/** Settings > Privacy, with the privacy_settings flag. */
+async function PrivacySection() {
+  const state = await myPrivacy();
+  if (state.kind !== "ready") return null;
+  return <PrivacySettings initial={state.privacy} />;
 }
 
 /** Settings > Connections, with the yapin flag on and the Yapin' app set on the server (feature 16). */

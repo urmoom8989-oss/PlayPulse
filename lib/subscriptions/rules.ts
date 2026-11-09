@@ -7,11 +7,31 @@ export const SUBSCRIPTION_CHANGES_PER_HOUR = 60;
 /** The guide shows this many channels, then SHOW MORE. */
 export const GUIDE_CHANNELS = 7;
 
-export type SubAction = "subscribe" | "unsubscribe" | "notify";
+export type SubAction = "subscribe" | "unsubscribe" | "notify" | "level";
 
 export function isSubAction(v: unknown): v is SubAction {
-  return v === "subscribe" || v === "unsubscribe" || v === "notify";
+  return v === "subscribe" || v === "unsubscribe" || v === "notify" || v === "level";
 }
+
+/** The bell's three choices (the bell_options flag), like 2020. */
+export type NotifyLevel = "all" | "personalized" | "none";
+export const NOTIFY_LEVELS: readonly NotifyLevel[] = ["all", "personalized", "none"];
+
+export function isNotifyLevel(v: unknown): v is NotifyLevel {
+  return v === "all" || v === "personalized" || v === "none";
+}
+
+/** The level from a my_subscriptions() row: notify_level, or the old bell (on is all). */
+export function levelOf(notifyLevel: unknown, notify: boolean): NotifyLevel {
+  return isNotifyLevel(notifyLevel) ? notifyLevel : notify ? "all" : "none";
+}
+
+/** The menu's labels and the toast after picking one. */
+export const LEVEL_TEXT: Record<NotifyLevel, { label: string; toast: string }> = {
+  all: { label: "All", toast: "You'll get all notifications" },
+  personalized: { label: "Personalized", toast: "You'll get occasional personalized notifications" },
+  none: { label: "None", toast: "You won't get notifications" },
+};
 
 /** The codes the database raises, and what the route answers. */
 const MESSAGES: Record<string, string> = {
@@ -21,6 +41,8 @@ const MESSAGES: Record<string, string> = {
   own_channel: "You can't subscribe to your own channel.",
   rate_limited: "You're changing subscriptions very fast. Try again in a bit.",
   not_subscribed: "Subscribe first to get notifications.",
+  bell_options_off: "Notification options aren't on yet.",
+  bad_request: "Something went wrong. Try again.",
   not_set_up: "Subscriptions aren't set up yet.",
   no_db: "Database not connected.",
 };

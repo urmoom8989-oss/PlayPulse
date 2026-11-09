@@ -4,6 +4,7 @@ import { flagOn } from "@/lib/flags";
 import { previewChannel, type Channel } from "@/lib/channels/types";
 import { ChannelAbout, ChannelHeader, NoVideos, type ChannelTab } from "./ChannelHeader";
 import { ChannelDbNotice, ChannelMissing, ChannelsNotSetUp, ChannelsOff } from "./ChannelNotices";
+import { ChannelSubscriptions } from "./ChannelSubscriptions";
 import { ChannelVideos } from "./ChannelVideos";
 
 function TabBody({ tab, channel, isOwner, live = false }: { tab: ChannelTab; channel: Channel; isOwner?: boolean; live?: boolean }) {
@@ -11,6 +12,7 @@ function TabBody({ tab, channel, isOwner, live = false }: { tab: ChannelTab; cha
   // Without a database (the preview channel) there is nothing to read.
   if (!live) return <NoVideos isOwner={isOwner} />;
   if (tab === "shorts") return <ChannelShorts channel={channel} isOwner={isOwner} />;
+  if (tab === "channels") return <ChannelSubscriptions channel={channel} isOwner={isOwner} />;
   return <ChannelVideos channel={channel} tab={tab} isOwner={isOwner} />;
 }
 
@@ -44,10 +46,10 @@ export async function ChannelView({ params, tab }: { params: Promise<{ handle: s
       );
     }
     case "ready": {
-      const shorts = await flagOn("shorts");
+      const [shorts, channelsTab] = await Promise.all([flagOn("shorts"), flagOn("privacy_settings")]);
       return (
         <div data-channel-state="ready">
-          <ChannelHeader channel={state.channel} tab={tab} isOwner={state.isOwner} shorts={shorts} />
+          <ChannelHeader channel={state.channel} tab={tab} isOwner={state.isOwner} shorts={shorts} channelsTab={channelsTab} />
           <TabBody tab={tab} channel={state.channel} isOwner={state.isOwner} live />
         </div>
       );
