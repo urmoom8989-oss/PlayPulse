@@ -5,16 +5,14 @@ import { useRouter } from "next/navigation";
 import { useFlag, type SessionUser } from "@/lib/store/session";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "./Avatar";
-import { ChannelIcon, KeyboardIcon, SettingsIcon, SignOutIcon } from "./icons";
+import { ChannelIcon, SettingsIcon, SignOutIcon } from "./icons";
 import { Menu, MenuDivider, MenuItem } from "./Menu";
-import { openShortcuts } from "./ShortcutsDialog";
 import { ThemeMenuItem } from "./ThemeMenuItem";
 
 /** The avatar in the top bar and its menu, 2019 style. */
 export function AvatarMenu({ user, email }: { user: SessionUser; email: string | null }) {
   const router = useRouter();
   const channels = useFlag("channels");
-  const shortcuts = useFlag("more_shortcuts");
 
   async function signOut() {
     await createClient()?.auth.signOut();
@@ -68,20 +66,6 @@ export function AvatarMenu({ user, email }: { user: SessionUser; email: string |
           >
             Sign out
           </MenuItem>
-          {shortcuts && (
-            <>
-              <MenuDivider />
-              <MenuItem
-                icon={<KeyboardIcon className="h-6 w-6" />}
-                onClick={() => {
-                  close();
-                  openShortcuts();
-                }}
-              >
-                Keyboard shortcuts
-              </MenuItem>
-            </>
-          )}
         </>
       )}
     </Menu>
