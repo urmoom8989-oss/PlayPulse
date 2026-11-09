@@ -28,8 +28,9 @@ export function parseSaved(raw: string | null | undefined): SavedAccount[] {
     if (!x || typeof x !== "object") continue;
     const r = x as Record<string, unknown>;
     if (typeof r.id !== "string" || !UUID.test(r.id) || typeof r.rt !== "string" || !r.rt || r.rt.length > 2000) continue;
-    if (out.some((s) => s.id === r.id.toLowerCase())) continue;
-    out.push({ id: r.id.toLowerCase(), rt: r.rt, email: typeof r.email === "string" && r.email ? r.email.slice(0, 320) : null });
+    const id = r.id.toLowerCase();
+    if (out.some((s) => s.id === id)) continue;
+    out.push({ id, rt: r.rt, email: typeof r.email === "string" && r.email ? r.email.slice(0, 320) : null });
     if (out.length >= MAX_SAVED) break;
   }
   return out;
