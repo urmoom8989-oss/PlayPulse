@@ -33,6 +33,25 @@ export function createDb(supabase) {
       };
     },
 
+    /**
+     * When the worker starts: gives back the jobs its slots were running
+     * before it stopped (037). 0 when the database does not have it yet.
+     */
+    async release(worker) {
+      const { data, error } = await supabase.rpc("encode_release", { worker });
+      if (error) {
+        if (error.code === "PGRST202" || error.code === "42883") return 0;
+        throw rpcError("encode_release", error);
+      }
+      return Number(data) || 0;
+    },
+
+    /** Says the job is still being worked on (037), so no other slot takes it over. */
+    async heartbeat(jobId) {
+      const { error } = await supabase.rpc("encode_heartbeat", { job_id: jobId });
+      if (error && error.code !== "PGRST202" && error.code !== "42883") throw rpcError("encode_heartbeat", error);
+    },
+
     /** False when the job is not running any more (taken back as stale). */
     async progress(jobId, pct) {
       const { data, error } = await supabase.rpc("encode_progress", { job_id: jobId, pct });

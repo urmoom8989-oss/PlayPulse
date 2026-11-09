@@ -19,7 +19,9 @@ export const S3_ENV = ["S3_ENDPOINT", "S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY"
 
 /**
  * Optional:
- *   WORKER_NAME       shown in encode_jobs.worker (default: the host name)
+ *   WORKER_NAME       shown in encode_jobs.worker (default: the host name); with
+ *                     ENCODE_SLOTS above 1 each slot adds "/1", "/2"...
+ *   ENCODE_SLOTS      how many videos are processed at once (default 2, 1 to 4)
  *   WORK_DIR          where sources are downloaded and encoded (default: the system temp folder)
  *   STATE_DIR         where the busy marker for the update script lives (default: none)
  *   MEDIA_PUBLIC_URL  https base that serves the bucket's hls/ files, for thumbnail_url.
@@ -62,6 +64,7 @@ export function readConfig(env = process.env) {
         },
     bucket: useS3 ? get("S3_BUCKET") : get("R2_BUCKET"),
     workerName: get("WORKER_NAME") || hostname(),
+    encodeSlots: Math.min(4, Math.max(1, Math.floor(Number(get("ENCODE_SLOTS") || 2)) || 2)),
     workDir: get("WORK_DIR") || tmpdir(),
     stateDir: get("STATE_DIR") || null,
     mediaPublicUrl: /^https:\/\//.test(publicUrl) ? publicUrl : null,

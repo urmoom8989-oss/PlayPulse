@@ -78,6 +78,7 @@ R2_BUCKET=
 
 # Optional:
 # WORKER_NAME=encoder-1
+# ENCODE_SLOTS=2
 # MEDIA_PUBLIC_URL=https://media.example.com
 # SITE_URL=https://tube.example.com
 ```
@@ -93,7 +94,8 @@ Where each value comes from:
 | `R2_ACCOUNT_ID` | the [R2 overview page](https://dash.cloudflare.com/?to=/:account/r2/overview), **Account ID** |
 | `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` | [Manage R2 API Tokens](https://dash.cloudflare.com/?to=/:account/r2/api-tokens), **Create API token** with **Object Read & Write** on the video bucket only. A separate token for the encoder makes it easy to revoke. |
 | `R2_BUCKET` | the name of the video bucket, the same as the website uses |
-| `WORKER_NAME` | optional, shown in the `encode_jobs.worker` column. Defaults to the server's name. Give every encoder box its own. |
+| `WORKER_NAME` | optional, shown in the `encode_jobs.worker` column. Defaults to the server's name. Give every encoder box its own. With more than one slot each slot adds `/1`, `/2`. |
+| `ENCODE_SLOTS` | optional. How many videos the box processes at once, 1 to 4, default 2. A 1080p encode uses about 3 of 8 CPUs and under 1 GB of memory, so 2 fit an 8 CPU, 8 GB box. People with nothing processing go first, so one person's long upload does not hold up everybody else's. |
 | `MEDIA_PUBLIC_URL` | optional. If you connect a [custom domain to the bucket](https://developers.cloudflare.com/r2/buckets/public-buckets/), put it here and `thumbnail_url` is filled in. Without it the site serves the thumbnail through `/api/media`. Use the same value on the website (see "Watch page" in the main README). |
 | `SITE_URL` | optional. The website's address, like `https://tube.example.com`, without a slash at the end. The encoder needs it for the links in Yapin' announcements (feature 16, see "Yapin'" in the main README). Without it no announcements are posted. |
 | `CAPTIONS` | optional. `off` turns the auto-generated captions off. The image sets everything else they need. |
@@ -278,10 +280,12 @@ deleting. Nothing to set up beyond migration 014.
   go again a minute later, up to 3 rounds, before the job fails, so the encode
   is not thrown away. The log shows `storage still busy ... trying again in a
   minute` when that happens.
-- If the box crashes during an encode, the worker gives the job back when it
-  starts again. A job stuck as `running` for more than 2 h 15 min is taken back
-  by the next worker that asks, so with uploads longer than about an hour run
-  one encoder, or a second one could take over a long encode that is still going.
+- If the box crashes during an encode, the worker gives its jobs back when it
+  starts again. A running job tells the database it is alive every minute
+  (migration 037); one silent for 10 minutes is taken back by the next slot
+  that asks, however long the encode has been going, so several slots and boxes
+  never work on the same video. (Before 037, a job running for 2 h 15 min was
+  taken back, which is still the rule for a worker without heartbeats.)
 - To try a failed video again, the owner presses **Retry** on it in the studio
   or on its watch page (migration 033, the `retry_failed` flag, 3 times a day).
   Without the flag, set its `status` back to `uploaded` in the `videos` table.

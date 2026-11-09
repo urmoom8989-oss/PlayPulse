@@ -561,3 +561,66 @@ test("captions: pieces after the sound track ends are not sent to whisper", asyn
     await s.cleanup();
   }
 });
+
+test("two slots process two videos at the same time, each under its own name, with heartbeats", async () => {
+  const s = await setup({ jobs: [{}, {}] });
+  try {
+    const stop = new AbortController();
+    const db = s.deps.db;
+    const names = [];
+    const beats = [];
+    let idle = 0;
+    let inFlight = 0;
+    let most = 0;
+    const run = s.deps.run;
+    const counted = {
+      ...db,
+      claim: async (w) => {
+        names.push(w);
+        const job = await db.claim(w);
+        if (!job && ++idle >= 2) stop.abort();
+        return job;
+      },
+      heartbeat: async (id) => void beats.push(id),
+      release: async (w) => {
+        names.push(`release ${w}`);
+        return 0;
+      },
+    };
+    await runLoop({
+      ...s.deps,
+      db: counted,
+      // Each encode takes a moment, so the two overlap.
+      run: async (...a) => {
+        inFlight++;
+        most = Math.max(most, inFlight);
+        await new Promise((r) => setTimeout(r, 30));
+        try {
+          return await run(...a);
+        } finally {
+          inFlight--;
+        }
+      },
+      config: { ...s.deps.config, encodeSlots: 2 },
+      stopSignal: stop.signal,
+      pollMs: 10,
+      heartbeatMs: 5,
+    });
+    assert.equal(names[0], "release test-box");
+    assert.ok(names.includes("test-box/1") && names.includes("test-box/2"), names.join(", "));
+    assert.ok(!names.includes("test-box"));
+    assert.deepEqual(s.supabase.rows.map((r) => r.status), ["done", "done"]);
+    assert.equal(most, 2, "the two encodes ran at the same time");
+    assert.ok(beats.length > 0, "heartbeats while working");
+    assert.ok(s.lines.some((l) => l.includes("2 videos at a time")));
+  } finally {
+    await s.cleanup();
+  }
+});
+
+test("slot names: the worker's own with one slot, /n with more", async () => {
+  const { slotName } = await import("../lib/loop.mjs");
+  assert.equal(slotName("box", 1, 1), "box");
+  assert.equal(slotName("box", 1, 2), "box/1");
+  assert.equal(slotName("box", 2, 2), "box/2");
+});

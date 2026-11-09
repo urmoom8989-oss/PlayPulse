@@ -280,7 +280,10 @@ shows a preview of the page.
 
 A separate encoder box turns every finished upload into HLS at 360p, 720p and
 1080p (never bigger than the upload), makes three thumbnails and a hover
-preview sprite, and marks the video ready. `/studio/videos` shows
+preview sprite, and marks the video ready. It processes 2 videos at once by
+default (`ENCODE_SLOTS`, `037_parallel_encodes.sql`), and people with nothing
+processing go first, so one person's long upload does not hold up everybody
+else's. `/studio/videos` shows
 "Processing, 42%" and updates every 5 seconds; ready videos get their thumbnail.
 The owner sees the same percent on `/watch?v=<id>`.
 

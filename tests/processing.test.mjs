@@ -93,3 +93,16 @@ test("progress, polling and the thumbnail key", () => {
   assert.equal(isActive("failed"), false);
   assert.equal(defaultThumbnailKey(VIDEO.toUpperCase()), `hls/${VIDEO}/thumb-1.webp`);
 });
+
+test("037: heartbeats, not run time, decide that a job stopped; people with nothing processing first", async () => {
+  const { readFileSync } = await import("node:fs");
+  const sql = readFileSync(new URL("../supabase/migrations/037_parallel_encodes.sql", import.meta.url), "utf8");
+  assert.match(sql, /add column if not exists heartbeat_at/);
+  assert.match(sql, /else j\.heartbeat_at < now\(\) - interval '10 minutes'/);
+  assert.match(sql, /when j\.heartbeat_at is null then j\.started_at < now\(\) - public\.encode_stale_after\(\)/);
+  assert.match(sql, /order by exists \(/);
+  assert.match(sql, /j\.worker like me \|\| '\/%'/);
+  for (const fn of ["claim_encode_job(text)", "encode_progress(uuid, int)", "encode_heartbeat(uuid)", "encode_release(text)"]) {
+    assert.ok(sql.includes(`grant execute on function public.${fn} to service_role`), fn);
+  }
+});
