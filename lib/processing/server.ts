@@ -17,8 +17,8 @@ export async function statusContext(): Promise<StatusContext> {
           async video(id) {
             const read = (columns: string) => supabase.from("videos").select(columns).eq("id", id).maybeSingle();
             // hd_pending comes with 038; before it the same row without it.
-            let { data, error } = await read("id, owner_id, status, thumbnail_url, error, hd_pending");
-            if (error) ({ data } = await read("id, owner_id, status, thumbnail_url, error"));
+            const withHd = await read("id, owner_id, status, thumbnail_url, error, hd_pending");
+            const { data } = withHd.error ? await read("id, owner_id, status, thumbnail_url, error") : withHd;
             return (data as StatusVideoRow | null) ?? null;
           },
           async job(videoId) {
