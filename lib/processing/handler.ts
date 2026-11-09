@@ -10,6 +10,8 @@ export type StatusVideoRow = {
   status: LiveStatus["status"];
   thumbnail_url: string | null;
   error: string | null;
+  /** Ready at low quality while HD is made (038); missing before 038. */
+  hd_pending?: boolean | null;
 };
 
 export type StatusContext = {
@@ -47,13 +49,15 @@ export async function videoStatus(id: string, ctx: StatusContext): Promise<Statu
 
   const job = readJob(await ctx.db.job(video.id));
   const thumbnailUrl = video.status === "ready" ? (video.thumbnail_url ?? (await ctx.thumbnail(video.id))) : null;
+  const hdPending = video.status === "ready" && video.hd_pending === true;
   const body: LiveStatus = {
     id: video.id,
     status: video.status,
-    progress: progressFor(video.status, job),
+    progress: progressFor(video.status, job, hdPending),
     job,
     thumbnailUrl,
     error: video.status === "failed" ? video.error : null,
+    ...(hdPending ? { hdPending: true } : {}),
   };
   return { status: 200, body };
 }

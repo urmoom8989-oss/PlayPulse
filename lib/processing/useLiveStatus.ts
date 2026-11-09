@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { STATUS_POLL_MS, isActive, type LiveStatus } from "./status";
+import { STATUS_POLL_MS, isWaiting, type LiveStatus } from "./status";
 
-type Polled = Pick<LiveStatus, "id" | "status" | "progress" | "job" | "thumbnailUrl" | "error">;
+type Polled = Pick<LiveStatus, "id" | "status" | "progress" | "job" | "thumbnailUrl" | "error" | "hdPending">;
 
 /**
  * Keeps videos that are on their way to ready up to date: every 5 seconds,
- * while any of them is uploaded or processing, it asks
+ * while any of them is uploaded or processing (or plays at low quality while
+ * its HD is made, 038), it asks
  * /api/videos/<id>/status and merges the answer in. Stops by itself once
  * nothing is left to wait for, or for a video the route will not answer for.
  */
@@ -17,7 +18,7 @@ export function useLiveStatuses<T extends Polled>(initial: T[], enabled: boolean
 
   const merged = initial.map((v) => (live[v.id] ? { ...v, ...live[v.id] } : v));
   const activeIds = merged
-    .filter((v) => isActive(v.status))
+    .filter((v) => isWaiting(v))
     .map((v) => v.id)
     .join(",");
 
@@ -42,7 +43,8 @@ export function useLiveStatuses<T extends Polled>(initial: T[], enabled: boolean
       );
       if (stopped) return;
       const fresh = answers.filter((a): a is Polled => a !== null && typeof a.id === "string");
-      if (fresh.length) setLive((prev) => ({ ...prev, ...Object.fromEntries(fresh.map((a) => [a.id, a])) }));
+      // The route leaves hdPending out once HD is done: that clears the one the page started with.
+      if (fresh.length) setLive((prev) => ({ ...prev, ...Object.fromEntries(fresh.map((a) => [a.id, { ...a, hdPending: a.hdPending === true }])) }));
       timer = setTimeout(poll, STATUS_POLL_MS);
     };
 

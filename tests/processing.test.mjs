@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { videoStatus } from "../lib/processing/handler.ts";
-import { defaultThumbnailKey, isActive, processingLine, progressFor, readJob } from "../lib/processing/status.ts";
+import { defaultThumbnailKey, isActive, isWaiting, processingLine, progressFor, readJob } from "../lib/processing/status.ts";
 
 const OWNER = "11111111-2222-3333-4444-555555555555";
 const OTHER = "99999999-8888-7777-6666-555555555555";
@@ -105,4 +105,56 @@ test("037: heartbeats, not run time, decide that a job stopped; people with noth
   for (const fn of ["claim_encode_job(text)", "encode_progress(uuid, int)", "encode_heartbeat(uuid)", "encode_release(text)"]) {
     assert.ok(sql.includes(`grant execute on function public.${fn} to service_role`), fn);
   }
+});
+
+test("038: low quality first, the status says HD is still being made", async () => {
+  const running = { status: "running", progress: 64, attempts: 1 };
+  const hd = await videoStatus(VIDEO, ctx({ video: { status: "ready", hd_pending: true }, job: running }));
+  assert.equal(hd.body.status, "ready");
+  assert.equal(hd.body.hdPending, true);
+  assert.equal(hd.body.progress, 64);
+  assert.equal(hd.body.thumbnailUrl, "https://r2.example.com/signed");
+  // HD done, or a database before 038: no hdPending at all, 100%.
+  for (const video of [{ status: "ready", hd_pending: false }, { status: "ready" }]) {
+    const r = await videoStatus(VIDEO, ctx({ video, job: { status: "done", progress: 100, attempts: 1 } }));
+    assert.equal("hdPending" in r.body, false);
+    assert.equal(r.body.progress, 100);
+  }
+  // hd_pending on a video that is not ready means nothing.
+  const odd = await videoStatus(VIDEO, ctx({ video: { status: "processing", hd_pending: true }, job: running }));
+  assert.equal("hdPending" in odd.body, false);
+
+  assert.equal(processingLine({ status: "ready", hdPending: true, job: running, progress: 64 }), "HD processing, 64%");
+  assert.equal(processingLine({ status: "ready", hdPending: true, job: { status: "queued", progress: 0, attempts: 1 }, progress: 0 }), "HD processing");
+  assert.equal(processingLine({ status: "ready", hdPending: false, job: running, progress: 100 }), null);
+  assert.equal(progressFor("ready", running, true), 64);
+  assert.equal(progressFor("ready", { status: "queued", progress: 30, attempts: 1 }, true), 0);
+  assert.equal(progressFor("ready", null, true), 100);
+  assert.equal(isWaiting({ status: "ready", hdPending: true }), true);
+  assert.equal(isWaiting({ status: "ready" }), false);
+  assert.equal(isWaiting({ status: "processing" }), true);
+});
+
+test("038: the video plays at low quality first and stays ready when only its HD fails", async () => {
+  const { readFileSync } = await import("node:fs");
+  const sql = readFileSync(new URL("../supabase/migrations/038_sd_first.sql", import.meta.url), "utf8");
+  assert.match(sql, /add column if not exists hd_pending boolean not null default false/);
+  // encode_sd_ready: ready with hd_pending, the job keeps running.
+  const sd = sql.slice(sql.indexOf("function public.encode_sd_ready"), sql.indexOf("function public.encode_done"));
+  assert.match(sd, /hd_pending = true/);
+  assert.doesNotMatch(sd, /update public\.encode_jobs/);
+  assert.match(sql, /set status = 'ready',\s+hd_pending = false/);
+  // A final failure after the low quality is out only gives up HD.
+  assert.match(sql, /where v\.id = job\.video_id and v\.status = 'ready' and v\.hd_pending;\s+if not found then/);
+  // The claim hands out the HD part of a ready video, says so, and leaves the video ready.
+  assert.match(sql, /v\.status in \('uploaded', 'processing'\) or \(v\.status = 'ready' and v\.hd_pending\)/);
+  assert.match(sql, /hd_only boolean/);
+  assert.match(sql, /if not \(vid\.status = 'ready' and vid\.hd_pending\) then/);
+  // Private videos stay private.
+  assert.match(sql, /v\.visibility <> 'private' or v\.owner_id = \(select auth\.uid\(\)\)/);
+  for (const fn of ["encode_sd_ready(uuid, numeric, int, int, text, text, text, jsonb)", "encode_done(uuid, numeric, int, int, text, text, text, jsonb)", "claim_encode_job(text)"]) {
+    assert.ok(sql.includes(`revoke execute on function public.${fn} from public, anon, authenticated`), fn);
+    assert.ok(sql.includes(`grant execute on function public.${fn} to service_role`), fn);
+  }
+  assert.ok(sql.includes("grant execute on function public.video_hd_pending(uuid) to anon, authenticated, service_role"));
 });

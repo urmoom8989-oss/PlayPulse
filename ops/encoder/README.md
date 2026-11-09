@@ -187,12 +187,25 @@ Everything for a video lives under `hls/<video id>/` in the bucket:
 
 | File | What it is |
 | --- | --- |
-| `master.m3u8` | the HLS master playlist (`videos.hls_key`) |
+| `master.m3u8` | the HLS master playlist (`videos.hls_key`). Cached for a minute, not five, because HD and captions are added to it later. |
 | `360p/`, `720p/`, `1080p/` | `index.m3u8`, an `init` segment and 4 second `.m4s` segments |
 | `thumb-1.webp`, `thumb-2.webp`, `thumb-3.webp` | frames at 10%, 50% and 90%, 1280 wide. The first is the default. |
 | `sprite.webp`, `sprite.vtt` | the hover preview: one 160x90 frame every 5 s (at most 100), and the WebVTT that maps time to tile (`videos.preview_sprite_key`) |
 | `captions/<lang>.vtt`, `captions/<lang>.m3u8` | the auto-generated captions as WebVTT, and the HLS subtitle playlist that `master.m3u8` names. `<lang>` is the language the speech model heard, like `en`. Only when somebody speaks. |
 
+- **Low quality first.** An upload of 720p or more is made in two runs: the
+  sizes below 720p, the thumbnails and the sprite first, so the video plays at
+  360p within minutes, then 720p and up, added to the same `master.m3u8` when
+  they are done (migration 038). Meanwhile the player's quality menu says "HD is
+  still processing" and the studio says "HD processing, 64%". The source is
+  read twice, which costs about a tenth more encoder time than one run. If only
+  the HD run fails for good, the video stays up at low quality. Smaller uploads,
+  and a database without 038, get one run as before. The log has an `sd` line
+  when the low quality is playable:
+
+  ```
+  2026-11-04T10:05:20.000Z sd job=1a2b3c4d video=5e6f7a8b 360p playable in 189.2s, HD next
+  ```
 - **Never upscaled.** A 720p upload gets 360p and 720p. Something between two
   sizes (like 1600x900) also gets one at its own size. Portrait videos count
   their short side, so a 1080x1920 phone video is 1080p.

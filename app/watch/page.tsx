@@ -171,6 +171,7 @@ async function Watch({ searchParams }: { searchParams: PageProps<"/watch">["sear
                   upNext={upNext}
                   channelName={video.channel.name}
                   live={broadcast?.state === "live" && endsAt !== null ? { endsAt } : null}
+                  hdPending={video.hdPending === true}
                 />
               )
             }

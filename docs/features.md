@@ -283,7 +283,10 @@ A separate encoder box turns every finished upload into HLS at 360p, 720p and
 preview sprite, and marks the video ready. It processes 2 videos at once by
 default (`ENCODE_SLOTS`, `037_parallel_encodes.sql`), and people with nothing
 processing go first, so one person's long upload does not hold up everybody
-else's. `/studio/videos` shows
+else's. Low quality comes first (`038_sd_first.sql`): an upload of 720p or more
+plays at 360p within minutes, and 720p and 1080p are added to it when they are
+done, like YouTube in 2020. Until then the player's quality menu says "HD is
+still processing" and the studio says "HD processing, 64%". `/studio/videos` shows
 "Processing, 42%" and updates every 5 seconds; ready videos get their thumbnail.
 The owner sees the same percent on `/watch?v=<id>`.
 

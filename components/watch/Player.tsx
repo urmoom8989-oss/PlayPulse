@@ -106,6 +106,8 @@ type Props = {
    * the time until `endsAt` (ms). After that it is a normal video.
    */
   live?: { endsAt: number } | null;
+  /** Low quality first (038): 720p and up are still being made; the quality menu says so. */
+  hdPending?: boolean;
 };
 
 type Menu = null | "main" | "quality" | "speed" | "subtitles" | "caption-options" | `caption-${CaptionSetting}`;
@@ -162,6 +164,7 @@ export function Player({
   upNext = [],
   channelName = "",
   live = null,
+  hdPending = false,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -1315,6 +1318,11 @@ export function Player({
                   {o.hd && <sup className="ml-0.5 text-[9px] font-bold text-[var(--mark)]">HD</sup>}
                 </MenuChoice>
               ))}
+              {hdPending && (
+                <p data-hd-pending className="mt-1 border-t border-white/20 px-4 pb-1 pt-3 text-[13px] font-normal leading-[18px] text-white/70">
+                  {t("HD is still processing. Check back later for higher quality.")}
+                </p>
+              )}
             </>
           )}
         </div>

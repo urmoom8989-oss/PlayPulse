@@ -18,7 +18,7 @@ const KEY = `uploads/${OWNER}/${VIDEO}/source.mp4`;
 const BYTES = 4096;
 
 /** A Supabase client whose rpc() behaves like the functions in 006_processing.sql. */
-function fakeSupabase({ jobs = [], claimError = null, progressAnswer = null } = {}) {
+function fakeSupabase({ jobs = [], claimError = null, progressAnswer = null, sdFirst = false } = {}) {
   const calls = [];
   const rows = jobs.map((j, i) => ({
     job_id: `00000000-0000-0000-0000-00000000000${i + 1}`,
@@ -54,6 +54,8 @@ function fakeSupabase({ jobs = [], claimError = null, progressAnswer = null } = 
             source_bytes: String(job.source_bytes),
             source_mime: job.source_mime,
             attempt: job.attempts,
+            // 038 and later answer hd_only too.
+            ...(sdFirst ? { hd_only: job.hdOnly === true } : {}),
           };
           return { data: [row], error: null };
         }
@@ -65,6 +67,9 @@ function fakeSupabase({ jobs = [], claimError = null, progressAnswer = null } = 
         case "encode_done":
           byId(args.job_id).status = "done";
           return { data: "done", error: null };
+        case "encode_sd_ready":
+          byId(args.job_id).sdReady = args;
+          return { data: "ready", error: null };
         case "encode_failed": {
           const job = byId(args.job_id);
           job.error = args.error;
@@ -91,7 +96,13 @@ function fakeR2({ size = BYTES } = {}) {
       if (size === null) throw Object.assign(new Error("NotFound"), { name: "NotFound", $metadata: { httpStatusCode: 404 } });
       return { ContentLength: size };
     }
-    if (name === "GetObjectCommand") return { Body: Readable.from([Buffer.alloc(BYTES, 1)]) };
+    if (name === "GetObjectCommand") {
+      // A file that was put (or seeded) comes back as itself; the source is any bytes.
+      const put = puts.get(input.Key);
+      if (put) return { Body: { transformToString: async () => put.text } };
+      if (input.Key.startsWith("hls/")) throw Object.assign(new Error("NoSuchKey"), { name: "NoSuchKey", $metadata: { httpStatusCode: 404 } });
+      return { Body: Readable.from([Buffer.alloc(BYTES, 1)]) };
+    }
     if (name === "PutObjectCommand") {
       // Small files come as a Buffer (so a retry can send them again), big ones as a stream.
       const chunks = [];
@@ -155,8 +166,9 @@ function fakeRun({ failEncode = 0, hang = false, probe = PROBE, whisper = null, 
       await writeFile(join(cwd, n, "init_0.mp4"), "init");
       await writeFile(join(cwd, n, "seg_00000.m4s"), "seg");
     }
-    await writeFile(join(cwd, "master.m3u8"), `#EXTM3U\n${names.map((n) => `#EXT-X-STREAM-INF:BANDWIDTH=1000000\n${n}/index.m3u8\n`).join("")}`);
-    await writeFile(join(cwd, "sprite.webp"), "sprite");
+    const master = args[args.indexOf("-master_pl_name") + 1];
+    await writeFile(join(cwd, master), `#EXTM3U\n#EXT-X-VERSION:7\n${names.map((n) => `#EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=${n}\n${n}/index.m3u8\n`).join("")}`);
+    if (args.includes("[spr]")) await writeFile(join(cwd, "sprite.webp"), "sprite");
     for (const us of [3000000, 6000000, 12000000]) onStdout?.(`out_time_us=${us}\nprogress=continue\n`);
     onStdout?.("progress=end\n");
     return "";
@@ -242,6 +254,8 @@ test("claim, progress, upload and done", async () => {
       `hls/${VIDEO}/thumb-3.webp`,
     ]);
     assert.equal(s.r2.puts.get(`hls/${VIDEO}/master.m3u8`).type, "application/vnd.apple.mpegurl");
+    assert.equal(s.r2.puts.get(`hls/${VIDEO}/master.m3u8`).cache, "public, max-age=60");
+    assert.equal(s.r2.puts.get(`hls/${VIDEO}/360p/index.m3u8`).cache, "public, max-age=300");
     assert.equal(s.r2.puts.get(`hls/${VIDEO}/360p/seg_00000.m4s`).type, "video/iso.segment");
     assert.match(s.r2.puts.get(`hls/${VIDEO}/360p/seg_00000.m4s`).cache, /immutable/);
     assert.equal(s.r2.puts.get(`hls/${VIDEO}/sprite.vtt`).type, "text/vtt; charset=utf-8");
@@ -257,6 +271,136 @@ test("claim, progress, upload and done", async () => {
     assert.deepEqual(await readdir(s.workDir), []);
     assert.ok(s.busySeen.every(Boolean), "busy marker was missing during the job");
     assert.equal(existsSync(join(s.stateDir, "busy")), false);
+  } finally {
+    await s.cleanup();
+  }
+});
+
+const PROBE_1080 = JSON.stringify({
+  format: { duration: "12.0" },
+  streams: [
+    { codec_type: "video", codec_name: "h264", width: 1920, height: 1080, avg_frame_rate: "30/1" },
+    { codec_type: "audio", codec_name: "aac" },
+  ],
+});
+const encodeRuns = (s) => s.run.runs.filter((r) => r.args.includes("-filter_complex"));
+const streamNames = (r) => r.args[r.args.indexOf("-var_stream_map") + 1].split(" ").map((x) => x.split("name:")[1]);
+const variantsIn = (text) => text.split("\n").filter((l) => l && !l.startsWith("#"));
+
+test("low quality first: 360p plays, then 720p and 1080p are added to the same master", async () => {
+  const s = await setup({ jobs: [{}], sdFirst: true, probe: PROBE_1080, mediaPublicUrl: "https://media.example.com" });
+  try {
+    assert.equal(await tick(s.deps), "done");
+
+    // Two encodes: the low ladder with the sprite, then HD with its own master.
+    const runs = encodeRuns(s);
+    assert.equal(runs.length, 2);
+    assert.deepEqual(streamNames(runs[0]), ["360p"]);
+    assert.ok(runs[0].args.includes("[spr]"));
+    assert.equal(runs[0].args[runs[0].args.indexOf("-master_pl_name") + 1], "master.m3u8");
+    assert.deepEqual(streamNames(runs[1]), ["720p", "1080p"]);
+    assert.ok(!runs[1].args.includes("[spr]"));
+    assert.equal(runs[1].args[runs[1].args.indexOf("-master_pl_name") + 1], "hd-master.m3u8");
+
+    // Ready at low quality first, then done with every rendition.
+    const names = rpcNames(s);
+    const sdAt = names.indexOf("encode_sd_ready");
+    assert.ok(sdAt > 0 && sdAt < names.indexOf("encode_done"), names.join(" "));
+    assert.equal(names.at(-1), "encode_done");
+    const sd = s.supabase.calls[sdAt].args;
+    assert.deepEqual(sd.renditions.map((r) => r.name), ["360p"]);
+    assert.deepEqual([sd.width, sd.height], [640, 360]);
+    assert.equal(sd.hls_key, `hls/${VIDEO}/master.m3u8`);
+    assert.equal(sd.thumbnail_url, `https://media.example.com/hls/${VIDEO}/thumb-1.webp`);
+    const done = s.supabase.calls.at(-1).args;
+    assert.deepEqual(done.renditions.map((r) => r.name), ["360p", "720p", "1080p"]);
+    assert.deepEqual([done.width, done.height], [1920, 1080]);
+
+    // The sd call came after every low file was stored, and before any HD file.
+    const putKeys = s.r2.sent.filter((x) => x.name === "PutObjectCommand").map((x) => x.key);
+    const firstHd = putKeys.findIndex((k) => k.includes("/720p/") || k.includes("/1080p/"));
+    assert.ok(putKeys.slice(0, firstHd).includes(`hls/${VIDEO}/360p/seg_00000.m4s`));
+    assert.ok(putKeys.slice(0, firstHd).includes(`hls/${VIDEO}/master.m3u8`));
+    // The merged master goes up after every HD file, and the HD master never does.
+    assert.equal(putKeys.at(-1), `hls/${VIDEO}/master.m3u8`);
+    assert.ok(!putKeys.some((k) => k.endsWith("hd-master.m3u8")), putKeys.join("\n"));
+    assert.deepEqual(variantsIn(s.r2.puts.get(`hls/${VIDEO}/master.m3u8`).text), ["360p/index.m3u8", "720p/index.m3u8", "1080p/index.m3u8"]);
+    for (const k of ["720p/index.m3u8", "720p/seg_00000.m4s", "1080p/init_0.mp4", "sprite.webp", "thumb-3.webp"]) {
+      assert.ok(s.r2.puts.has(`hls/${VIDEO}/${k}`), `${k} was not stored`);
+    }
+
+    // The bar fills once: the low part ends at 30, HD to 99.
+    const pcts = s.supabase.calls.filter((c) => c.name === "encode_progress").map((c) => c.args.pct);
+    assert.deepEqual([...pcts].sort((a, b) => a - b), pcts);
+    assert.ok(pcts.includes(25) && pcts.includes(30) && pcts.includes(92) && pcts.at(-1) === 99, `progress was ${pcts}`);
+    assert.ok(s.lines.some((l) => l.startsWith("sd ") && l.includes("360p playable")), s.lines.join("\n"));
+    assert.deepEqual(await readdir(s.workDir), []);
+  } finally {
+    await s.cleanup();
+  }
+});
+
+test("without 038 (no hd_only from the claim) a 1080p source gets one run as before", async () => {
+  const s = await setup({ jobs: [{}], probe: PROBE_1080 });
+  try {
+    assert.equal(await tick(s.deps), "done");
+    assert.equal(encodeRuns(s).length, 1);
+    assert.deepEqual(streamNames(encodeRuns(s)[0]), ["360p", "720p", "1080p"]);
+    assert.ok(!rpcNames(s).includes("encode_sd_ready"));
+  } finally {
+    await s.cleanup();
+  }
+});
+
+test("a source with nothing to split (no HD) gets one run and no sd step", async () => {
+  const probe = PROBE.replace('"width":1280,"height":720', '"width":640,"height":360');
+  assert.notEqual(probe, PROBE);
+  const s = await setup({ jobs: [{}], sdFirst: true, probe });
+  try {
+    assert.equal(await tick(s.deps), "done");
+    assert.equal(encodeRuns(s).length, 1);
+    assert.deepEqual(streamNames(encodeRuns(s)[0]), ["360p"]);
+    assert.ok(!rpcNames(s).includes("encode_sd_ready"));
+    assert.equal(rpcNames(s).at(-1), "encode_done");
+  } finally {
+    await s.cleanup();
+  }
+});
+
+test("a retry of the HD part makes only HD and merges it into the stored master", async () => {
+  const s = await setup({ jobs: [{ hdOnly: true }], sdFirst: true, probe: PROBE_1080 });
+  try {
+    const stored = "#EXTM3U\n#EXT-X-VERSION:7\n#EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=640x360\n360p/index.m3u8\n";
+    s.r2.puts.set(`hls/${VIDEO}/master.m3u8`, { text: stored });
+    assert.equal(await tick(s.deps), "done");
+
+    const runs = encodeRuns(s);
+    assert.equal(runs.length, 1);
+    assert.deepEqual(streamNames(runs[0]), ["720p", "1080p"]);
+    // No thumbnails or sprite again, and the low files stay as they are.
+    assert.ok(!s.run.runs.some((r) => r.args.includes("-ss")));
+    const putKeys = s.r2.sent.filter((x) => x.name === "PutObjectCommand").map((x) => x.key);
+    assert.ok(!putKeys.some((k) => k.includes("/360p/") || k.includes("thumb-") || k.includes("sprite")), putKeys.join("\n"));
+    assert.ok(s.r2.sent.some((x) => x.name === "GetObjectCommand" && x.key === `hls/${VIDEO}/master.m3u8`));
+    assert.deepEqual(variantsIn(s.r2.puts.get(`hls/${VIDEO}/master.m3u8`).text), ["360p/index.m3u8", "720p/index.m3u8", "1080p/index.m3u8"]);
+
+    assert.ok(!rpcNames(s).includes("encode_sd_ready"));
+    const done = s.supabase.calls.at(-1);
+    assert.equal(done.name, "encode_done");
+    assert.deepEqual(done.args.renditions.map((r) => r.name), ["360p", "720p", "1080p"]);
+    assert.ok(s.lines.some((l) => l.startsWith("claim ") && l.includes("HD only")));
+  } finally {
+    await s.cleanup();
+  }
+});
+
+test("a retry of the HD part whose low master is gone fails without another retry", async () => {
+  const s = await setup({ jobs: [{ hdOnly: true }], sdFirst: true, probe: PROBE_1080 });
+  try {
+    assert.equal(await tick(s.deps), "failed");
+    const failed = s.supabase.calls.find((c) => c.name === "encode_failed").args;
+    assert.equal(failed.retry, false);
+    assert.match(failed.error, /low quality master playlist is gone/);
   } finally {
     await s.cleanup();
   }
