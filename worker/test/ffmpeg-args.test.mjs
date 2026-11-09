@@ -161,3 +161,12 @@ test("the time limit follows the video's length, between 2 and 12 hours", async 
   assert.equal(jobTimeoutMs(10693.4), hour + 10693.4 * 2000);
   assert.equal(jobTimeoutMs(24 * 3600), JOB_TIMEOUT_MAX_MS);
 });
+
+test("a rung capped at 30 fps drops frames before it is scaled; the others keep the source rate", () => {
+  const renditions = pickRenditions({ width: 1920, height: 1080, fps: 60 });
+  const args = buildEncodeArgs({ input: "in.mp4", renditions, hasAudio: true });
+  const graph = args[args.indexOf("-filter_complex") + 1].split(";");
+  assert.equal(graph[1], "[s0]fps=30,scale=640:360:flags=bicubic,setsar=1,format=yuv420p[v0]");
+  assert.equal(graph[2], "[s1]scale=1280:720:flags=bicubic,setsar=1,format=yuv420p[v1]");
+  assert.equal(graph[3], "[s2]scale=1920:1080:flags=bicubic,setsar=1,format=yuv420p[v2]");
+});

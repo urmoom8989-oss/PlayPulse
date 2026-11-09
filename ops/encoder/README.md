@@ -1,8 +1,9 @@
 # Set up the encoder box
 
 The encoder turns uploaded videos into something people can stream: HLS at
-360p, 720p and 1080p (only the sizes the upload can fill), three thumbnails, a
-hover preview sprite and auto-generated captions. It runs on its own server,
+360p, 720p and 1080p (only the sizes the upload can fill; below 720p at most
+30 fps, 720p and up at the upload's frame rate), three thumbnails, a hover
+preview sprite and auto-generated captions. It runs on its own server,
 separate from the website, because encoding keeps every CPU core busy.
 
 It takes about 15 minutes. You need:

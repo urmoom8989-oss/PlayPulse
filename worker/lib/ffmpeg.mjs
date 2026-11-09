@@ -37,7 +37,7 @@ export function renditionPlaylist(r) {
  * the tile inside this run, a long upload sat at 5% until the encode was done.
  * @param {{
  *   input: string,
- *   renditions: { name: string, width: number, height: number, videoKbps: number, audioKbps: number }[],
+ *   renditions: { name: string, width: number, height: number, videoKbps: number, audioKbps: number, fps?: number }[],
  *   hasAudio: boolean,
  *   sprite?: { interval: number, count: number, columns: number, rows: number, width: number, height: number } | null,
  *   spriteFrames?: string | null,
@@ -53,7 +53,9 @@ export function buildEncodeArgs({ input, renditions, hasAudio, sprite = null, sp
 
   const graph = [`[0:v]split=${outs.length}${outs.join("")}`];
   renditions.forEach((r, i) => {
-    graph.push(`[s${i}]scale=${r.width}:${r.height}:flags=bicubic,setsar=1,format=yuv420p[v${i}]`);
+    // A rung with `fps` (below 720p from a faster source) drops to that frame rate first.
+    const fps = r.fps ? `fps=${r.fps},` : "";
+    graph.push(`[s${i}]${fps}scale=${r.width}:${r.height}:flags=bicubic,setsar=1,format=yuv420p[v${i}]`);
   });
   if (sprite) {
     graph.push(
