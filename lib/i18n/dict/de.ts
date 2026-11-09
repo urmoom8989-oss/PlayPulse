@@ -116,6 +116,7 @@ const dict: Record<string, string> = {
   "Public videos appear here after they are uploaded and processed.": "Öffentliche Videos erscheinen hier, sobald sie hochgeladen und verarbeitet sind.",
   "Public videos show up here once they are processed.": "Öffentliche Videos erscheinen hier, sobald sie verarbeitet sind.",
   "Quality": "Qualität",
+  "HD is still processing. Check back later for higher quality.": "HD wird noch verarbeitet. Schau später wieder vorbei für eine höhere Qualität.",
   "Recent searches": "Letzte Suchanfragen",
   "Recommended": "Empfohlen",
   "Relevance": "Relevanz",

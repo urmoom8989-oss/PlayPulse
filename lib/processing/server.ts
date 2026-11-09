@@ -15,11 +15,10 @@ export async function statusContext(): Promise<StatusContext> {
     db: supabase
       ? {
           async video(id) {
-            const { data } = await supabase
-              .from("videos")
-              .select("id, owner_id, status, thumbnail_url, error")
-              .eq("id", id)
-              .maybeSingle();
+            const read = (columns: string) => supabase.from("videos").select(columns).eq("id", id).maybeSingle();
+            // hd_pending comes with 038; before it the same row without it.
+            let { data, error } = await read("id, owner_id, status, thumbnail_url, error, hd_pending");
+            if (error) ({ data } = await read("id, owner_id, status, thumbnail_url, error"));
             return (data as StatusVideoRow | null) ?? null;
           },
           async job(videoId) {
@@ -55,6 +54,24 @@ export async function jobsFor(supabase: SupabaseClient, videoIds: string[]): Pro
     if (job) out.set(row.video_id, job);
   }
   return out;
+}
+
+/**
+ * Which of these ready videos play at low quality while HD is still being
+ * made (038). Row level security only shows the person's own videos, or
+ * public ones. Empty before 038.
+ */
+export async function hdPendingIds(supabase: SupabaseClient, videoIds: string[]): Promise<Set<string>> {
+  if (videoIds.length === 0) return new Set();
+  const { data, error } = await supabase.from("videos").select("id").in("id", videoIds).eq("hd_pending", true);
+  if (error || !data) return new Set();
+  return new Set((data as { id: string }[]).map((r) => String(r.id)));
+}
+
+/** Whether HD is still being made for a video anyone with the link can watch (video_hd_pending in 038). */
+export async function videoHdPending(supabase: SupabaseClient, videoId: string): Promise<boolean> {
+  const { data, error } = await supabase.rpc("video_hd_pending", { video_id: videoId });
+  return !error && data === true;
 }
 
 /**

@@ -56,6 +56,9 @@ export const HIGH_FPS = 31;
 export const FULL_FPS_FROM = 720;
 export const LOW_RUNG_FPS = 30;
 
+/** Low quality first (038): renditions below this short side go in the first, quick run. */
+export const HD_FROM = 720;
+
 /** Thumbnails: where in the video (share of the duration) and how wide. The first is the default. */
 export const THUMBNAIL_AT = [0.1, 0.5, 0.9];
 export const THUMBNAIL_WIDTH = 1280;

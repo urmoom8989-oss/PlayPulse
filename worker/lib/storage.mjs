@@ -48,7 +48,10 @@ export function contentTypeFor(name) {
 
 /** Everything under hls/<video>/ is written once per encode. Playlists can change on a re-encode, segments cannot. */
 export function cacheControlFor(name) {
-  return /\.(m4s|mp4)$/.test(name) ? "public, max-age=31536000, immutable" : "public, max-age=300";
+  if (/\.(m4s|mp4)$/.test(name)) return "public, max-age=31536000, immutable";
+  // The master playlist changes when HD (038) and captions are added: a minute, not five.
+  if (/(^|\/)master\.m3u8$/.test(name)) return "public, max-age=60";
+  return "public, max-age=300";
 }
 
 /** The R2 folder for a video's encoded files. */

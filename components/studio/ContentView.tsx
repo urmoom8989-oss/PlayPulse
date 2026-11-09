@@ -486,6 +486,11 @@ export function ContentView({
                           </>
                         )}
                       </div>
+                      {!trash && v.status === "ready" && v.hdPending && (
+                        <p className="mt-1 text-[12px] leading-4 text-text-2" data-hd-pending={v.id}>
+                          HD is still processing. It plays in lower quality until then.
+                        </p>
+                      )}
                       {!trash && v.status === "failed" && (
                         <div className="mt-1 flex flex-wrap items-center gap-x-2" data-failed={v.id}>
                           <span className="text-[12px] leading-4 text-[var(--error)]">{failureText(v.failReason)}</span>

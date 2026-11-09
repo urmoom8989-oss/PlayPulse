@@ -2,12 +2,14 @@
 // then the auto-generated captions of the ready video.
 // Every outside effect comes in through `deps`, so the tests run this with a
 // fake database, fake R2 and a fake ffmpeg.
-import { mkdir, mkdtemp, rm, statfs, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, statfs, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { addCaptions } from "./captions.mjs";
 import {
+  HD_MASTER_PLAYLIST,
   MASTER_PLAYLIST,
   PROGRESS_STEPS,
+  SPLIT_STEPS,
   SPRITE_IMAGE,
   SPRITE_VTT,
   buildEncodeArgs,
@@ -15,11 +17,12 @@ import {
   buildThumbnailArgs,
   createProgressParser,
   encodePercent,
+  mergeMasters,
   renditionPlaylist,
   thumbnailName,
 } from "./ffmpeg.mjs";
 import { pickRenditions } from "./ladder.mjs";
-import { DISK_MARGIN_BYTES, DISK_SOURCE_FACTOR, JOB_TIMEOUT_MS, PROGRESS_EVERY_MS, THUMBNAIL_AT, jobTimeoutMs } from "./limits.mjs";
+import { DISK_MARGIN_BYTES, DISK_SOURCE_FACTOR, HD_FROM, JOB_TIMEOUT_MS, PROGRESS_EVERY_MS, THUMBNAIL_AT, jobTimeoutMs } from "./limits.mjs";
 import { human, limitText, seconds } from "./log.mjs";
 import { buildProbeArgs, parseProbe } from "./probe.mjs";
 import { run as realRun } from "./run.mjs";
@@ -113,7 +116,7 @@ export async function processJob(job, deps) {
 
   let dir = null;
   try {
-    log("claim", { ...ids, attempt: job.attempt, worker: config.workerName }, job.sourceKey);
+    log("claim", { ...ids, attempt: job.attempt, worker: config.workerName }, `${job.sourceKey}${job.hdOnly ? " (HD only, the low quality is out)" : ""}`);
 
     // 1. Trust nothing about the upload until R2 says the file is all there.
     if (!job.sourceKey || !(job.sourceBytes > 0)) throw new JobError("the video has no source file", { retry: false });
@@ -167,54 +170,107 @@ export async function processJob(job, deps) {
       `renditions ${renditions.map((r) => `${r.name}(${r.width}x${r.height})`).join(" ")}, time limit ${limitText(limit)}`,
     );
 
-    // 5. Encode: one ffmpeg run for the whole ladder and the sprite.
-    t = now();
-    await progress(PROGRESS_STEPS.encodeStart, true);
-    const pending = [];
-    const parse = createProgressParser((s) => pending.push(progress(encodePercent(s, probe.durationS))));
-    await run("ffmpeg", buildEncodeArgs({ input, renditions, hasAudio: probe.hasAudio, sprite, spriteFrames }), {
-      cwd: out,
-      signal,
-      onStdout: parse,
-    });
-    await Promise.all(pending);
-    log("encode", ids, `${renditions.length} renditions in ${seconds(now() - t)}`);
-    await progress(PROGRESS_STEPS.encodeEnd, true);
-
-    // 6. Thumbnails at 10%, 50% and 90%, the sprite tiled from its frames, and its WebVTT.
-    t = now();
-    await run("ffmpeg", buildSpriteArgs({ frames: spriteFrames, plan: sprite, output: join(out, SPRITE_IMAGE) }), { signal });
-    for (const [i, share] of THUMBNAIL_AT.entries()) {
-      const at = Math.min(probe.durationS * share, Math.max(0, probe.durationS - 0.1));
-      await run("ffmpeg", buildThumbnailArgs({ input, atSeconds: at, output: join(out, thumbnailName(i)) }), { signal });
-    }
-    await writeFile(join(out, SPRITE_VTT), buildVtt(sprite, probe.durationS, SPRITE_IMAGE));
-    log("thumbnails", ids, `${THUMBNAIL_AT.length} thumbnails and a ${sprite.count} frame sprite in ${seconds(now() - t)}`);
-    await progress(PROGRESS_STEPS.thumbnails, true);
-
-    // 7. Upload everything under hls/<video>/.
-    t = now();
+    // Low quality first (038): the renditions below 720p and the sprite in a
+    // quick first run, so the video plays within minutes; 720p and up in a
+    // second run, added to the master playlist when they are done. A source
+    // with nothing to split (all low, or all HD), or a database without 038,
+    // gets one run as before.
+    const low = renditions.filter((r) => Math.min(r.width, r.height) < HD_FROM);
+    const high = renditions.filter((r) => Math.min(r.width, r.height) >= HD_FROM);
+    const split = Boolean(job.sdFirst) && low.length > 0 && high.length > 0;
+    // A retry of the HD part only (the low renditions are out already). Should
+    // the ladder not split any more, everything is made again in one run.
+    const hdOnly = split && job.hdOnly === true;
+    const steps = split ? SPLIT_STEPS : PROGRESS_STEPS;
     const prefix = hlsPrefix(job.videoId);
-    const span = PROGRESS_STEPS.uploadEnd - PROGRESS_STEPS.thumbnails;
-    const sent = await storage.uploadDir(out, prefix, {
-      signal,
-      onFile: (n, total) => void progress(PROGRESS_STEPS.thumbnails + (span * n) / total),
-      onRound: (round, err, left) => log("upload", ids, `storage still busy (${err.message}), ${left} files left, trying again in a minute (round ${round + 1})`),
-    });
-    log("upload", ids, `${sent.files} files, ${human(sent.bytes)} in ${seconds(now() - t)}`);
-
-    // 8. Done.
-    const top = renditions[renditions.length - 1];
-    await db.done(job.jobId, {
+    const details = (list) => ({
       durationS: Math.round(probe.durationS * 1000) / 1000,
-      width: top.width,
-      height: top.height,
+      width: list[list.length - 1].width,
+      height: list[list.length - 1].height,
       hlsKey: `${prefix}/${MASTER_PLAYLIST}`,
       thumbnailUrl: config.mediaPublicUrl ? `${config.mediaPublicUrl}/${prefix}/${thumbnailName(0)}` : null,
       previewSpriteKey: `${prefix}/${SPRITE_VTT}`,
-      renditions: renditionsJson(renditions),
+      renditions: renditionsJson(list),
     });
-    log("done", ids, `ready in ${seconds(now() - started)}`);
+    const encode = async (list, from, to, extra = {}) => {
+      const pending = [];
+      const parse = createProgressParser((sec) => pending.push(progress(encodePercent(sec, probe.durationS, from, to))));
+      await run("ffmpeg", buildEncodeArgs({ input, renditions: list, hasAudio: probe.hasAudio, ...extra }), {
+        cwd: out,
+        signal,
+        onStdout: parse,
+      });
+      await Promise.all(pending);
+    };
+    const upload = (folder, keyPrefix, from, to) =>
+      storage.uploadDir(folder, keyPrefix, {
+        signal,
+        onFile: (n, total) => void progress(from + ((to - from) * n) / total),
+        onRound: (round, err, left) =>
+          log("upload", ids, `storage still busy (${err.message}), ${left} files left, trying again in a minute (round ${round + 1})`),
+      });
+
+    if (!hdOnly) {
+      // 5. Encode: one ffmpeg run for the low ladder (or the whole one) and the sprite.
+      const first = split ? low : renditions;
+      t = now();
+      await progress(steps.encodeStart, true);
+      await encode(first, steps.encodeStart, steps.encodeEnd, { sprite, spriteFrames });
+      log("encode", ids, `${first.length} renditions in ${seconds(now() - t)}${split ? " (low quality first)" : ""}`);
+      await progress(steps.encodeEnd, true);
+
+      // 6. Thumbnails at 10%, 50% and 90%, the sprite tiled from its frames, and its WebVTT.
+      t = now();
+      await run("ffmpeg", buildSpriteArgs({ frames: spriteFrames, plan: sprite, output: join(out, SPRITE_IMAGE) }), { signal });
+      for (const [i, share] of THUMBNAIL_AT.entries()) {
+        const at = Math.min(probe.durationS * share, Math.max(0, probe.durationS - 0.1));
+        await run("ffmpeg", buildThumbnailArgs({ input, atSeconds: at, output: join(out, thumbnailName(i)) }), { signal });
+      }
+      await writeFile(join(out, SPRITE_VTT), buildVtt(sprite, probe.durationS, SPRITE_IMAGE));
+      log("thumbnails", ids, `${THUMBNAIL_AT.length} thumbnails and a ${sprite.count} frame sprite in ${seconds(now() - t)}`);
+      await progress(steps.thumbnails, true);
+
+      // 7. Upload everything under hls/<video>/.
+      t = now();
+      const sent = await upload(out, prefix, steps.thumbnails, steps.uploadEnd);
+      log("upload", ids, `${sent.files} files, ${human(sent.bytes)} in ${seconds(now() - t)}`);
+
+      // 8. The video plays: at low quality while HD is made, or done.
+      if (split) {
+        await db.sdReady(job.jobId, details(low));
+        log("sd", ids, `${low.map((r) => r.name).join(", ")} playable in ${seconds(now() - started)}, HD next`);
+      } else {
+        await db.done(job.jobId, details(renditions));
+        log("done", ids, `ready in ${seconds(now() - started)}`);
+      }
+    }
+
+    if (split) {
+      // 8b. HD: the renditions from 720p up, their own master playlist (not uploaded).
+      t = now();
+      await progress(steps.hdStart, true);
+      await encode(high, steps.hdStart, steps.hdEnd, { masterName: HD_MASTER_PLAYLIST });
+      log("encode", ids, `${high.length} HD renditions in ${seconds(now() - t)}`);
+      t = now();
+      let files = 0;
+      let bytes = 0;
+      const span = (steps.hdUploadEnd - steps.hdEnd) / high.length;
+      for (const [i, r] of high.entries()) {
+        const sent = await upload(join(out, r.name), `${prefix}/${r.name}`, steps.hdEnd + span * i, steps.hdEnd + span * (i + 1));
+        files += sent.files;
+        bytes += sent.bytes;
+      }
+      // The master last, so it never names a file that is not there yet.
+      const lowMaster = hdOnly
+        ? await storage.getText(`${prefix}/${MASTER_PLAYLIST}`)
+        : await readFile(join(out, MASTER_PLAYLIST), "utf8");
+      if (!lowMaster) throw new JobError("the low quality master playlist is gone from storage", { retry: false });
+      await writeFile(join(out, MASTER_PLAYLIST), mergeMasters(lowMaster, await readFile(join(out, HD_MASTER_PLAYLIST), "utf8")));
+      await storage.upload(`${prefix}/${MASTER_PLAYLIST}`, join(out, MASTER_PLAYLIST), signal);
+      log("upload", ids, `${files} HD files, ${human(bytes)} in ${seconds(now() - t)}`);
+      await db.done(job.jobId, details(renditions));
+      log("done", ids, `HD ready in ${seconds(now() - started)}`);
+    }
 
     // 9. Auto-generated captions, now that the video is ready, so nobody waits
     // for them. They have their own time limit and never fail the job.

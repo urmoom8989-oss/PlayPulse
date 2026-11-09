@@ -3,7 +3,7 @@ import { cache } from "react";
 import { connection } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { flagOn } from "@/lib/flags";
-import { failedJobsFor, jobsFor } from "@/lib/processing/server";
+import { failedJobsFor, jobsFor, videoHdPending } from "@/lib/processing/server";
 import { canRetry } from "@/lib/processing/retry";
 import { progressFor, type LiveStatus } from "@/lib/processing/status";
 import { readSupabaseConfig } from "@/lib/supabase/env";
@@ -205,13 +205,14 @@ export const watchPageState = cache(async function watchPageState(v: string | nu
   // Before a Premiere or live broadcast starts, viewers get the page without the files.
   if (!video.src && video.broadcast?.state !== "upcoming") return { kind: "missing" };
 
-  const [upNext, engagement, comments, broadcast] = await Promise.all([
+  const [upNext, engagement, comments, broadcast, hdPending] = await Promise.all([
     upNextFor(supabase, row, publicBase, user?.id ?? null),
     engagementFor(row.id),
     commentsFor(row.id),
     video.broadcast ? broadcastFor(supabase, row.id, video.broadcast) : null,
+    video.broadcast ? false : videoHdPending(supabase, row.id),
   ]);
-  return { kind: "ready", video: { ...video, broadcast }, upNext, preview: false, engagement, comments };
+  return { kind: "ready", video: { ...video, broadcast, hdPending }, upNext, preview: false, engagement, comments };
 });
 
 /** The broadcast with the viewer's reminder and how many are watching (watch_broadcast()). */

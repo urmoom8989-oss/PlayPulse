@@ -21,6 +21,11 @@ export type LiveStatus = {
   job: JobInfo | null;
   thumbnailUrl: string | null;
   error: string | null;
+  /**
+   * Low quality first (038): ready and playing at low quality while 720p and
+   * up are still being made. Left out when there is nothing to wait for.
+   */
+  hdPending?: boolean;
 };
 
 /** The default thumbnail the encoder writes. Keep in step with worker/lib/ffmpeg.mjs. */
@@ -46,9 +51,17 @@ export function isActive(status: LiveStatus["status"]): boolean {
   return status === "uploaded" || status === "processing";
 }
 
-/** The percent to show, or null when there is nothing to show. */
-export function progressFor(status: LiveStatus["status"], job: JobInfo | null): number | null {
-  if (status === "ready") return 100;
+/** Worth asking again: on its way to ready, or ready at low quality while HD is made (038). */
+export function isWaiting(s: Pick<LiveStatus, "status" | "hdPending">): boolean {
+  return isActive(s.status) || (s.status === "ready" && s.hdPending === true);
+}
+
+/**
+ * The percent to show, or null when there is nothing to show. A video that
+ * plays at low quality while HD is made shows the job's percent, not 100.
+ */
+export function progressFor(status: LiveStatus["status"], job: JobInfo | null, hdPending = false): number | null {
+  if (status === "ready") return hdPending && job ? (job.status === "running" ? job.progress : 0) : 100;
   if (!isActive(status) || !job) return null;
   return job.status === "running" ? job.progress : 0;
 }
@@ -56,8 +69,13 @@ export function progressFor(status: LiveStatus["status"], job: JobInfo | null): 
 /**
  * The short line under the status badge in the studio, or null.
  *   "Processing, 42%"  "Waiting to process"  "Trying again (attempt 2 of 3)"
+ *   "HD processing, 64%" (ready at low quality, 038)
  */
-export function processingLine(s: Pick<LiveStatus, "status" | "job" | "progress">): string | null {
+export function processingLine(s: Pick<LiveStatus, "status" | "job" | "progress" | "hdPending">): string | null {
+  // Low quality first (038): it plays already, HD comes later.
+  if (s.status === "ready" && s.hdPending) {
+    return s.job?.status === "running" ? `HD processing, ${s.progress ?? s.job.progress}%` : "HD processing";
+  }
   if (!isActive(s.status) || !s.job) return null;
   if (s.job.status === "running") return `Processing, ${s.progress ?? s.job.progress}%`;
   if (s.job.status === "queued" && s.job.attempts > 0) return `Trying again (attempt ${s.job.attempts + 1} of 3)`;

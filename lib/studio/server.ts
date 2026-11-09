@@ -4,7 +4,7 @@ import { getCurrentUser, type CurrentUser } from "@/lib/auth";
 import { flagOn } from "@/lib/flags";
 import { readSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
-import { failedJobsFor } from "@/lib/processing/server";
+import { failedJobsFor, hdPendingIds } from "@/lib/processing/server";
 import { canRetry } from "@/lib/processing/retry";
 import { readPublicBase } from "@/lib/watch/media";
 import { previewOverview, previewRows } from "./preview";
@@ -115,7 +115,13 @@ export async function studioContent(trash: boolean): Promise<ContentState> {
   const rows = (Array.isArray(data) ? data : []) as Record<string, unknown>[];
   const link = await withLinks(rows);
   const studioRows = rows.map((r) => rowToStudio(r, link));
-  return { kind: "ready", rows: trash ? studioRows : await withRetry(gate, studioRows), now: Date.now() };
+  return { kind: "ready", rows: trash ? studioRows : await withHd(gate, await withRetry(gate, studioRows)), now: Date.now() };
+}
+
+/** Low quality first (038): ready videos whose HD is still being made say so. */
+async function withHd(gate: { supabase: Db }, rows: StudioRow[]): Promise<StudioRow[]> {
+  const hd = await hdPendingIds(gate.supabase, rows.filter((r) => r.status === "ready").map((r) => r.id));
+  return hd.size === 0 ? rows : rows.map((r) => (hd.has(r.id) ? { ...r, hdPending: true } : r));
 }
 
 /** Failed videos get the encoder's last error and, with the retry_failed flag, the Retry button. */

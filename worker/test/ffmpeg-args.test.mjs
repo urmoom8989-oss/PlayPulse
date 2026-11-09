@@ -7,6 +7,7 @@ import {
   buildThumbnailArgs,
   createProgressParser,
   encodePercent,
+  mergeMasters,
 } from "../lib/ffmpeg.mjs";
 import { pickRenditions } from "../lib/ladder.mjs";
 import { buildProbeArgs, parseProbe } from "../lib/probe.mjs";
@@ -126,6 +127,77 @@ test("encode percent stays inside the encode share of the bar", () => {
   assert.equal(encodePercent(100, 100), 90);
   assert.equal(encodePercent(500, 100), 90);
   assert.equal(encodePercent(10, 0), 5);
+});
+
+test("encode percent can be given its own share (low quality first, then HD)", () => {
+  assert.equal(encodePercent(0, 100, 5, 25), 5);
+  assert.equal(encodePercent(50, 100, 5, 25), 15);
+  assert.equal(encodePercent(100, 100, 30, 92), 92);
+});
+
+test("the HD run writes its own master playlist", () => {
+  const source = { width: 1920, height: 1080, fps: 30 };
+  const high = pickRenditions(source).filter((r) => r.height >= 720);
+  const args = buildEncodeArgs({ input: "in.mp4", renditions: high, hasAudio: true, masterName: "hd-master.m3u8" });
+  assert.equal(args[args.indexOf("-master_pl_name") + 1], "hd-master.m3u8");
+  assert.equal(args[args.indexOf("-var_stream_map") + 1], "v:0,a:0,name:720p v:1,a:1,name:1080p");
+  const plain = buildEncodeArgs({ input: "in.mp4", renditions: high, hasAudio: true });
+  assert.equal(plain[plain.indexOf("-master_pl_name") + 1], "master.m3u8");
+});
+
+const SD_MASTER = [
+  "#EXTM3U",
+  "#EXT-X-VERSION:7",
+  '#EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=640x360,CODECS="avc1.64001e,mp4a.40.2"',
+  "360p/index.m3u8",
+  "",
+].join("\n");
+const HD_MASTER = [
+  "#EXTM3U",
+  "#EXT-X-VERSION:7",
+  '#EXT-X-STREAM-INF:BANDWIDTH=3100000,RESOLUTION=1280x720,CODECS="avc1.64001f,mp4a.40.2"',
+  "720p/index.m3u8",
+  "",
+  '#EXT-X-STREAM-INF:BANDWIDTH=5500000,RESOLUTION=1920x1080,CODECS="avc1.640028,mp4a.40.2"',
+  "1080p/index.m3u8",
+  "",
+].join("\n");
+
+test("the HD variants are added to the low quality master, smallest first", () => {
+  const merged = mergeMasters(SD_MASTER, HD_MASTER);
+  assert.equal(
+    merged,
+    [
+      "#EXTM3U",
+      "#EXT-X-VERSION:7",
+      '#EXT-X-STREAM-INF:BANDWIDTH=1000000,RESOLUTION=640x360,CODECS="avc1.64001e,mp4a.40.2"',
+      "360p/index.m3u8",
+      '#EXT-X-STREAM-INF:BANDWIDTH=3100000,RESOLUTION=1280x720,CODECS="avc1.64001f,mp4a.40.2"',
+      "720p/index.m3u8",
+      '#EXT-X-STREAM-INF:BANDWIDTH=5500000,RESOLUTION=1920x1080,CODECS="avc1.640028,mp4a.40.2"',
+      "1080p/index.m3u8",
+      "",
+    ].join("\n"),
+  );
+  // Merging again (a retry) adds nothing twice.
+  assert.equal(mergeMasters(merged, HD_MASTER), merged);
+});
+
+test("captions on the low quality master carry over to the HD variants", () => {
+  const withSubs = SD_MASTER.replace(
+    "#EXT-X-STREAM-INF:BANDWIDTH=1000000",
+    '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English",LANGUAGE="en",URI="captions/en.m3u8"\n#EXT-X-STREAM-INF:BANDWIDTH=1000000',
+  ).replace('mp4a.40.2"\n360p', 'mp4a.40.2",SUBTITLES="subs"\n360p');
+  const merged = mergeMasters(withSubs, HD_MASTER).split("\n");
+  const infs = merged.filter((l) => l.startsWith("#EXT-X-STREAM-INF:"));
+  assert.equal(infs.length, 3);
+  assert.ok(infs.every((l) => l.endsWith('SUBTITLES="subs"')), infs.join("\n"));
+  assert.equal(merged.filter((l) => l.startsWith("#EXT-X-MEDIA:")).length, 1);
+});
+
+test("a master that is not a playlist, or an HD one without variants, is refused", () => {
+  assert.throws(() => mergeMasters("<html>", HD_MASTER), /not a playlist/);
+  assert.throws(() => mergeMasters(SD_MASTER, "#EXTM3U\n"), /no variants/);
 });
 
 test("ffprobe args and parsing", () => {

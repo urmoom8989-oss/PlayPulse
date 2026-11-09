@@ -33,6 +33,8 @@ export type WatchVideo = {
   channel: WatchChannel;
   /** A Premiere or live broadcast (028), or null for a plain upload. */
   broadcast?: Broadcast | null;
+  /** Low quality first (038): it plays, and 720p and up are still being made. */
+  hdPending?: boolean;
 };
 
 export type UpNextVideo = {

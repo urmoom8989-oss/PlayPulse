@@ -4,7 +4,7 @@ import { getCurrentUser, type CurrentUser } from "@/lib/auth";
 import { flagOn } from "@/lib/flags";
 import { signedThumbnailUrl } from "@/lib/processing/media";
 import { previewVideos } from "@/lib/processing/preview";
-import { jobsFor } from "@/lib/processing/server";
+import { hdPendingIds, jobsFor } from "@/lib/processing/server";
 import { progressFor, type JobInfo } from "@/lib/processing/status";
 import { readSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -51,6 +51,8 @@ export type StudioVideo = {
   job: JobInfo | null;
   /** 0 to 100 on the way to ready, 100 when ready, null when unknown. */
   progress: number | null;
+  /** Ready at low quality while HD is still being made (038). */
+  hdPending?: boolean;
 };
 
 const VIDEO_COLUMNS = "id, owner_id, title, description, visibility, category, status, source_bytes, thumbnail_url, error, created_at";
@@ -95,18 +97,23 @@ async function withProcessing(
   videos: StudioVideo[],
   processingOn: boolean,
 ): Promise<StudioVideo[]> {
+  // Low quality first (038): ready videos whose HD is still being made keep their job.
+  const hd = processingOn
+    ? await hdPendingIds(supabase, videos.filter((v) => v.status === "ready").map((v) => v.id))
+    : new Set<string>();
   const jobs = processingOn
     ? await jobsFor(
         supabase,
-        videos.filter((v) => v.status === "uploaded" || v.status === "processing").map((v) => v.id),
+        videos.filter((v) => v.status === "uploaded" || v.status === "processing" || hd.has(v.id)).map((v) => v.id),
       )
     : new Map<string, JobInfo>();
   return Promise.all(
     videos.map(async (v) => {
       const job = jobs.get(v.id) ?? null;
+      const hdPending = hd.has(v.id);
       const thumbnailUrl =
         v.status === "ready" ? (v.thumbnailUrl ?? (await signedThumbnailUrl(v.id))) : v.thumbnailUrl;
-      return { ...v, job, progress: progressFor(v.status, job), thumbnailUrl };
+      return { ...v, job, progress: progressFor(v.status, job, hdPending), thumbnailUrl, ...(hdPending ? { hdPending } : {}) };
     }),
   );
 }

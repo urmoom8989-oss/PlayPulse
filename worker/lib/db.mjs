@@ -30,6 +30,10 @@ export function createDb(supabase) {
         sourceBytes: row.source_bytes === null ? null : Number(row.source_bytes),
         sourceMime: row.source_mime,
         attempt: Number(row.attempt),
+        // 038: the low renditions are out already, only HD is left to make.
+        hdOnly: row.hd_only === true,
+        // 038 is in the database: low quality first is possible.
+        sdFirst: Object.prototype.hasOwnProperty.call(row, "hd_only"),
       };
     },
 
@@ -57,6 +61,21 @@ export function createDb(supabase) {
       const { data, error } = await supabase.rpc("encode_progress", { job_id: jobId, pct });
       if (error) throw rpcError("encode_progress", error);
       return data !== false;
+    },
+
+    /** 038: the low renditions are up, the video plays; the job goes on with HD. */
+    async sdReady(jobId, r) {
+      const { error } = await supabase.rpc("encode_sd_ready", {
+        job_id: jobId,
+        duration_s: r.durationS,
+        width: r.width,
+        height: r.height,
+        hls_key: r.hlsKey,
+        thumbnail_url: r.thumbnailUrl,
+        preview_sprite_key: r.previewSpriteKey,
+        renditions: r.renditions,
+      });
+      if (error) throw rpcError("encode_sd_ready", error);
     },
 
     async done(jobId, r) {
