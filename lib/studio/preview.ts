@@ -44,6 +44,20 @@ export function previewRows(trash: boolean, now = Date.now()): StudioRow[] {
     row(3, "Sourdough starter, day one", { visibility: "unlisted", views: 311, likes: 18, comments: 4 }, now),
     row(4, "Kitchen tour (draft)", { visibility: "private", publishedAt: null, views: 0 }, now),
     row(5, "Three sauces for any pasta", { views: 15022, likes: 640, comments: 71 }, now),
+    row(
+      6,
+      "Full bake-along stream (3 hours)",
+      {
+        status: "failed",
+        visibility: "private",
+        publishedAt: null,
+        thumbnail: null,
+        durationS: null,
+        failReason: "Please reduce your request rate.",
+        canRetry: true,
+      },
+      now,
+    ),
   ];
 }
 

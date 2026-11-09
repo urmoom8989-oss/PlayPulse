@@ -3,7 +3,8 @@ import { cache } from "react";
 import { connection } from "next/server";
 import { getCurrentUser } from "@/lib/auth";
 import { flagOn } from "@/lib/flags";
-import { jobsFor } from "@/lib/processing/server";
+import { failedJobsFor, jobsFor } from "@/lib/processing/server";
+import { canRetry } from "@/lib/processing/retry";
 import { progressFor, type LiveStatus } from "@/lib/processing/status";
 import { readSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
@@ -137,7 +138,14 @@ export type WatchPageState =
   /** Public or unlisted, but not ready yet. */
   | { kind: "processing"; title: string }
   /** The owner, before the video is ready: progress when the processing flag is on. */
-  | { kind: "owner-processing"; video: WatchVideo; live: LiveStatus; processingOn: boolean }
+  | {
+      kind: "owner-processing";
+      video: WatchVideo;
+      live: LiveStatus;
+      processingOn: boolean;
+      /** A failed video: the encoder's last error, and whether Retry can work (033, the retry_failed flag). */
+      failed?: { reason: string | null; canRetry: boolean };
+    }
   /**
    * engagement: likes and the saved position with the engagement flag on (feature 9), else null.
    * comments: the first page with the comments flag on (feature 10), "no-db" in the preview, else null.
@@ -186,6 +194,12 @@ export const watchPageState = cache(async function watchPageState(v: string | nu
       thumbnailUrl: null,
       error: null,
     };
+    if (row.status === "failed") {
+      const [failedJobs, retryOn] = await Promise.all([failedJobsFor(supabase, [row.id]), flagOn("retry_failed", user?.id ?? null)]);
+      const failedJob = failedJobs.get(row.id) ?? null;
+      const failed = { reason: failedJob?.error ?? null, canRetry: retryOn && canRetry(row.status, failedJob) };
+      return { kind: "owner-processing", video, live, processingOn, failed };
+    }
     return { kind: "owner-processing", video, live, processingOn };
   }
   // Before a Premiere or live broadcast starts, viewers get the page without the files.

@@ -287,6 +287,24 @@ To set it up:
 2. Set up the encoder box: [`ops/encoder/README.md`](../ops/encoder/README.md).
 3. Switch the `processing` flag to `test` or `everyone`.
 
+### Retry failed videos
+
+When processing fails for good (3 attempts), the owner gets a **Retry** button:
+under the title in the studio's content list, next to the reason in plain
+words ("Storage was too busy while saving the processed video."), and on the
+video's own `/watch` page. Retry processes the file that was already uploaded,
+with 3 fresh attempts, so nothing has to be uploaded again.
+
+- Migration `033_retry_failed.sql`: `retry_encode(video_id)` (the owner's own
+  failed video, not in the trash, whose upload finished; at most 3 retries a day
+  per video, counted in `encode_jobs.manual_retries`) and the `retry_failed`
+  flag (off).
+- An upload that never finished has nothing to process, so it gets no button:
+  upload the file again.
+- The route is `POST /api/videos/<id>/retry` with a JSON body (`{}`).
+- With `npm run dev` and no Supabase key, the content list shows a failed sample
+  video with the button.
+
 Worker tests (ladder, ffmpeg arguments, sprite timing, the loop with Supabase
 and object storage mocked, and a real 3 second encode when ffmpeg is installed):
 

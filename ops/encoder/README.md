@@ -277,8 +277,10 @@ deleting. Nothing to set up beyond migration 014.
   starts again. A job stuck as `running` for more than 2 h 15 min is taken back
   by the next worker that asks, so with uploads longer than about an hour run
   one encoder, or a second one could take over a long encode that is still going.
-- To try a failed video again, set its `status` back to `uploaded` in the
-  `videos` table. A fresh job is queued.
+- To try a failed video again, the owner presses **Retry** on it in the studio
+  or on its watch page (migration 033, the `retry_failed` flag, 3 times a day).
+  Without the flag, set its `status` back to `uploaded` in the `videos` table.
+  Either way a fresh job is queued with the file already uploaded.
 - To stop the encoder: `systemctl stop sloptube-encoder`. A running job goes back
   in the queue.
 

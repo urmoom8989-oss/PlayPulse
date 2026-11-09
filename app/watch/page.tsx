@@ -3,6 +3,7 @@ import { Suspense, type ReactNode } from "react";
 import { ChannelMessage } from "@/components/channel/ChannelNotices";
 import { CommentsSection, CommentsUnavailable } from "@/components/comments/CommentsSection";
 import { ErrorIcon } from "@/components/icons";
+import { RetryButton } from "@/components/processing/RetryButton";
 import { WatchProcessing } from "@/components/processing/WatchProcessing";
 import { Countdown } from "@/components/live/Countdown";
 import { LiveChat } from "@/components/live/LiveChat";
@@ -15,6 +16,7 @@ import { WatchStub } from "@/components/watch/WatchStub";
 import { jsonLdText, videoJsonLd } from "@/lib/seo/meta";
 import { siteOrigin } from "@/lib/seo/origin";
 import { seoVideo, watchPageMetadata } from "@/lib/seo/pages";
+import { failureText } from "@/lib/processing/retry";
 import { parseStart } from "@/lib/watch/format";
 import { watchPageState } from "@/lib/watch/server";
 import type { WatchVideo } from "@/lib/watch/types";
@@ -32,7 +34,7 @@ async function VideoJsonLd({ video }: { video: WatchVideo }) {
 }
 
 /** The black 16:9 area with a message in it, where the player would be. */
-function PlayerMessage({ title, children, spinner = false }: { title: string; children?: ReactNode; spinner?: boolean }) {
+function PlayerMessage({ title, children, spinner = false, action }: { title: string; children?: ReactNode; spinner?: boolean; action?: ReactNode }) {
   return (
     <div className="grid h-full w-full place-items-center bg-black p-6 text-center">
       <div>
@@ -43,6 +45,7 @@ function PlayerMessage({ title, children, spinner = false }: { title: string; ch
         )}
         <p className="text-[18px] text-white">{title}</p>
         {children && <p className="mt-1 text-[13px] text-[#aaaaaa]">{children}</p>}
+        {action && <div className="mt-4 text-[#aaaaaa]">{action}</div>}
       </div>
     </div>
   );
@@ -112,8 +115,22 @@ async function Watch({ searchParams }: { searchParams: PageProps<"/watch">["sear
     case "owner-processing": {
       const { video, live, processingOn } = state;
       const failed = live.status === "failed";
-      const box = failed ? (
-        <PlayerMessage title="This upload failed">Only you see this. Upload the file again from /upload.</PlayerMessage>
+      const box = failed && state.failed?.canRetry ? (
+        <PlayerMessage
+          title="Processing failed"
+          action={
+            <RetryButton
+              videoId={video.id}
+              className="btn-blue mx-auto mb-2 gap-2 uppercase"
+            />
+          }
+        >
+          {failureText(state.failed.reason)} Only you see this. Retry processes the file you already uploaded.
+        </PlayerMessage>
+      ) : failed ? (
+        <PlayerMessage title="This upload failed">
+          {state.failed?.reason ? `${failureText(state.failed.reason)} ` : ""}Only you see this. Upload the file again from /upload.
+        </PlayerMessage>
       ) : processingOn ? (
         <div className="grid h-full w-full place-items-center bg-black text-center">
           <WatchProcessing video={live} />

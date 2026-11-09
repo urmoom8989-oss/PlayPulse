@@ -4,6 +4,8 @@ import { getCurrentUser, type CurrentUser } from "@/lib/auth";
 import { flagOn } from "@/lib/flags";
 import { readSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { failedJobsFor } from "@/lib/processing/server";
+import { canRetry } from "@/lib/processing/retry";
 import { readPublicBase } from "@/lib/watch/media";
 import { previewOverview, previewRows } from "./preview";
 import { deleteObject, headObject, signedGet, signedPut, storageConfigured } from "./storage";
@@ -112,7 +114,20 @@ export async function studioContent(trash: boolean): Promise<ContentState> {
   if (error) return codeOf(error) === "not_set_up" ? { kind: "not-set-up" } : { kind: "off" };
   const rows = (Array.isArray(data) ? data : []) as Record<string, unknown>[];
   const link = await withLinks(rows);
-  return { kind: "ready", rows: rows.map((r) => rowToStudio(r, link)), now: Date.now() };
+  const studioRows = rows.map((r) => rowToStudio(r, link));
+  return { kind: "ready", rows: trash ? studioRows : await withRetry(gate, studioRows), now: Date.now() };
+}
+
+/** Failed videos get the encoder's last error and, with the retry_failed flag, the Retry button. */
+async function withRetry(gate: { user: CurrentUser; supabase: Db }, rows: StudioRow[]): Promise<StudioRow[]> {
+  const failed = rows.filter((r) => r.status === "failed").map((r) => r.id);
+  if (failed.length === 0) return rows;
+  const [jobs, retryOn] = await Promise.all([failedJobsFor(gate.supabase, failed), flagOn("retry_failed", gate.user.id)]);
+  return rows.map((r) => {
+    if (r.status !== "failed") return r;
+    const job = jobs.get(r.id) ?? null;
+    return { ...r, failReason: job?.error ?? null, canRetry: retryOn && canRetry(r.status, job) };
+  });
 }
 
 export type Still = { name: string; url: string };

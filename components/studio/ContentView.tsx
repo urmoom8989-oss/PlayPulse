@@ -6,6 +6,7 @@ import { useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from
 import { bulkDoneText, bulkReducer, initBulk, selectedLabel, selectionOf, type BulkAction } from "@/lib/studio/bulk";
 import { studioErrorMessage, trashExpiry, trashLabel } from "@/lib/studio/rules";
 import { applyQuery, queryParams, readQuery, rowDate, toggleSort, type SortKey, type TableQuery } from "@/lib/studio/table";
+import { failureText } from "@/lib/processing/retry";
 import type { StudioRow, Visibility } from "@/lib/studio/types";
 import { formatDate, formatTime } from "@/lib/watch/format";
 import {
@@ -25,6 +26,7 @@ import {
 } from "../icons";
 import { Menu, MenuItem } from "../Menu";
 import { RemovedNotice } from "../moderation/RemovedNotice";
+import { RetryButton } from "../processing/RetryButton";
 
 const VIS: Record<Visibility, { label: string; Icon: typeof EyeIcon }> = {
   public: { label: "Public", Icon: EyeIcon },
@@ -484,6 +486,19 @@ export function ContentView({
                           </>
                         )}
                       </div>
+                      {!trash && v.status === "failed" && (
+                        <div className="mt-1 flex flex-wrap items-center gap-x-2" data-failed={v.id}>
+                          <span className="text-[12px] leading-4 text-[var(--error)]">{failureText(v.failReason)}</span>
+                          {v.canRetry && (
+                            <RetryButton
+                              videoId={v.id}
+                              preview={preview}
+                              onResult={(message) => setToast(message)}
+                              className="-ml-2 flex h-8 items-center gap-1.5 rounded-[2px] px-2 text-[13px] font-medium uppercase text-[var(--studio-accent)] hover:bg-hover disabled:opacity-40"
+                            />
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                   {/* Phones: one line of numbers under the title. */}
