@@ -329,10 +329,6 @@ in the browser:
   is paused, like the 2020 player. While it plays they do nothing.
 - `Home` and `End` jump to the start and the end.
 - `/` puts the cursor in the search box, on any page.
-- **Shift+?** opens the **Keyboard shortcuts** dialog on any page, with every
-  key in three groups (Playback, General, Subtitles and closed captions).
-  Keyboard shortcuts in the account menu (and in the three dot menu when signed
-  out) opens it too. Escape, Dismiss or a click outside closes it.
 
 None of the keys work while typing in a field or with Ctrl, Alt or Cmd held.
 

@@ -1,10 +1,10 @@
-// More keyboard shortcuts (< > , . Home End, Shift+? and /) and hover previews.
+// More keyboard shortcuts (< > , . Home End and /) and hover previews.
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { hoverStart, hoverVideoAllowed } from "../lib/feed/preview.ts";
 import { FRAME_S, keyAction, stepSpeed } from "../lib/watch/keys.ts";
 import { SPEEDS } from "../lib/watch/quality.ts";
-import { isSearchKey, isShortcutsKey, SHORTCUT_GROUPS } from "../lib/watch/shortcuts.ts";
+import { isSearchKey } from "../lib/watch/shortcuts.ts";
 
 test("the new keys only work with the more_shortcuts flag", () => {
   for (const key of ["<", ">", ",", ".", "Home", "End"]) assert.equal(keyAction({ key }), null, key);
@@ -34,23 +34,11 @@ test("stepSpeed walks the gear menu's speeds and stops at the ends", () => {
   assert.ok(Math.abs(FRAME_S - 1 / 30) < 1e-12);
 });
 
-test("Shift+? and / outside text fields", () => {
-  assert.equal(isShortcutsKey({ key: "?" }, false), true);
-  assert.equal(isShortcutsKey({ key: "?" }, true), false);
-  assert.equal(isShortcutsKey({ key: "?", ctrlKey: true }, false), false);
-  assert.equal(isShortcutsKey({ key: "/" }, false), false);
+test("/ outside text fields", () => {
   assert.equal(isSearchKey({ key: "/" }, false), true);
   assert.equal(isSearchKey({ key: "/" }, true), false);
   assert.equal(isSearchKey({ key: "/", metaKey: true }, false), false);
-});
-
-test("the shortcuts dialog lists every key the player knows", () => {
-  const keys = SHORTCUT_GROUPS.flatMap((g) => g.items.flatMap((i) => i.keys));
-  for (const k of ["k", "j", "l", ",", ".", "<", ">", "Home", "End", "f", "t", "i", "m", "c", "+", "-", "/", "?"]) {
-    assert.ok(keys.includes(k), k);
-  }
-  const labels = SHORTCUT_GROUPS.flatMap((g) => g.items.map((i) => i.label));
-  assert.equal(new Set(labels).size, labels.length, "labels are unique (they are React keys)");
+  assert.equal(isSearchKey({ key: "?" }, false), false);
 });
 
 test("hover video: where it starts and who gets it", () => {

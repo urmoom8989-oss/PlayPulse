@@ -3,9 +3,8 @@
 -- owner switches them on):
 --
 -- - more_shortcuts: the rest of the 2020 player keys (< and > for speed, , and
---   . to step one frame while paused, Home and End), "/" to jump to the search
---   box, and the Keyboard shortcuts dialog (Shift+?, or Keyboard shortcuts in
---   the account and settings menus).
+--   . to step one frame while paused, Home and End) and "/" to jump to the
+--   search box. No shortcuts dialog.
 -- - hover_previews: resting the pointer on a thumbnail plays the video, muted,
 --   in the thumbnail (after the sprite frames), at the lowest quality that fits
 --   the card. Not on touch screens, nor with reduced motion or data saver on.
@@ -17,7 +16,7 @@ values
   (
     'more_shortcuts',
     'More keyboard shortcuts',
-    'The rest of the 2020 player keys (< and > change the speed, , and . step one frame while paused, Home and End), / jumps to the search box, and Shift+? shows the Keyboard shortcuts dialog (also in the account and settings menus).',
+    'The rest of the 2020 player keys (< and > change the speed, , and . step one frame while paused, Home and End), and / jumps to the search box.',
     'off'
   ),
   (
