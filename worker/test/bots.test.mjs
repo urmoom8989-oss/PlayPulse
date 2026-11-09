@@ -1,7 +1,19 @@
 // The channel bots: what they say, and the rounds against a fake database.
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { GROW_BY, POOL_MAX, ROUND_CAP, around, broadcastState, liveRound, orderDue, orderRound, orderShare } from "../lib/bots.mjs";
+import {
+  COMMENTS_GIVE_UP_AFTER_MS,
+  GROW_BY,
+  POOL_MAX,
+  ROUND_CAP,
+  around,
+  broadcastState,
+  createCueCache,
+  liveRound,
+  orderDue,
+  orderRound,
+  orderShare,
+} from "../lib/bots.mjs";
 import { chaptersOf, keywords, makeChatLine, makeComment, parseVtt, quoteOf, stamp } from "../lib/bottext.mjs";
 
 /** A repeatable random source. */
@@ -205,15 +217,67 @@ test("stopped and skipped: a video that went private, comments that are off, a P
   assert.equal(premiere.state.deliveredNow[0].likes, 5);
 });
 
-test("nothing new to say: comments wait for the next round, and are dropped at the end of the window", async () => {
+test("nothing new to say: comments wait, even for an all at once order, and are dropped 6 hours after the window", async () => {
   const now = Date.UTC(2026, 10, 9, 12);
   const spread = order(now, { comments: 4, starts_at: at(now - 3600_000), ends_at: at(now + 3600_000) });
   const db = fakeDb({ orders: [spread], commentsAnswer: "duplicate" });
   await orderRound({ db, cuesFor: async () => [], log: () => {}, now: () => now });
   assert.equal(db.state.delivered.length, 0);
+  // All at once: not counted as written while there is still time to write them.
+  const atOnce = fakeDb({ orders: [order(now, { comments: 400 })], commentsAnswer: "duplicate" });
+  await orderRound({ db: atOnce, cuesFor: async () => [], log: () => {}, now: () => now });
+  assert.equal(atOnce.state.delivered.length, 0);
+  const later = now + COMMENTS_GIVE_UP_AFTER_MS;
   const end = fakeDb({ orders: [order(now, { comments: 400 })], commentsAnswer: "duplicate" });
-  await orderRound({ db: end, cuesFor: async () => [], log: () => {}, now: () => now });
+  await orderRound({ db: end, cuesFor: async () => [], log: () => {}, now: () => later });
   assert.equal(end.state.delivered[0].comments, 400);
+});
+
+test("an order of 130 comments on a video without captions gets all 130, every one different", async () => {
+  const now = Date.UTC(2026, 10, 9, 12);
+  const o = order(now, { comments: 130, title: "my first vlog" });
+  const db = fakeDb({ orders: [o] });
+  const written = new Set();
+  // Like bot_post_comment: the same text (any case) is refused.
+  db.postComment = async (_video, body) => {
+    const key = body.toLowerCase();
+    if (written.has(key)) return "duplicate";
+    written.add(key);
+    return "posted";
+  };
+  const rand = seeded(7);
+  for (let round = 0; round < 3; round++) {
+    await orderRound({ db, cuesFor: async () => [], log: () => {}, now: () => now + round * 5000, rand });
+    // What bot_order_delivered keeps track of.
+    o.done_comments = written.size;
+  }
+  assert.equal(written.size, 130);
+  assert.equal(db.state.delivered.reduce((n, d) => n + d.comments, 0), 130);
+});
+
+test("without captions there are thousands of different comments", () => {
+  const rand = seeded(11);
+  const out = Array.from({ length: 1000 }, () => makeComment({ title: "", cues: [], now: Date.UTC(2026, 10, 9), rand }).toLowerCase());
+  assert.ok(new Set(out).size > 850, `only ${new Set(out).size} different`);
+  assert.ok(!out.some((c) => c.includes("undefined") || c.includes("  ")));
+});
+
+test("a video without captions is looked at again after a few minutes", async () => {
+  let t = 0;
+  let reads = 0;
+  let has = false;
+  const storage = { getText: async () => (reads++, has ? "WEBVTT\n\n00:00:01.000 --> 00:00:02.000\nhello there friends\n" : null) };
+  const cues = createCueCache(storage, { now: () => t });
+  assert.deepEqual(await cues({ id: "v", hls_key: "hls/v/master.m3u8" }), []);
+  has = true;
+  t = 60_000;
+  assert.deepEqual(await cues({ id: "v", hls_key: "hls/v/master.m3u8" }), []);
+  t = 6 * 60_000;
+  assert.equal((await cues({ id: "v", hls_key: "hls/v/master.m3u8" })).length, 1);
+  const before = reads;
+  t = 30 * 60_000;
+  await cues({ id: "v", hls_key: "hls/v/master.m3u8" });
+  assert.equal(reads, before, "captions found: kept for the hour");
 });
 
 test("the live round fills the chat and the viewer count while a broadcast is on", async () => {

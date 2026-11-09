@@ -57,7 +57,7 @@ export function chaptersOf(description) {
 }
 
 const STOP = new Set(
-  "the a an and or but of to in on at for with my your our this that these those is are was were be been it its i im i'm you we they he she me us them from by as so just about into over out up down vs part new video official".split(" "),
+  "the a an and or but of to in on at for with my your our this that these those is are was were be been it its i im i'm you we they he she me us them from by as so just about into over out up down vs part new video official first last best ever today episode full edition what when where why how have has more most very really will".split(" "),
 );
 
 /** The words of a title worth reacting to ("speedrun", "castle"), longest first. */
@@ -89,6 +89,72 @@ export function quoteOf(text, max = 60) {
 const pick = (list, rand) => list[Math.floor(rand() * list.length) % list.length];
 
 const MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+/**
+ * The general comments are put together from a way to start, what is said and
+ * a way to end, so a big order without captions (a video whose captions are
+ * not made yet, or one where nobody speaks) still gets thousands of different
+ * comments instead of the same few dozen.
+ */
+const OPENERS = ["", "", "", "", "ngl ", "honestly ", "bro ", "lowkey ", "fr ", "not gonna lie ", "yo ", "ok ", "man ", "dude ", "real talk ", "ok but "];
+const GENERAL = [
+  "first time watching your channel and I'm already subscribed",
+  "the editing on this is crazy good",
+  "you deserve way more subs",
+  "this needs more views",
+  "underrated channel fr",
+  "your videos always make my day",
+  "came here from recommended, not disappointed",
+  "the quality of these videos keeps getting better",
+  "W video",
+  "how does this only have this many views??",
+  "watched the whole thing, no skips",
+  "this was so good",
+  "this deserves to blow up",
+  "I needed this today",
+  "this made my whole day",
+  "instant like",
+  "the effort in this is insane",
+  "keep it up man",
+  "can't wait for the next one",
+  "the thumbnail got me but the video kept me here",
+  "this is criminally underrated",
+  "still thinking about this video",
+  "watched this twice already",
+  "this is my comfort channel now",
+  "the vibes in this are immaculate",
+  "sending this to all my friends",
+  "you never miss",
+  "the sound in this is so clean",
+  "this channel never disappoints",
+  "top tier content",
+  "this is the best one yet",
+  "came back to watch this again",
+  "every upload is better than the last",
+  "the pacing in this is perfect",
+  "this is way better than I expected",
+  "notification squad where you at",
+  "how is this channel not huge yet",
+  "the ending though",
+  "the music choice was perfect",
+  "this deserves a million views",
+  "I could watch this all day",
+  "so glad I found this channel",
+  "early gang",
+  "this is gold",
+  "the way this video was made is so good",
+  "this is exactly what I needed today",
+  "the intro alone is worth it",
+  "ok this one is my favorite",
+];
+const ENDINGS = ["", "", "", "", "!", "!!", " 🔥", " 😂", " 💯", " 🙌", " ❤️", " 👏", " 😭", " fr", " no cap", " 🔥🔥", " lol", " 👍"];
+
+/** One general comment, from an opener, a line and an ending. */
+function general(line, rand) {
+  const opener = pick(OPENERS, rand);
+  const body = opener && /^[A-Z][a-z]/.test(line) && !line.startsWith("I ") ? line[0].toLowerCase() + line.slice(1) : line;
+  return `${opener}${body}${pick(ENDINGS, rand)}`;
+}
 
 /** Makes a comment read like a person typed it: sometimes all lowercase, sometimes no final punctuation. */
 function casual(text, rand) {
@@ -135,41 +201,24 @@ export function makeComment({ title = "", description = "", cues = [], now = Dat
   }
   if (words.length && roll < 0.8) {
     const w = pick(words.slice(0, 3), rand);
-    return casual(
-      pick(
-        [
-          `this ${w} video is actually so good`,
-          `been waiting for a ${w} video!`,
-          `${w} content just hits different`,
-          `best ${w} video on this site no cap`,
-          `more ${w} videos please`,
-        ],
-        rand,
-      ),
-      rand,
-    );
-  }
-  const d = new Date(now);
-  return casual(
-    pick(
+    const line = pick(
       [
-        "first time watching your channel and I'm already subscribed",
-        `who's watching in ${MONTHS[d.getMonth()]} ${d.getFullYear()}?`,
-        "the editing on this is crazy good",
-        "you deserve way more subs",
-        "this needs more views",
-        "underrated channel fr",
-        "your videos always make my day",
-        "came here from recommended, not disappointed",
-        "the quality of these videos keeps getting better",
-        "W video",
-        "how does this only have this many views??",
-        "watched the whole thing, no skips",
+        `this ${w} video is actually so good`,
+        `been waiting for a ${w} video`,
+        `${w} content just hits different`,
+        `best ${w} video on this site`,
+        `more ${w} videos please`,
+        `I could watch ${w} videos all day`,
+        `nobody does ${w} like this`,
+        `the ${w} part was the best`,
       ],
       rand,
-    ),
-    rand,
-  );
+    );
+    return casual(general(line, rand), rand);
+  }
+  const d = new Date(now);
+  const line = rand() < 0.04 ? `who's watching in ${MONTHS[d.getMonth()]} ${d.getFullYear()}?` : pick(GENERAL, rand);
+  return casual(general(line, rand), rand);
 }
 
 /** A live chat line: about what is being said right now, or the usual stream chat. */
