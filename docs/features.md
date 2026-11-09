@@ -84,6 +84,29 @@ The client secret stays in the Supabase dashboard. Never put it in this reposito
 
 Until Google is switched on, the Google button says so and email sign up still works.
 
+### Switch account
+
+Behind the `switch_account` flag (`031_switch_account.sql`, off at first), one
+login can have several channels, like 2020's brand accounts:
+
+- **Switch account** in the account menu lists every channel of this login
+  (picture, name, handle, subscribers, a check on the current one). A click
+  signs this browser in as that channel and reloads the site. Comments, likes,
+  subscriptions, uploads and the studio are then that channel's own.
+- **Add or manage channels** opens `/account/switcher` ("Use PlayPulse as..."),
+  with a card per channel and **Create a new channel**, which asks for a name,
+  makes the channel and switches to it. Up to 20 extra channels per login.
+- Each extra channel is an account of its own with no password and no real
+  email address (never shown); the only way in is switching from an account in
+  the same group. The site checks the group in the database
+  (`can_switch_to`), then signs in with the service role like Sign in with
+  Yapin' does: a one time token redeemed on the server at once.
+- It needs `SUPABASE_SERVICE_ROLE_KEY` on the website (the same setting Sign in
+  with Yapin' uses). Without it the list still shows, but switching and making
+  channels say so.
+- Delete the extra channels (switch to each, Settings, Delete account) before
+  deleting the main account: once it is gone they cannot be reached.
+
 ## Channels
 
 Every account has a channel at `/@handle` with Home, Videos and About tabs, and

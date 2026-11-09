@@ -88,6 +88,7 @@ again. See [`supabase/migrations/README.md`](../supabase/migrations/README.md).
 - [ ] `028_bell_privacy.sql` (bell options and privacy settings, two flags)
 - [ ] `029_live.sql` (Premieres, live from an upload and live chat, the `premieres` and `live` flags)
 - [ ] `030_bots.sql` (channel bots for @typicalgamer, run by the encoder, the `bots` flag)
+- [ ] `031_switch_account.sql` (several channels per login, the `switch_account` flag; needs `SUPABASE_SERVICE_ROLE_KEY` on the website)
 
 Then make yourself an admin (sign up on the site first):
 
