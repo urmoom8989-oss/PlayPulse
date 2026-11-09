@@ -286,7 +286,10 @@ processing go first, so one person's long upload does not hold up everybody
 else's. Low quality comes first (`038_sd_first.sql`): an upload of 720p or more
 plays at 360p within minutes, and 720p and 1080p are added to it when they are
 done, like YouTube in 2020. Until then the player's quality menu says "HD is
-still processing" and the studio says "HD processing, 64%". `/studio/videos` shows
+still processing" and the studio says "HD processing, 64%". Right after an upload the
+upload page says "Processing..." (also while the video waits for a free encoder),
+then the percent, then "Your video can be watched now" while HD is made.
+`/studio/videos` shows
 "Processing, 42%" and updates every 5 seconds; ready videos get their thumbnail.
 The owner sees the same percent on `/watch?v=<id>`.
 

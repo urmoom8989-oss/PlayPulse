@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import { videoStatus } from "../lib/processing/handler.ts";
-import { defaultThumbnailKey, isActive, isWaiting, processingLine, progressFor, readJob } from "../lib/processing/status.ts";
+import { defaultThumbnailKey, isActive, isWaiting, processingLine, progressFor, readJob, uploadStatusText } from "../lib/processing/status.ts";
 
 const OWNER = "11111111-2222-3333-4444-555555555555";
 const OTHER = "99999999-8888-7777-6666-555555555555";
@@ -157,4 +157,31 @@ test("038: the video plays at low quality first and stays ready when only its HD
     assert.ok(sql.includes(`grant execute on function public.${fn} to service_role`), fn);
   }
   assert.ok(sql.includes("grant execute on function public.video_hd_pending(uuid) to anon, authenticated, service_role"));
+});
+
+test("the upload page says Processing right away, then follows the encoder", () => {
+  const base = { error: null };
+  assert.deepEqual(uploadStatusText({ ...base, status: "uploaded", job: null, progress: 0 }), {
+    title: "Processing...",
+    line: "Waiting to process",
+    pct: 0,
+  });
+  assert.deepEqual(uploadStatusText({ ...base, status: "uploaded", job: { status: "queued", progress: 0, attempts: 0 }, progress: 0 }).line, "Waiting to process");
+  const running = { status: "running", progress: 12, attempts: 1 };
+  assert.deepEqual(uploadStatusText({ ...base, status: "processing", job: running, progress: 12 }), {
+    title: "Processing...",
+    line: "Processing, 12%",
+    pct: 12,
+  });
+  assert.deepEqual(uploadStatusText({ ...base, status: "ready", hdPending: true, job: { ...running, progress: 64 }, progress: 64 }), {
+    title: "Your video can be watched now",
+    line: "HD processing, 64%",
+    pct: 64,
+  });
+  assert.deepEqual(uploadStatusText({ ...base, status: "ready", job: null, progress: 100 }), {
+    title: "Processing done. Your video is ready.",
+    line: null,
+    pct: null,
+  });
+  assert.equal(uploadStatusText({ status: "failed", job: null, progress: null, error: "not a video" }).line, "not a video");
 });
