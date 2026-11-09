@@ -253,6 +253,26 @@ const checks = [
       `${path} shows none of the studio states`,
   })),
   {
+    // The Bots page (034): a notice or the panel, or the sign in page. Never a crash.
+    path: "/studio/bots",
+    test: (body) => /data-bot-state="(off|no-db|not-set-up)"|data-bot-panel/.test(body) || body.includes("Sign in") || "/studio/bots shows none of its states",
+  },
+  {
+    // Bot orders and Retry answer with JSON, never a crash.
+    path: "/api/studio/bots",
+    method: "POST",
+    body: JSON.stringify({ action: "cancel", orderId: "00000000-0000-4000-8000-000000000000" }),
+    allowStatus: [400, 401, 403, 404, 409, 500, 503],
+    test: (body) => typeof JSON.parse(body).error === "string" || "no error code",
+  },
+  {
+    path: "/api/videos/00000000-0000-4000-8000-000000000000/retry",
+    method: "POST",
+    body: "{}",
+    allowStatus: [400, 401, 403, 404, 409, 500, 503],
+    test: (body) => typeof JSON.parse(body).error === "string" || "no error code",
+  },
+  {
     // The studio routes answer with JSON, never a crash: 400 for a bad body,
     // 401 signed out, 403 with the flag off, 503 without the database.
     path: "/api/studio/bulk",

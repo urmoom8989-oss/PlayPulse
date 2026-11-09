@@ -231,17 +231,18 @@ Dockerfile) and checks the speech model against the SHA-1 in whisper.cpp's
 
 ## Channel bots
 
-The worker also runs the channel bots (`supabase/migrations/030_bots.sql`,
-`lib/bots.mjs`) beside the encodes, with the same service role key and
-bucket: no new settings. They only do anything while the `bots` flag is not
-`off`, and only for channels with `bots_on` (the migration sets it for
-@typicalgamer). Every 10 minutes they add each of those videos' views, the
-likes and dislikes that go with them, now and then a comment about a moment in
-the video (read from its captions in the bucket, `hls/<video>/captions/`) and
-a few subscribers. While one of its Premieres or live broadcasts is on, every
-15 seconds they keep a crowd watching and post a few chat lines. The rates are
-in the one row of `public.bot_settings`. The log shows a `bots` line each
-round.
+The worker also delivers the channel bots (`supabase/migrations/030_bots.sql`
+and `034_bot_panel.sql`, `lib/bots.mjs`) beside the encodes, with the same
+service role key and bucket: no new settings. Nothing happens on its own: it
+only delivers what the owner of a channel with `bots_on` (@typicalgamer)
+ordered in the studio's Bots page, while the `bots` flag is not `off`. Every
+minute each running order gets its share so far (views, likes and dislikes,
+comments about moments in the video read from its captions in the bucket,
+`hls/<video>/captions/`, and subscribers), and the bot account pool grows when
+an order needs more accounts. For a Premiere or live broadcast the owner ticked,
+every 15 seconds while it is on it keeps a crowd watching and posts a few chat
+lines (the rates are in the one row of `public.bot_settings`). The log shows an
+`orders round done` line each minute an order is running.
 
 ## Emptying the trash in R2
 
