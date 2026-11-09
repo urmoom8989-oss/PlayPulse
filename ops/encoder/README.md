@@ -293,6 +293,10 @@ deleting. Nothing to set up beyond migration 014.
   go again a minute later, up to 3 rounds, before the job fails, so the encode
   is not thrown away. The log shows `storage still busy ... trying again in a
   minute` when that happens.
+- The upload comes down from storage in 64 MB pieces, 4 at a time, and the bar
+  moves through its first 10% as they arrive. A piece whose connection drops is
+  fetched again on its own (up to 6 tries), so a slow or flaky bucket costs
+  time, not the video.
 - If the box crashes during an encode, the worker gives its jobs back when it
   starts again. A running job tells the database it is alive every minute
   (migration 037); one silent for 10 minutes is taken back by the next slot

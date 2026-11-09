@@ -1,7 +1,7 @@
 // R2 through its S3 API: read the source, write the HLS files, empty the
 // folders of purged videos.
 import { createReadStream, createWriteStream } from "node:fs";
-import { readdir, readFile, stat } from "node:fs/promises";
+import { open, readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
 import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
@@ -100,6 +100,22 @@ export function isRetryable(err) {
   );
 }
 
+/**
+ * Big sources come down in pieces of this size, a few at a time, and a piece
+ * whose connection drops is fetched again on its own. One long stream on slow
+ * storage could run for half an hour and fail near the end.
+ */
+export const DOWNLOAD_PART_BYTES = 64 * 1024 * 1024;
+export const DOWNLOAD_PARALLEL = 4;
+export const DOWNLOAD_TRIES = 6;
+
+/** A piece worth fetching again: anything but a stop, or a refusal (4xx other than 408 and 429). */
+export function isRetryableDownload(err, signal) {
+  if (signal?.aborted) return false;
+  const status = err?.$metadata?.httpStatusCode;
+  return !(status >= 400 && status < 500 && status !== 408 && status !== 429);
+}
+
 /** The wait before try n + 1: half a second doubling to at most 30 seconds, with jitter. */
 export function backoffMs(n, rand = Math.random) {
   const base = Math.min(30_000, 500 * 2 ** Math.max(0, n - 1));
@@ -157,23 +173,91 @@ export function createStorage(client, bucket, { sleep = wait, now = Date.now, ra
       }
     },
 
-    /** Saves an object to a file. onBytes(got), when given, hears how many bytes are in so far. */
-    async download(key, path, signal, onBytes) {
-      const out = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }), { abortSignal: signal });
-      if (!out.Body) throw new Error("R2 sent no body");
-      if (!onBytes) {
-        await pipeline(out.Body, createWriteStream(path), { signal });
+    /**
+     * Saves an object to a file. onBytes(got), when given, hears how many bytes
+     * are in so far. With the size known, the file comes down in pieces
+     * (DOWNLOAD_PART_BYTES, DOWNLOAD_PARALLEL at a time), each tried again on
+     * its own up to DOWNLOAD_TRIES times; without it, in one stream.
+     */
+    async download(key, path, signal, onBytes, { size = null, partBytes = DOWNLOAD_PART_BYTES, parallel = DOWNLOAD_PARALLEL } = {}) {
+      if (!(size > 0)) {
+        const out = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }), { abortSignal: signal });
+        if (!out.Body) throw new Error("R2 sent no body");
+        let got = 0;
+        const count = new Transform({
+          transform(chunk, _encoding, done) {
+            got += chunk.length;
+            onBytes?.(got);
+            done(null, chunk);
+          },
+        });
+        await pipeline(out.Body, count, createWriteStream(path), { signal });
         return;
       }
-      let got = 0;
-      const count = new Transform({
-        transform(chunk, _encoding, done) {
-          got += chunk.length;
-          onBytes(got);
-          done(null, chunk);
-        },
-      });
-      await pipeline(out.Body, count, createWriteStream(path), { signal });
+
+      const parts = [];
+      for (let start = 0; start < size; start += partBytes) parts.push({ start, end: Math.min(size, start + partBytes) - 1, got: 0 });
+      // One piece failing for good stops the others before the file is closed.
+      const stop = new AbortController();
+      const sig = signal ? AbortSignal.any([signal, stop.signal]) : stop.signal;
+      let total = 0;
+      let firstError = null;
+      const file = await open(path, "w");
+
+      const fetchPart = async (part) => {
+        const out = await client.send(
+          new GetObjectCommand({ Bucket: bucket, Key: key, Range: `bytes=${part.start}-${part.end}` }),
+          { abortSignal: sig },
+        );
+        if (!out.Body) throw new Error("the storage sent no body");
+        let pos = part.start;
+        for await (const chunk of out.Body) {
+          if (sig.aborted) throw sig.reason ?? new Error("aborted");
+          // A storage that ignores the range sends more: only this piece is kept.
+          const piece = chunk.length > part.end + 1 - pos ? chunk.subarray(0, part.end + 1 - pos) : chunk;
+          if (piece.length) await file.write(piece, 0, piece.length, pos);
+          pos += piece.length;
+          part.got += piece.length;
+          total += piece.length;
+          onBytes?.(total);
+          if (pos > part.end) break;
+        }
+        if (pos !== part.end + 1) {
+          throw Object.assign(new Error(`a piece of the file came in short (${pos - part.start} of ${part.end + 1 - part.start} bytes)`), {
+            code: "ECONNRESET",
+          });
+        }
+      };
+
+      let next = 0;
+      const worker = async () => {
+        while (next < parts.length && !sig.aborted) {
+          const part = parts[next++];
+          for (let attempt = 1; ; attempt++) {
+            try {
+              await fetchPart(part);
+              break;
+            } catch (err) {
+              if (attempt >= DOWNLOAD_TRIES || !isRetryableDownload(err, sig)) {
+                firstError ??= err;
+                stop.abort(err);
+                throw err;
+              }
+              // This piece starts over; the bytes it had are counted again.
+              total -= part.got;
+              part.got = 0;
+              await sleep(backoffMs(attempt, rand), sig);
+            }
+          }
+        }
+      };
+      try {
+        await Promise.allSettled(Array.from({ length: Math.min(parallel, parts.length) }, worker));
+      } finally {
+        await file.close();
+      }
+      if (firstError) throw signal?.aborted ? (signal.reason ?? firstError) : firstError;
+      if (sig.aborted) throw signal?.reason ?? new Error("aborted");
     },
 
     /**
