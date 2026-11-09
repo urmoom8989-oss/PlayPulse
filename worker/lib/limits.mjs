@@ -24,6 +24,9 @@ export function jobTimeoutMs(durationS) {
 /** How long the worker waits between claim_encode_job calls when there is nothing to do. */
 export const POLL_MS = 5000;
 
+/** A running job tells the database it is alive this often (037: 10 minutes without one and it counts as stopped). */
+export const HEARTBEAT_MS = 60 * 1000;
+
 /** The shortest gap between two encode_progress calls. */
 export const PROGRESS_EVERY_MS = 3000;
 
