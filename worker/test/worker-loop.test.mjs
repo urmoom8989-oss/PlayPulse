@@ -569,7 +569,6 @@ test("two slots process two videos at the same time, each under its own name, wi
     const db = s.deps.db;
     const names = [];
     const beats = [];
-    let idle = 0;
     let inFlight = 0;
     let most = 0;
     const run = s.deps.run;
@@ -578,7 +577,8 @@ test("two slots process two videos at the same time, each under its own name, wi
       claim: async (w) => {
         names.push(w);
         const job = await db.claim(w);
-        if (!job && ++idle >= 2) stop.abort();
+        // Stop once both videos are done (not when one slot is idle while the other still works).
+        if (!job && s.supabase.rows.every((r) => r.status === "done")) stop.abort();
         return job;
       },
       heartbeat: async (id) => void beats.push(id),
