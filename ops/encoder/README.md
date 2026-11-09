@@ -265,6 +265,14 @@ deleting. Nothing to set up beyond migration 014.
   has the details.
 - An upload whose size in R2 does not match what the browser said is refused
   right away, without retries.
+- A long video is thousands of files (a 3 hour 1080p video is about 8,600), and
+  R2 or S3 may answer "Please reduce your request rate." when they come fast.
+  The worker sends 6 files at a time, and when the storage says to slow down,
+  every upload pauses (half a second, doubling up to 30 seconds) and that file
+  goes again, up to 10 tries. If a file is still refused, the files not sent yet
+  go again a minute later, up to 3 rounds, before the job fails, so the encode
+  is not thrown away. The log shows `storage still busy ... trying again in a
+  minute` when that happens.
 - If the box crashes during an encode, the worker gives the job back when it
   starts again. A job stuck as `running` for more than 2 h 15 min is taken back
   by the next worker that asks, so with uploads longer than about an hour run

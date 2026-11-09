@@ -199,6 +199,7 @@ export async function processJob(job, deps) {
     const sent = await storage.uploadDir(out, prefix, {
       signal,
       onFile: (n, total) => void progress(PROGRESS_STEPS.thumbnails + (span * n) / total),
+      onRound: (round, err, left) => log("upload", ids, `storage still busy (${err.message}), ${left} files left, trying again in a minute (round ${round + 1})`),
     });
     log("upload", ids, `${sent.files} files, ${human(sent.bytes)} in ${seconds(now() - t)}`);
 
