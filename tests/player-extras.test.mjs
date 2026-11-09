@@ -195,3 +195,37 @@ test("end screen: countdown with autoplay on, the wall with it off", async () =>
   assert.equal(secondsLeft(1000, 99000), 0);
   assert.equal(secondsLeft(5000, 1000), 8, "a clock going back never adds time");
 });
+
+test("browsers without hls.js: the quality menu comes from the master playlist", async () => {
+  const { parseVariants, qualityOptions, levelForSize, levelForSaved, AUTO } = await import("../lib/watch/quality.ts");
+  const master = [
+    "#EXTM3U",
+    "#EXT-X-VERSION:7",
+    '#EXT-X-MEDIA:TYPE=SUBTITLES,GROUP-ID="subs",NAME="English (auto-generated)",LANGUAGE="en",URI="captions/en.m3u8"',
+    '#EXT-X-STREAM-INF:BANDWIDTH=990000,RESOLUTION=640x360,CODECS="avc1.64001e,mp4a.40.2",SUBTITLES="subs"',
+    "360p/index.m3u8",
+    '#EXT-X-STREAM-INF:BANDWIDTH=3100000,RESOLUTION=1280x720,CODECS="avc1.64001f,mp4a.40.2",SUBTITLES="subs"',
+    "",
+    "720p/index.m3u8",
+    "#EXT-X-STREAM-INF:BANDWIDTH=5500000,RESOLUTION=1920x1080",
+    "https://cdn.example.com/v/1080p/index.m3u8",
+  ].join("\n");
+  const variants = parseVariants(master, "https://site.example/api/media/v1/master.m3u8");
+  assert.deepEqual(
+    variants.map((v) => [v.height, v.bitrate, v.uri]),
+    [
+      [360, 990000, "https://site.example/api/media/v1/360p/index.m3u8"],
+      [720, 3100000, "https://site.example/api/media/v1/720p/index.m3u8"],
+      [1080, 5500000, "https://cdn.example.com/v/1080p/index.m3u8"],
+    ],
+  );
+  const opts = qualityOptions(variants);
+  assert.deepEqual(opts.map((o) => [o.label, o.level]), [["1080p", 2], ["720p", 1], ["360p", 0], ["Auto", AUTO]]);
+  assert.equal(levelForSaved(opts, "720p"), 1);
+  // On Auto, the picture's size tells which one is playing (short side for portrait).
+  assert.equal(levelForSize(opts, 1280, 720), 1);
+  assert.equal(levelForSize(opts, 720, 1280), 1);
+  assert.equal(levelForSize(opts, 0, 0), AUTO);
+  assert.equal(levelForSize(opts, 854, 480), AUTO);
+  assert.deepEqual(parseVariants("#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\n", "https://x.example/m.m3u8"), []);
+});

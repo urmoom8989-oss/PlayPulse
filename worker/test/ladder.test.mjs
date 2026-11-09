@@ -52,8 +52,19 @@ test("rotation from the phone swaps width and height", () => {
   assert.deepEqual(sizes(pickRenditions({ width: 1280, height: 720, rotation: 90 })), ["360p 360x640", "720p 720x1280"]);
 });
 
-test("60 fps sources get 1.5 times the video bitrate", () => {
-  assert.deepEqual(pickRenditions({ width: 1280, height: 720, fps: 60 }).map((r) => r.videoKbps), [1200, 4200]);
+test("60 fps: 720p and up keep it with 1.5 times the bitrate, below 720p is capped at 30 fps", () => {
+  const out = pickRenditions({ width: 1920, height: 1080, fps: 60 });
+  assert.deepEqual(out.map((r) => [r.name, r.fps ?? null, r.videoKbps]), [
+    ["360p", 30, 800],
+    ["720p", null, 4200],
+    ["1080p", null, 7500],
+  ]);
+  // A small 60 fps source is all below 720p: capped too.
+  assert.deepEqual(pickRenditions({ width: 854, height: 480, fps: 60 }).map((r) => [r.name, r.fps]), [["360p", 30], ["480p", 30]]);
+  // 30 fps and slower sources are left alone.
+  assert.ok(pickRenditions({ width: 1920, height: 1080, fps: 30 }).every((r) => r.fps === undefined));
+  assert.ok(pickRenditions({ width: 1920, height: 1080, fps: 29.97 }).every((r) => r.fps === undefined));
+  assert.ok(pickRenditions({ width: 1920, height: 1080 }).every((r) => r.fps === undefined));
 });
 
 test("even helpers", () => {

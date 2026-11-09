@@ -46,6 +46,13 @@ export const NATIVE_RUNG_MIN_RATIO = 1.25;
 /** Above this frame rate the video bitrates get 1.5 times as many bits. */
 export const HIGH_FPS = 31;
 
+/**
+ * Renditions below this short side (360p, 480p...) are capped at LOW_RUNG_FPS:
+ * 60 fps only for 720p and up, like YouTube.
+ */
+export const FULL_FPS_FROM = 720;
+export const LOW_RUNG_FPS = 30;
+
 /** Thumbnails: where in the video (share of the duration) and how wide. The first is the default. */
 export const THUMBNAIL_AT = [0.1, 0.5, 0.9];
 export const THUMBNAIL_WIDTH = 1280;

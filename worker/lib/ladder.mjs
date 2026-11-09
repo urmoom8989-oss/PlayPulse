@@ -1,5 +1,5 @@
 // Which renditions a source gets. Pure functions, no imports but the limits.
-import { HIGH_FPS, LADDER, NATIVE_RUNG_MIN_RATIO } from "./limits.mjs";
+import { FULL_FPS_FROM, HIGH_FPS, LADDER, LOW_RUNG_FPS, NATIVE_RUNG_MIN_RATIO } from "./limits.mjs";
 
 /** The nearest even number, at least 2. H.264 with yuv420p needs even sizes. */
 export function even(n) {
@@ -25,6 +25,9 @@ export function displaySize({ width, height, rotation = 0 }) {
  *   - a source well between two rungs (for example 1280x900) also gets one at
  *     its own size, so it does not lose detail
  *   - every width and height is even
+ *   - below 720p a source faster than 30 fps is capped at 30 fps (`fps` on the
+ *     rung); 720p and up keep the source's frame rate and, above 30 fps, get
+ *     1.5 times the bitrate
  * @param {{ width: number, height: number, rotation?: number, fps?: number }} source
  */
 export function pickRenditions(source) {
@@ -33,18 +36,22 @@ export function pickRenditions(source) {
   const portrait = height > width;
   const short = Math.min(width, height);
   const long = Math.max(width, height);
-  const fpsBoost = (source.fps ?? 30) > HIGH_FPS ? 1.5 : 1;
+  const highFps = (source.fps ?? 30) > HIGH_FPS;
 
   const size = (shortSide) => {
     const longSide = Math.min(even((long * shortSide) / short), evenDown(long));
     return portrait ? { width: shortSide, height: longSide } : { width: longSide, height: shortSide };
   };
-  const rung = (name, shortSide, videoKbps, audioKbps) => ({
-    name,
-    ...size(shortSide),
-    videoKbps: Math.round(videoKbps * fpsBoost),
-    audioKbps,
-  });
+  const rung = (name, shortSide, videoKbps, audioKbps) => {
+    const capped = highFps && shortSide < FULL_FPS_FROM;
+    return {
+      name,
+      ...size(shortSide),
+      videoKbps: Math.round(videoKbps * (highFps && !capped ? 1.5 : 1)),
+      audioKbps,
+      ...(capped ? { fps: LOW_RUNG_FPS } : {}),
+    };
+  };
 
   const fits = LADDER.filter((r) => r.height <= short);
   if (fits.length === 0) {

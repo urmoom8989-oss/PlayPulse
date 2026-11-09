@@ -53,7 +53,18 @@ import { clampTime, FRAME_S, keyAction, stepSpeed, stepVolume, type PlayerAction
 import { atLiveEdge } from "@/lib/live/state";
 import { useT } from "@/lib/i18n/client";
 import { loadQuality, loadResume, loadVolume, saveQuality, saveResume, saveVolume } from "@/lib/watch/prefs";
-import { AUTO, levelForSaved, qualityOptions, qualitySummary, SPEEDS, speedLabel, type QualityOption } from "@/lib/watch/quality";
+import {
+  AUTO,
+  levelForSaved,
+  levelForSize,
+  parseVariants,
+  qualityOptions,
+  qualitySummary,
+  SPEEDS,
+  speedLabel,
+  type QualityOption,
+  type Variant,
+} from "@/lib/watch/quality";
 import { menuPosition, watchLink } from "@/lib/watch/nerds";
 import { DOUBLE_TAP_MS, nextTap, tapSide, tapTotal, type TapSide, type TapState } from "@/lib/watch/taps";
 import type { UpNextVideo } from "@/lib/watch/types";
@@ -110,19 +121,33 @@ const RESUMED_MS = 3000;
 /** After captions go on, the track's name shows this long (until the first words). */
 const CAPTION_HINT_MS = 3000;
 
-/** Safari (desktop and iOS) plays HLS itself; everybody else gets hls.js. */
-function preferNative(video: HTMLVideoElement): boolean {
-  if (!video.canPlayType("application/vnd.apple.mpegurl")) return false;
-  const ua = navigator.userAgent;
-  return /safari/i.test(ua) && !/chrome|chromium|crios|android|edg/i.test(ua);
+/**
+ * Plays a rendition's playlist in place of the master one (native HLS, where
+ * that is how a quality is picked), keeping the time, speed and play state.
+ */
+function swapSource(video: HTMLVideoElement, url: string) {
+  const at = video.currentTime;
+  const wasPaused = video.paused;
+  const rate = video.playbackRate;
+  video.src = url;
+  video.addEventListener(
+    "loadedmetadata",
+    () => {
+      if (at > 0) video.currentTime = at;
+      video.playbackRate = rate;
+      if (!wasPaused) video.play().catch(() => {});
+    },
+    { once: true },
+  );
 }
 
 /**
  * The video player, in the 2019 YouTube style: red progress bar with sprite
  * previews on hover, a big play button while paused, and a bottom bar with
  * play, volume, time, CC (player extras), the settings gear (speed,
- * Subtitles/CC and quality), theater, picture in picture and fullscreen. hls.js everywhere except Safari, which plays
- * HLS natively (and then picks the quality itself).
+ * Subtitles/CC and quality), theater, picture in picture and fullscreen. hls.js in every browser that can run it
+ * (Safari on a Mac and iPad too, and iPhones on iOS 17.1 or later), so the quality menu works everywhere; a browser
+ * without it plays HLS itself, and picking a quality there plays that rendition's playlist.
  */
 export function Player({
   videoId,
@@ -145,6 +170,8 @@ export function Player({
   const menuRef = useRef<HTMLDivElement>(null);
   const gearRef = useRef<HTMLButtonElement>(null);
   const hlsRef = useRef<Hls | null>(null);
+  // Native HLS only: the renditions of the master playlist, by quality menu level.
+  const variantsRef = useRef<Variant[]>([]);
   const idleTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const lastSaved = useRef(0);
 
@@ -267,11 +294,30 @@ export function Player({
       });
     };
 
-    if (preferNative(video)) {
+    // Without hls.js the browser plays HLS itself: the quality menu lists the
+    // master playlist's renditions, and picking one plays its own playlist.
+    let onResize: (() => void) | null = null;
+    const playNative = async () => {
       setNative(true);
-      setEngine("Safari (native HLS)");
-      setOptions(qualityOptions([]));
-      video.src = src;
+      setEngine("native HLS");
+      const master = new URL(src, window.location.href).toString();
+      let variants: Variant[] = [];
+      try {
+        const res = await fetch(master);
+        if (res.ok) variants = parseVariants(await res.text(), master);
+      } catch {
+        // No list: Auto only, the browser still plays the master playlist.
+      }
+      if (cancelled) return;
+      variantsRef.current = variants;
+      const opts = qualityOptions(variants);
+      setOptions(opts);
+      const level = levelForSaved(opts, saved);
+      setChosen(level);
+      // The picture's size tells which rendition the browser plays on Auto.
+      onResize = () => setPlayingLevel(levelForSize(opts, video.videoWidth, video.videoHeight));
+      video.addEventListener("resize", onResize);
+      video.src = level === AUTO ? master : variants[level].uri;
       video.addEventListener(
         "loadedmetadata",
         () => {
@@ -280,25 +326,24 @@ export function Player({
         },
         { once: true },
       );
-      return () => {
-        video.removeAttribute("src");
-        video.load();
-      };
-    }
+    };
 
     void import("hls.js").then(({ default: HlsClass }) => {
       if (cancelled) return;
       if (!HlsClass.isSupported()) {
-        if (video.canPlayType("application/vnd.apple.mpegurl")) {
-          setNative(true);
-          setOptions(qualityOptions([]));
-          video.src = src;
-        } else {
-          setError("This browser can't play this video.");
-        }
+        if (video.canPlayType("application/vnd.apple.mpegurl")) void playNative();
+        else setError("This browser can't play this video.");
         return;
       }
-      hls = new HlsClass({ startPosition: start > 0 ? start : -1, maxBufferLength: 30, backBufferLength: 60 });
+      // iPhones have only ManagedMediaSource, which plays when AirPlay is off for the element.
+      if (!("MediaSource" in window) && "ManagedMediaSource" in window) video.disableRemotePlayback = true;
+      hls = new HlsClass({
+        startPosition: start > 0 ? start : -1,
+        maxBufferLength: 30,
+        backBufferLength: 60,
+        // Classic MediaSource where there is one (Safari on a Mac keeps AirPlay).
+        preferManagedMediaSource: false,
+      });
       hlsRef.current = hls;
       setEngine(`hls.js ${HlsClass.version}`);
       hls.on(HlsClass.Events.MANIFEST_PARSED, (_e, data) => {
@@ -327,6 +372,12 @@ export function Player({
       cancelled = true;
       hls?.destroy();
       hlsRef.current = null;
+      if (video.getAttribute("src")) {
+        video.removeAttribute("src");
+        video.load();
+      }
+      variantsRef.current = [];
+      if (onResize) video.removeEventListener("resize", onResize);
     };
   }, [src, startAt, videoId, serverStart, liveEndsAt]);
 
@@ -683,7 +734,13 @@ export function Player({
     setChosen(opt.level);
     saveQuality(opt.label);
     const hls = hlsRef.current;
+    const video = videoRef.current;
     if (hls) hls.currentLevel = opt.level;
+    else if (native && video && src) {
+      const url = opt.level === AUTO ? new URL(src, window.location.href).toString() : variantsRef.current[opt.level]?.uri;
+      if (url) swapSource(video, url);
+      if (opt.level !== AUTO) setPlayingLevel(opt.level);
+    }
     setMenu(null);
   };
 
@@ -1258,7 +1315,6 @@ export function Player({
                   {o.hd && <sup className="ml-0.5 text-[9px] font-bold text-[var(--mark)]">HD</sup>}
                 </MenuChoice>
               ))}
-              {native && <p className="px-4 pb-1 pt-2 text-[12px] font-normal text-[#aaaaaa]">Safari picks the quality itself.</p>}
             </>
           )}
         </div>
@@ -1304,7 +1360,7 @@ export function Player({
           videoRef={videoRef}
           hlsRef={hlsRef}
           engine={engine || "loading"}
-          quality={native ? "picked by Safari" : summary}
+          quality={summary}
           playingLevel={playingLevel}
           onClose={() => setNerds(false)}
         />

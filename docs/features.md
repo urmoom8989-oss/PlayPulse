@@ -340,10 +340,18 @@ button (or `t`) puts the player across the whole width. On phones everything is
 stacked under the player.
 
 - The player uses [hls.js](https://github.com/video-dev/hls.js) (pinned to an
-  exact version), and Safari's own HLS playback on Safari.
+  exact version) in every browser that can run it: Chrome, Edge, Firefox,
+  Safari on a Mac and iPad, and iPhones on iOS 17.1 or later (ManagedMediaSource,
+  with AirPlay off for the player). A browser without it (older iPhones) plays
+  HLS itself.
 - Gear menu: playback speed (0.25 to 2) and quality (every rendition, highest
-  first, and Auto). Hovering the progress bar shows a frame from the preview
-  sprite with the time.
+  first, and Auto) in every browser. Where the browser plays HLS itself, the
+  menu lists the master playlist's renditions and picking one plays that
+  rendition's playlist from the same moment; Auto is the browser's own pick,
+  shown as "Auto (720p)" from the picture's size. Hovering the progress bar
+  shows a frame from the preview sprite with the time.
+- Frame rate: 720p and up play at the upload's frame rate (60 fps stays 60);
+  360p, 480p and other renditions below 720p are capped at 30 fps.
 - Keys: space or `k` play and pause, `j` and `l` jump 10 seconds, the arrows
   5 seconds, up and down change the volume, `m` mutes, `f` is full screen, `t`
   theater, `i` picture in picture, `0` to `9` jump to 0% to 90%.
@@ -381,8 +389,8 @@ the browser:
   browser's own menu.
 - **Stats for nerds**: video ID, viewport and dropped frames, current and best
   resolution, volume, codecs, connection speed, buffer health, speed and
-  quality, and the player (hls.js or Safari's own). Safari does not tell the
-  page its codecs or connection speed.
+  quality, and the player (hls.js or the browser's own HLS). Without hls.js the
+  browser does not tell the page its codecs or connection speed.
 - **Double tap** on a phone: the left half goes back 10 seconds, the right half
   forward, and each extra tap adds 10 more. A single tap still plays or pauses.
 - **Autoplay.** The Autoplay switch above Up next works and the browser
