@@ -173,7 +173,10 @@ export function formatJoined(createdAt: string): string {
 export function channelErrorText(code: string): string {
   const known: Record<string, string> = {
     not_signed_in: "Your session ended. Sign in again.",
-    no_channel: "Your channel is not set up yet. Ask the owner to run migration 004.",
+    no_channel: "You don't have a channel yet. Create one from the account menu.",
+    has_channel: "You already have a channel.",
+    bad_name: "Give the channel a name of up to 50 characters.",
+    banned: "This account has been banned.",
     handle_invalid: "That handle cannot be used. Use 3 to 30 letters, numbers, underscores or dots.",
     handle_reserved: "That handle is reserved.",
     handle_taken: "That handle is taken. Try another.",

@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
+import { NeedsChannel } from "@/components/channel/NeedsChannel";
 import { Uploader } from "@/components/upload/Uploader";
 import { UploadSkeleton, UploadsOff } from "@/components/upload/UploadNotices";
 import { uploadPageState } from "@/lib/upload/server";
@@ -17,6 +18,8 @@ async function UploadGate() {
       redirect("/login?next=/upload");
     case "not-onboarded":
       redirect("/welcome?next=/upload");
+    case "no-channel":
+      return <NeedsChannel next="/upload" what="upload videos" />;
     case "ready":
       return <Uploader configured={state.configured} />;
   }

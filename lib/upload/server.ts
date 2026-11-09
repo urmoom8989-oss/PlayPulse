@@ -18,6 +18,8 @@ export type UploadPageState =
   | { kind: "off"; noDb: boolean }
   | { kind: "signed-out" }
   | { kind: "not-onboarded" }
+  /** No channel yet (036): uploading asks for one. */
+  | { kind: "no-channel" }
   | { kind: "ready"; user: CurrentUser; configured: boolean };
 
 /** What /upload should show. Reads the request, so call it inside <Suspense>. */
@@ -30,6 +32,7 @@ export async function uploadPageState(): Promise<UploadPageState> {
   if (!(await flagOn("upload", user?.id ?? null))) return { kind: "off", noDb: false };
   if (!user) return { kind: "signed-out" };
   if (!user.onboarded) return { kind: "not-onboarded" };
+  if (!user.channelHandle) return { kind: "no-channel" };
   return { kind: "ready", user, configured: readStorageConfig() !== null };
 }
 

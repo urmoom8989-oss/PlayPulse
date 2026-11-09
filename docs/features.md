@@ -111,32 +111,50 @@ get the 2020 rows **Language: English** and **Location: United States**:
 
 ### Switch account
 
-Behind the `switch_account` flag (`031_switch_account.sql`, off at first), one
-login can have several channels, like 2020's brand accounts:
+Behind the `switch_account` flag (`031_switch_account.sql`, off at first),
+several accounts can be signed in on one browser, like 2020's Switch account:
 
-- **Switch account** in the account menu lists every channel of this login
-  (picture, name, handle, subscribers, a check on the current one). A click
-  signs this browser in as that channel and reloads the site. Comments, likes,
-  subscriptions, uploads and the studio are then that channel's own.
-- **Add or manage channels** opens `/account/switcher` ("Use PlayPulse as..."),
-  with a card per channel and **Create a new channel**, which asks for a name,
-  makes the channel and switches to it. Up to 20 extra channels per login.
-- Each extra channel is an account of its own with no password and no real
-  email address (never shown); the only way in is switching from an account in
-  the same group. The site checks the group in the database
-  (`can_switch_to`), then signs in with the service role like Sign in with
-  Yapin' does: a one time token redeemed on the server at once.
-- It needs `SUPABASE_SERVICE_ROLE_KEY` on the website (the same setting Sign in
-  with Yapin' uses). Without it the list still shows, but switching and making
-  channels say so.
-- Delete the extra channels (switch to each, Settings, Delete account) before
-  deleting the main account: once it is gone they cannot be reached.
+- **Switch account** in the account menu lists the accounts signed in on this
+  browser (picture, name, address, the channel or "No channel", a check on the
+  one in use). A click uses that account and reloads the site; the one that was
+  in use stays signed in, a click away.
+- **Add account** keeps the account in use signed in and opens the sign in page
+  for another (or Create account). **Sign out of all accounts** signs this
+  browser out of every one of them; **Sign out** in the main menu only the one
+  in use.
+- Signed out, the sign in page lists the accounts still signed in on this
+  browser under "Choose an account", with an x to remove one.
+- `/account/switcher` shows the same list as a page, with Add account and
+  Create a channel.
+- How: the account in use has Supabase's usual session cookies; the others wait
+  in the `pp_accounts` cookie (httpOnly, a year) with their refresh tokens, at
+  most 10. Switching swaps them on the server (`/api/accounts`), so each
+  session is only ever used by one account at a time.
+- Accounts linked by the first version of this feature (channels made with the
+  old "Add channel", each an account without a password) still show in the
+  list and switch with the service role (`can_switch_to`, then a one time token
+  redeemed on the server), which needs `SUPABASE_SERVICE_ROLE_KEY` on the
+  website.
 
 ## Channels
 
-Every account has a channel at `/@handle` with Home, Videos and About tabs, and
-the owner edits it in `/studio/channel`: name, handle, description, links,
-picture and banner. `/channel/<id>` sends people on to the `/@handle` address.
+A channel lives at `/@handle` with Home, Videos and About tabs, and the owner
+edits it in `/studio/channel`: name, handle, description, links, picture and
+banner. `/channel/<id>` sends people on to the `/@handle` address.
+
+With the `optional_channels` flag (`036_optional_channels.sql`, off at first),
+a channel is a choice, like 2020's "Create a channel":
+
+- New accounts start without a channel. They can watch, like, subscribe and
+  comment as their account (comments show the name without a link).
+- **Create a channel** in the account menu (`/account/create-channel`) asks for
+  a name and a handle, both filled in from the account, and makes the channel
+  once.
+- Uploading, the studio and going live ask for a channel first, with a button
+  to make one.
+- Channels that already exist stay. Bot accounts never have one (036 removes
+  theirs), so they do not show up as channels in search.
+- With the flag off, every new account gets a channel at sign up, as before.
 
 - A handle is 3 to 30 lower case letters, numbers, underscores or dots. The
   first change is free, after that once every 14 days.

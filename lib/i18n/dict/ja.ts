@@ -229,6 +229,9 @@ const dict: Record<string, string> = {
   "{n} views": "{n} 回視聴",
   "{n} waiting": "{n} 人が待機中",
   "{n} watching now": "{n} 人が視聴中",
+  "Add account": "アカウントを追加",
+  "Sign out of all accounts": "すべてのアカウントからログアウト",
+  "Create a channel": "チャンネルを作成",
 };
 
 export default dict;

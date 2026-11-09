@@ -5,16 +5,21 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useFlag, type SessionUser } from "@/lib/store/session";
 import { createClient } from "@/lib/supabase/client";
-import type { SwitchAccount } from "@/lib/switch/rules";
+import type { SwitchAccount } from "@/lib/accounts/saved-rules";
 import { Avatar } from "./Avatar";
-import { ArrowBackIcon, ChannelIcon, ChevronRightIcon, SettingsIcon, SignOutIcon, SwitchAccountIcon } from "./icons";
+import { AddIcon, ArrowBackIcon, ChannelIcon, ChevronRightIcon, SettingsIcon, SignOutIcon, SwitchAccountIcon } from "./icons";
 import { Menu, MenuDivider, MenuItem } from "./Menu";
 import { PrefsMenuItems, PrefsPanel } from "./i18n/PrefsMenu";
-import { AccountList } from "./switch/AccountList";
+import { AccountList, addAccount, signOutAll } from "./switch/AccountList";
 import { useT } from "@/lib/i18n/client";
 import { ThemeMenuItem } from "./ThemeMenuItem";
 
-/** The avatar in the top bar and its menu, 2019 style. With switch_account, "Switch account" opens the list of channels. */
+/**
+ * The avatar in the top bar and its menu, 2019 style. With switch_account,
+ * "Switch account" opens the accounts signed in on this browser and Add
+ * account. Without a channel (036), "Create a channel" takes the place of
+ * "Your channel".
+ */
 export function AvatarMenu({ user, email }: { user: SessionUser; email: string | null }) {
   const router = useRouter();
   const channels = useFlag("channels");
@@ -22,6 +27,7 @@ export function AvatarMenu({ user, email }: { user: SessionUser; email: string |
   const t = useT();
   const [view, setView] = useState<"main" | "accounts" | "language" | "location">("main");
   const [accounts, setAccounts] = useState<SwitchAccount[] | null>(null);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
 
   async function signOut() {
     await createClient()?.auth.signOut();
@@ -55,21 +61,25 @@ export function AvatarMenu({ user, email }: { user: SessionUser; email: string |
               <ArrowBackIcon className="h-6 w-6 text-icon" />
               {t("Accounts")}
             </button>
-            <p className="px-4 pb-1 pt-3 text-[13px] text-text-2">{user.username}</p>
             {accounts === null ? (
               <p className="px-4 py-3 text-[13px] text-text-2">{t("Loading...")}</p>
             ) : (
-              <AccountList accounts={accounts} />
+              <div className="pt-1">
+                <AccountList accounts={accounts} />
+              </div>
             )}
             <MenuDivider />
-            <Link
-              href="/account/switcher"
-              onClick={close}
-              className="flex h-10 items-center px-4 text-[14px] text-text hover:bg-hover"
-              data-manage-channels
-            >
-              {t("Add or manage channels")}
-            </Link>
+            <MenuItem icon={<AddIcon className="h-6 w-6" />} onClick={async () => setAccountsError(await addAccount())}>
+              {t("Add account")}
+            </MenuItem>
+            <MenuItem icon={<SignOutIcon className="h-6 w-6" />} onClick={() => void signOutAll()}>
+              {t("Sign out of all accounts")}
+            </MenuItem>
+            {accountsError && (
+              <p role="alert" className="px-4 pb-2 text-[12px] text-[var(--error)]">
+                {accountsError}
+              </p>
+            )}
           </div>
         ) : (
           <>
@@ -94,6 +104,17 @@ export function AvatarMenu({ user, email }: { user: SessionUser; email: string |
                 }}
               >
                 {t("Your channel")}
+              </MenuItem>
+            )}
+            {channels && !user.channelHandle && (
+              <MenuItem
+                icon={<ChannelIcon className="h-6 w-6" />}
+                onClick={() => {
+                  close();
+                  router.push("/account/create-channel");
+                }}
+              >
+                {t("Create a channel")}
               </MenuItem>
             )}
             {switching && (

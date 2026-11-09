@@ -135,7 +135,7 @@ export function CommentsSection({
   };
   const signedIn = initial.signedIn && user !== null;
   const viewer = useMemo(
-    () => (user ? { handle: user.channelHandle ?? user.username, name: user.displayName, avatarUrl: user.avatarUrl } : null),
+    () => (user ? { handle: user.channelHandle, name: user.displayName, avatarUrl: user.avatarUrl } : null),
     [user],
   );
   const ctx: CommentContext = { isOwner: initial.isOwner, signedIn: initial.signedIn, viewer, channel, now, signIn };

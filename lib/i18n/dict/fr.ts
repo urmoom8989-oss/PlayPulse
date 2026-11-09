@@ -229,6 +229,9 @@ const dict: Record<string, string> = {
   "{n} views": "{n} vues",
   "{n} waiting": "{n} en attente",
   "{n} watching now": "{n} spectateurs",
+  "Add account": "Ajouter un compte",
+  "Sign out of all accounts": "Se déconnecter de tous les comptes",
+  "Create a channel": "Créer une chaîne",
 };
 
 export default dict;
