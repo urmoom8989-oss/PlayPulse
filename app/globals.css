@@ -18,6 +18,8 @@
   --red: #cc0000;
   /* Brand teal (lib/brand.ts): the mark, active guide icons and thumbnail progress. */
   --mark: #0f766e;
+  /* The brand green behind SUBSCRIBE's white text: the same in both themes, 5.5:1 with white. */
+  --brand-button: #0f766e;
   --logo-word: #0f766e;
   --divider: #e5e5e5;
   --hover: #f2f2f2;
@@ -55,6 +57,7 @@
   --link: #3ea6ff;
   --red: #cc0000;
   --mark: #2dd4bf;
+  --brand-button: #0f766e;
   --logo-word: #5eead4;
   --divider: #383838;
   --hover: #303030;
@@ -90,6 +93,7 @@
   --color-text-3: var(--text-3);
   --color-link: var(--link);
   --color-red: var(--red);
+  --color-brand: var(--brand-button);
   --color-divider: var(--divider);
   --color-hover: var(--hover);
   --color-active: var(--active);

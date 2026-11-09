@@ -1,22 +1,20 @@
-// The studio's Bots page (034_bot_panel.sql, the bots flag): what bot_panel()
-// answers, the limits bot_order_add() keeps, and the words the page uses.
+// The studio's Bots page (034_bot_panel.sql, 035_bots_at_once.sql, the bots
+// flag): what bot_panel() answers, what bot_order_add() accepts, and the words
+// the page uses.
 // No imports on purpose, so Node can load this file directly in the tests.
 
 export type BotKind = "views" | "likes" | "dislikes" | "comments" | "subscribers";
 export const BOT_KINDS: BotKind[] = ["views", "likes", "dislikes", "comments", "subscribers"];
 
-/** The most one order may ask for. Keep in step with bot_order_add() in 034_bot_panel.sql. */
-export const BOT_LIMITS: Record<BotKind, number> = {
-  views: 1_000_000,
-  likes: 10_000,
-  dislikes: 10_000,
-  comments: 1_000,
-  subscribers: 10_000,
-};
+/**
+ * No limit of our own: only what the database's whole numbers hold. Keep in
+ * step with bot_order_add() in 035_bots_at_once.sql.
+ */
+export const MAX_AMOUNT = 2_000_000_000;
 
-/** How long an order takes to deliver, in minutes. 0 is "right away" (as fast as the bots go). */
+/** How long an order takes to deliver, in minutes. 0 is all at once (about a second; comments a few seconds later). */
 export const WINDOWS = [
-  { minutes: 0, label: "Right away" },
+  { minutes: 0, label: "All at once" },
   { minutes: 60, label: "Over 1 hour" },
   { minutes: 1440, label: "Over 24 hours" },
   { minutes: 10080, label: "Over 7 days" },
@@ -133,7 +131,7 @@ export function amountOf(text: string | number | null | undefined): number {
 /** The error code bot_order_add() would answer, checked before sending, or null. */
 export function orderProblem(o: OrderInput): string | null {
   for (const k of BOT_KINDS) {
-    if (!Number.isInteger(o[k]) || o[k] < 0 || o[k] > BOT_LIMITS[k]) return "bad_amount";
+    if (!Number.isInteger(o[k]) || o[k] < 0 || o[k] > MAX_AMOUNT) return "bad_amount";
   }
   if (!WINDOWS.some((w) => w.minutes === o.overMinutes)) return "bad_window";
   if (!o.videoId && (o.views || o.likes || o.dislikes || o.comments)) return "not_found";
@@ -144,11 +142,7 @@ export function orderProblem(o: OrderInput): string | null {
 /** Likes, dislikes and comments that look natural for this many views. */
 export function suggestFor(views: number): Pick<OrderInput, "likes" | "dislikes" | "comments"> {
   const v = Math.max(0, Math.floor(views));
-  return {
-    likes: Math.min(BOT_LIMITS.likes, Math.round(v * RATES.likes)),
-    dislikes: Math.min(BOT_LIMITS.dislikes, Math.round(v * RATES.dislikes)),
-    comments: Math.min(BOT_LIMITS.comments, Math.round(v * RATES.comments)),
-  };
+  return { likes: Math.round(v * RATES.likes), dislikes: Math.round(v * RATES.dislikes), comments: Math.round(v * RATES.comments) };
 }
 
 const n = (v: number) => Math.max(0, Math.floor(v)).toLocaleString("en-US");
@@ -180,7 +174,7 @@ export function windowText(startsAt: string, endsAt: string): string {
   const minutes = Math.round((Date.parse(endsAt) - Date.parse(startsAt)) / 60000);
   const w = WINDOWS.find((x) => x.minutes === minutes);
   if (w) return w.label;
-  return Number.isFinite(minutes) && minutes > 0 ? `Over ${minutes} minutes` : "Right away";
+  return Number.isFinite(minutes) && minutes > 0 ? `Over ${minutes} minutes` : "All at once";
 }
 
 /** The status line of an order. */
@@ -205,10 +199,10 @@ const MESSAGES: Record<string, string> = {
   not_found: "That video is gone.",
   not_public: "Make the video public or unlisted first.",
   not_ready: "Wait until the video is processed.",
-  bad_amount: "Check the numbers: up to 1,000,000 views, 10,000 likes, 10,000 dislikes, 1,000 comments and 10,000 subscribers.",
+  bad_amount: "Use whole numbers up to 2,000,000,000.",
   empty_order: "Enter how many to add.",
   bad_window: "Pick how fast to add them.",
-  too_many_orders: "There are 50 orders running already. Wait for some to finish or cancel one.",
+  too_many_orders: "There are 500 orders running already. Wait for some to finish or cancel one.",
   not_a_broadcast: "Bot viewers and chat are for Premieres and live broadcasts.",
   not_active: "That order already finished.",
   rate_limited: "That's a lot of changes at once. Wait a minute and try again.",

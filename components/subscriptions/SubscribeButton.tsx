@@ -56,7 +56,8 @@ function BellMenu({ channelId, notify }: { channelId: string; notify: boolean })
 
 const base =
   "inline-flex h-9 shrink-0 items-center rounded-[2px] px-4 text-[14px] font-medium uppercase tracking-[0.007px]";
-const red = `${base} bg-red text-white`;
+// SUBSCRIBE is in the brand green (it was red in 2019).
+const green = `${base} bg-brand text-white`;
 // SUBSCRIBED is grey on grey in 2019: a light box with grey text, dark in the dark theme.
 const grey = `${base} bg-[var(--sub-bg)] text-text-2`;
 
@@ -64,14 +65,14 @@ const grey = `${base} bg-[var(--sub-bg)] text-text-2`;
 function Placeholder({ title }: { title: string }) {
   const t = useT();
   return (
-    <button type="button" disabled title={t(title)} className={`${red} cursor-not-allowed opacity-60`} data-subscribe="off">
+    <button type="button" disabled title={t(title)} className={`${green} cursor-not-allowed opacity-60`} data-subscribe="off">
       {t("Subscribe")}
     </button>
   );
 }
 
 /**
- * SUBSCRIBE (red) or SUBSCRIBED (grey) with the bell next to it, 2019 style.
+ * SUBSCRIBE (green) or SUBSCRIBED (grey) with the bell next to it, 2019 style.
  * Clicks show at once and go to the server one at a time (see
  * lib/subscriptions/toggle.ts). Signed out, the click goes to sign in and
  * comes back here. `count` is the subscriber count the server rendered.
@@ -100,7 +101,7 @@ export function SubscribeButton({ channelId, channelName, count }: { channelId: 
     return (
       <button
         type="button"
-        className={red}
+        className={green}
         data-subscribe="signed-out"
         onClick={() => {
           const here = window.location.pathname + window.location.search;
@@ -116,7 +117,7 @@ export function SubscribeButton({ channelId, channelName, count }: { channelId: 
   const view = state ? viewToggle(state) : { subscribed: false, notify: false, count };
   if (!ready) {
     return (
-      <button type="button" disabled className={`${red} opacity-60`} data-subscribe="loading" aria-busy>
+      <button type="button" disabled className={`${green} opacity-60`} data-subscribe="loading" aria-busy>
         {t("Subscribe")}
       </button>
     );
@@ -126,7 +127,7 @@ export function SubscribeButton({ channelId, channelName, count }: { channelId: 
     return (
       <button
         type="button"
-        className={red}
+        className={green}
         data-subscribe="no"
         aria-pressed={false}
         onClick={() => toggle(channelId)}

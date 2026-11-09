@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import {
-  BOT_LIMITS,
+  MAX_AMOUNT,
   WINDOWS,
   amountOf,
   amountsText,
@@ -28,7 +28,7 @@ const REFRESH_MS = 30_000;
 
 type Send = (body: Record<string, unknown>, done: string) => Promise<boolean>;
 
-function NumberField({ label, value, onChange, max, name }: { label: string; value: string; onChange: (v: string) => void; max: number; name: string }) {
+function NumberField({ label, value, onChange, name }: { label: string; value: string; onChange: (v: string) => void; name: string }) {
   return (
     <label className="block min-w-0">
       <span className="mb-1 block text-[12px] font-medium text-text-2">{label}</span>
@@ -39,7 +39,6 @@ function NumberField({ label, value, onChange, max, name }: { label: string; val
         placeholder="0"
         onChange={(e) => onChange(e.target.value.replace(/[^\d,]/g, ""))}
         aria-label={label}
-        title={`Up to ${n(max)}`}
         data-bot-field={name}
         className="field !h-10 !text-[14px]"
       />
@@ -74,7 +73,7 @@ function VideoOrderForm({ video, send, busy, onClose }: { video: BotVideo; send:
   const [likes, setLikes] = useState("");
   const [dislikes, setDislikes] = useState("");
   const [comments, setComments] = useState("");
-  const [over, setOver] = useState<WindowMinutes>(1440);
+  const [over, setOver] = useState<WindowMinutes>(0);
   const amounts = { views: amountOf(views), likes: amountOf(likes), dislikes: amountOf(dislikes), comments: amountOf(comments), subscribers: 0 };
   const problem = orderProblem({ ...amounts, videoId: video.id, overMinutes: over });
   const windowLabel = WINDOWS.find((w) => w.minutes === over)?.label.toLowerCase() ?? "";
@@ -89,17 +88,20 @@ function VideoOrderForm({ video, send, busy, onClose }: { video: BotVideo; send:
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (problem) return;
-    const ok = await send({ action: "order", videoId: video.id, ...amounts, overMinutes: over }, `Ordered ${amountsText(amounts)}.`);
+    const rest = amountsText({ ...amounts, comments: 0 });
+    const coming = amounts.comments ? `${n(amounts.comments)} ${amounts.comments === 1 ? "comment is" : "comments are"} on the way.` : "";
+    const text = over !== 0 ? `Ordered ${amountsText(amounts)}.` : [rest === "nothing" ? "" : `Added ${rest}.`, coming].filter(Boolean).join(" ");
+    const ok = await send({ action: "order", videoId: video.id, ...amounts, overMinutes: over }, text);
     if (ok) onClose();
   }
 
   return (
     <form onSubmit={submit} className="mt-3 rounded-[2px] border border-divider bg-[var(--page)] p-4" data-bot-form={video.id}>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <NumberField label="Views" name="views" value={views} onChange={setViews} max={BOT_LIMITS.views} />
-        <NumberField label="Likes" name="likes" value={likes} onChange={setLikes} max={BOT_LIMITS.likes} />
-        <NumberField label="Dislikes" name="dislikes" value={dislikes} onChange={setDislikes} max={BOT_LIMITS.dislikes} />
-        <NumberField label="Comments" name="comments" value={comments} onChange={setComments} max={BOT_LIMITS.comments} />
+        <NumberField label="Views" name="views" value={views} onChange={setViews} />
+        <NumberField label="Likes" name="likes" value={likes} onChange={setLikes} />
+        <NumberField label="Dislikes" name="dislikes" value={dislikes} onChange={setDislikes} />
+        <NumberField label="Comments" name="comments" value={comments} onChange={setComments} />
       </div>
       <div className="mt-3 grid gap-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-end">
         <WindowSelect value={over} onChange={setOver} />
@@ -121,7 +123,9 @@ function VideoOrderForm({ video, send, busy, onClose }: { video: BotVideo; send:
           ? "Enter how many to add. Comments are written from the video's captions."
           : problem
             ? botErrorMessage(problem)
-            : `Adds ${amountsText(amounts)} ${over === 0 ? "right away" : windowLabel}.`}
+            : over === 0
+              ? `Adds ${amountsText(amounts)} all at once${amounts.comments ? " (comments take a few seconds)" : ""}.`
+              : `Adds ${amountsText(amounts)} ${windowLabel}.`}
       </p>
       <div className="mt-3 flex justify-end gap-2">
         <button type="button" className="btn-text" onClick={onClose}>
@@ -137,14 +141,17 @@ function VideoOrderForm({ video, send, busy, onClose }: { video: BotVideo; send:
 
 function SubscribersCard({ panel, send, busy }: { panel: Panel; send: Send; busy: boolean }) {
   const [subs, setSubs] = useState("");
-  const [over, setOver] = useState<WindowMinutes>(1440);
+  const [over, setOver] = useState<WindowMinutes>(0);
   const amount = amountOf(subs);
   const problem = orderProblem({ views: 0, likes: 0, dislikes: 0, comments: 0, subscribers: amount, videoId: null, overMinutes: over });
 
   async function submit(e: FormEvent) {
     e.preventDefault();
     if (problem) return;
-    const ok = await send({ action: "order", videoId: null, views: 0, likes: 0, dislikes: 0, comments: 0, subscribers: amount, overMinutes: over }, `Ordered ${amountsText({ subscribers: amount })}.`);
+    const ok = await send(
+      { action: "order", videoId: null, views: 0, likes: 0, dislikes: 0, comments: 0, subscribers: amount, overMinutes: over },
+      `${over === 0 ? "Added" : "Ordered"} ${amountsText({ subscribers: amount })}.`,
+    );
     if (ok) setSubs("");
   }
 
@@ -158,13 +165,13 @@ function SubscribersCard({ panel, send, busy }: { panel: Panel; send: Send; busy
         has {n(panel.channel.subscribers)} subscribers.
       </p>
       <form onSubmit={submit} className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,180px)_minmax(0,220px)_auto] sm:items-end">
-        <NumberField label="Subscribers to add" name="subscribers" value={subs} onChange={setSubs} max={BOT_LIMITS.subscribers} />
+        <NumberField label="Subscribers to add" name="subscribers" value={subs} onChange={setSubs} />
         <WindowSelect value={over} onChange={setOver} />
         <button type="submit" className="btn-blue sm:justify-self-start" disabled={busy || Boolean(problem)} data-bot-subscribe>
           Add subscribers
         </button>
       </form>
-      {amount > BOT_LIMITS.subscribers && <p className="mt-2 text-[13px] text-[var(--error)]">{botErrorMessage("bad_amount")}</p>}
+      {amount > MAX_AMOUNT && <p className="mt-2 text-[13px] text-[var(--error)]">{botErrorMessage("bad_amount")}</p>}
     </section>
   );
 }
@@ -364,8 +371,9 @@ export function BotPanel({ panel, now }: { panel: Panel; now: number }) {
       </section>
 
       <p className="text-[12px] leading-[18px] text-text-2">
-        Bot accounts: {n(panel.channel.pool)} of up to {n(panel.channel.poolMax)}. Each like, dislike and subscription comes from a
-        different account, and more are made when an order needs them.
+        The first 20,000 views of each order are full views with a watch time, so they show in Analytics; the rest go straight onto
+        the view count. Likes, dislikes and subscribers come from the {n(panel.channel.pool)} bot accounts first, then go straight onto
+        the counts. Comments each come from a bot account, and more accounts are made when they run out.
       </p>
 
       {toast && (

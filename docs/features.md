@@ -454,31 +454,35 @@ stream, with live chat.
 
 ### Channel bots
 
-Behind the `bots` flag (`030_bots.sql` and `034_bot_panel.sql`, off at first),
-for channels with `channels.bots_on` (set for @typicalgamer only). Nothing is
-added on its own: the owner orders bots in the studio's **Bots** page
-(`/studio/bots`, in the studio nav only for those channels), and the encoder
-worker delivers them. Bot activity reads like real people's and counts like it
-everywhere (the counts, Trending, analytics).
+Behind the `bots` flag (`030_bots.sql`, `034_bot_panel.sql` and
+`035_bots_at_once.sql`, off at first), for channels with `channels.bots_on`
+(set for @typicalgamer only). Nothing is added on its own: the owner orders
+bots in the studio's **Bots** page (`/studio/bots`, in the studio nav only for
+those channels). Bot activity counts like real people's everywhere (the counts,
+Trending, analytics).
 
-- **For a video** (public or unlisted, processed): how many views, likes,
-  dislikes and comments, and how fast: right away, over 1 hour, over 24 hours
-  or over 7 days. "Match likes and comments to the views" fills in the rates
-  real videos get (4.5% likes, 0.2% dislikes, 0.4% comments). At most
-  1,000,000 views, 10,000 likes, 10,000 dislikes and 1,000 comments an order.
-- **For the channel**: up to 10,000 subscribers an order, with the same choice
-  of speed.
+- **For a video** (public or unlisted, processed): any number of views, likes,
+  dislikes and comments (up to 2,000,000,000 each, what the database holds).
+  "Match likes and comments to the views" fills in the rates real videos get
+  (4.5% likes, 0.2% dislikes, 0.4% comments).
+- **For the channel**: any number of subscribers.
+- **All at once** (the default): the views, likes, dislikes and subscribers are
+  added in the same click, in about a second; the comments come from the encoder
+  worker a few seconds later, since they are written from the video's captions.
+  Or spread them over 1 hour, 24 hours or 7 days.
 - **Orders** show how much is delivered, with a progress bar, and can be
-  cancelled; what was added stays. The worker delivers a little every minute,
-  spread over the window (in pieces of 10,000 views, 600 reactions, 10 comments
-  and 1,000 subscribers a minute for big "right away" orders). An order stops
-  when its video goes private, is deleted or is removed.
-- **Views** are counted views of their own, with a watch time and a traffic
-  source; a Premiere or live broadcast gets none before it starts.
-- **Likes, dislikes and subscriptions** come from bot accounts with ordinary
-  names (300 made by 030; they cannot sign in), one each per video or channel.
-  When an order needs more, the worker makes more, up to 10,000.
-- **Comments** mostly quote or point at a moment in the video, read from its
+  cancelled; what was added stays. An order stops when its video goes private,
+  is deleted or is removed.
+- **Views**: the first 20,000 of each order are counted views of their own,
+  with a watch time, a traffic source and a country, so Analytics shows them;
+  the rest go straight onto the video's view count (which Trending and every
+  page use), so a million views do not fill the database. A Premiere or live
+  broadcast gets none before it starts.
+- **Likes, dislikes and subscribers** come from bot accounts with ordinary names
+  (300 made by 030; they cannot sign in), one each per video or channel, up to
+  2,000 at a time; the rest go straight onto the counts.
+- **Comments** each come from a bot account (more are made when they run out,
+  up to 10,000). Most quote or point at a moment in the video, read from its
   auto-generated captions ("2:31 "no way he actually built the whole castle in
   one night" 😂"), some name a chapter or a word from the title, the rest are the
   usual "who's watching in November 2026?". Never the same text twice on a

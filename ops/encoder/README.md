@@ -231,18 +231,21 @@ Dockerfile) and checks the speech model against the SHA-1 in whisper.cpp's
 
 ## Channel bots
 
-The worker also delivers the channel bots (`supabase/migrations/030_bots.sql`
-and `034_bot_panel.sql`, `lib/bots.mjs`) beside the encodes, with the same
-service role key and bucket: no new settings. Nothing happens on its own: it
-only delivers what the owner of a channel with `bots_on` (@typicalgamer)
-ordered in the studio's Bots page, while the `bots` flag is not `off`. Every
-minute each running order gets its share so far (views, likes and dislikes,
-comments about moments in the video read from its captions in the bucket,
-`hls/<video>/captions/`, and subscribers), and the bot account pool grows when
-an order needs more accounts. For a Premiere or live broadcast the owner ticked,
-every 15 seconds while it is on it keeps a crowd watching and posts a few chat
-lines (the rates are in the one row of `public.bot_settings`). The log shows an
-`orders round done` line each minute an order is running.
+The worker also delivers the channel bots (`supabase/migrations/030_bots.sql`,
+`034_bot_panel.sql` and `035_bots_at_once.sql`, `lib/bots.mjs`) beside the
+encodes, with the same service role key and bucket: no new settings. Nothing
+happens on its own: it only delivers what the owner of a channel with `bots_on`
+(@typicalgamer) ordered in the studio's Bots page, while the `bots` flag is not
+`off`. An "all at once" order gets its views, likes, dislikes and subscribers
+from the database when it is placed; every 5 seconds the worker writes the
+comments of running orders (about moments in the video, read from its captions
+in the bucket, `hls/<video>/captions/`), up to 100 an order a round, and gives
+orders spread over an hour, a day or a week their share so far. The bot account
+pool grows when there are no bots left to comment. For a Premiere or live
+broadcast the owner ticked, every 15 seconds while it is on it keeps a crowd
+watching and posts a few chat lines (the rates are in the one row of
+`public.bot_settings`). The log shows an `orders round done` line for each
+round that added something.
 
 ## Emptying the trash in R2
 
