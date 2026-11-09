@@ -56,7 +56,7 @@ If Docker is available, also: `docker build -f ops/app/Dockerfile .` and
   (`if not exists`, `create or replace`, `drop policy if exists`), RLS on every table.
   Never edit an applied migration. See `supabase/migrations/README.md`.
 - No em dashes in UI text or docs.
-- The logo and names are our own: the green slop mark in `lib/brand.ts` (redraw the
+- The logo and names are our own: the teal pulse line mark in `lib/brand.ts` (redraw the
   favicon with `node scripts/favicon.mjs`), and "Snips" for short vertical videos in
   the UI (URLs, flag keys and tables keep the old `shorts` name). Never bring back a
   red play button, a red rectangle mark or another site's product names.

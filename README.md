@@ -289,5 +289,5 @@ sloptube is released under the [MIT license](LICENSE). Third party notices,
 including FFmpeg and the Material icons, are in [NOTICE.md](NOTICE.md).
 
 sloptube is an independent project. It is not affiliated with, endorsed by or
-sponsored by YouTube or Google. The sloptube name and the green slop mark are
+sponsored by YouTube or Google. The sloptube name and the teal pulse line mark are
 the project's own.

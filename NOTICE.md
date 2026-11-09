@@ -54,6 +54,6 @@ for the full list of the installed tree.
 "YouTube" and "YouTube Shorts" are trademarks of Google LLC. sloptube follows the
 general page layout common to video sites of 2019 and 2020, but it is not
 affiliated with, endorsed by or sponsored by Google or YouTube. The sloptube
-name, the green slop mark and the Snips drop are the project's own drawings
+name, the teal pulse line mark and the Snips drop are the project's own drawings
 (`lib/brand.ts`) and do not use any YouTube logo, play button or name. Yapin' is a separate service; sloptube only
 talks to its public OAuth and webhook API.
