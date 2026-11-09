@@ -115,18 +115,20 @@ bytes. Processing (feature 4) turns it into HLS and the watch page (feature 5)
 plays it. Railway Buckets are supported; Cloudflare R2 remains supported for
 existing installs.
 
-- MP4, MOV, WebM or MKV, up to 5 GiB (5,368,709,120 bytes) per video, as many
-  uploads as people like (`023_open_uploads_usernames.sql` removed the old 10 a
-  day limit). Files are stored as objects in one shared bucket; no separate
-  5 GiB bucket is created or reserved for each video.
+- MP4, MOV, WebM or MKV of any size, as many uploads as people like
+  (`025_upload_any_size.sql` lifted the 5 GiB limit and
+  `023_open_uploads_usernames.sql` removed the old 10 a day limit). The only
+  limit left is the storage's own: 5 TiB for one file. Files over 160 GB go up
+  in bigger parts, so no upload needs more than 10,000, and the part links work
+  for 7 days. Files are stored as objects in one shared bucket.
 - Uploading needs a finished sign up (13 or older) and a channel.
 - New videos stay private and appear only to their owner until they press
   **Publish**. Public videos appear on the channel and in feeds after processing.
 - Categories: Music, Sports, Gaming, Movies and TV, News, Live or Other.
 - Custom thumbnails can be JPG, PNG or WebP up to 2 MB; they can be selected
   during upload or changed later in Studio.
-- A 5 GiB application limit does not guarantee storage capacity or pricing: check
-  the bucket provider's current plan, quotas and bandwidth charges.
+- Big files cost storage and bandwidth, and the encoder box needs the disk
+  space to process them: check the bucket provider's plan, quotas and charges.
 
 ### 1. Run the migration
 
@@ -136,7 +138,8 @@ Run `supabase/migrations/005_videos.sql` in the
 `upload` flag that starts `off`. Switch the flag to `test` or `everyone` to show
 the upload icon in the top bar, `/upload` and `/studio/videos`.
 Apply `supabase/migrations/021_upload_size.sql` after `020_flag_panel.sql` to
-raise the database limit to 5 GiB. Then apply
+raise the database limit to 5 GiB (and `025_upload_any_size.sql` later lifts it
+to 5 TiB, the storage's own limit). Then apply
 `supabase/migrations/022_upload_categories_publish.sql` for categories,
 pre-processing custom thumbnails and the explicit Publish action. On an existing
 install, run only migrations 021 and 022 if they have not already been applied.
@@ -320,7 +323,7 @@ the browser:
 
 ### More keyboard shortcuts
 
-Behind the `more_shortcuts` flag (`025_shortcuts_hover.sql`, off at first), all
+Behind the `more_shortcuts` flag (`026_shortcuts_hover.sql`, off at first), all
 in the browser:
 
 - `<` and `>` (Shift+, and Shift+.) step through the gear menu's speeds, and
@@ -334,7 +337,7 @@ None of the keys work while typing in a field or with Ctrl, Alt or Cmd held.
 
 ### Hover previews
 
-Behind the `hover_previews` flag (`025_shortcuts_hover.sql`, off at first): rest
+Behind the `hover_previews` flag (`026_shortcuts_hover.sql`, off at first): rest
 the pointer on a thumbnail on the home page, Trending, channel pages or search
 results and, after the sprite's frames (which every card already has), the
 video itself plays in the thumbnail, muted. It starts a tenth of the way in
@@ -529,7 +532,7 @@ holds for visits through the site.
 
 ### Spelling correction
 
-Behind the `search_spelling` flag (`026_search_spelling.sql`, off at first):
+Behind the `search_spelling` flag (`027_search_spelling.sql`, off at first):
 
 - When a search finds nothing but a close spelling finds something, the page
   shows that spelling's results under **Showing results for** *the fix*, with

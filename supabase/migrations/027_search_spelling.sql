@@ -1,4 +1,4 @@
--- 026_search_spelling.sql
+-- 027_search_spelling.sql
 -- Spelling correction for search, like 2020: "Showing results for <fixed>,
 -- Search instead for <typed>" when what was typed finds nothing, and "Did you
 -- mean: <fixed>" above the results when it finds something.
@@ -18,7 +18,7 @@
 --   (in the extensions schema) for the edit distance.
 -- - the search_spelling flag (off).
 --
--- Run after 025_shortcuts_hover.sql (needs 010_search.sql). Safe to run more
+-- Run after 026_shortcuts_hover.sql (needs 010_search.sql). Safe to run more
 -- than once.
 
 create extension if not exists fuzzystrmatch with schema extensions;

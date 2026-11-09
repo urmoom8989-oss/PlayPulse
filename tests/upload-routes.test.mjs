@@ -11,7 +11,7 @@ import {
   signUploadThumbnail,
 } from "../lib/upload/handlers.ts";
 import { createS3Client, createS3Storage } from "../lib/upload/s3.ts";
-import { PART_SIZE, sourceKey } from "../lib/upload/rules.ts";
+import { MAX_UPLOAD_BYTES, PART_SIZE, PART_URL_TTL_S, partSizeFor, sourceKey } from "../lib/upload/rules.ts";
 import { thumbnailKey } from "../lib/studio/rules.ts";
 
 const OWNER = "11111111-2222-3333-4444-555555555555";
@@ -57,7 +57,7 @@ function setup({ userId = OWNER, flag = true, storage = true, db = true, headSiz
   let n = 0;
   const fakeDb = {
     async createUpload(title, bytes, mime) {
-      if (bytes > 5 * 1024 * MB) return { error: "file_too_big" };
+      if (bytes > MAX_UPLOAD_BYTES) return { error: "file_too_big" };
       const id = `aaaaaaaa-bbbb-cccc-dddd-${String(++n).padStart(12, "0")}`;
       const key = sourceKey(userId, id, mime);
       videos.set(id, { id, ownerId: userId, status: "uploading", sourceKey: key, sourceBytes: bytes, sourceMime: mime, title });
@@ -115,11 +115,19 @@ test("sign: signed out, flag off and no database are refused", async () => {
 test("sign: bad files are refused before anything is created", async () => {
   const { ctx, calls, videos } = setup();
   assert.equal((await signUpload({ title: "a", bytes: 10, mime: "image/gif" }, ctx)).status, 415);
-  assert.equal((await signUpload({ title: "a", bytes: 6 * 1024 * MB, mime: "video/mp4" }, ctx)).status, 413);
+  assert.equal((await signUpload({ title: "a", bytes: MAX_UPLOAD_BYTES + 1, mime: "video/mp4" }, ctx)).status, 413);
   assert.equal((await signUpload({ title: "a", bytes: 0, mime: "video/mp4" }, ctx)).status, 400);
   assert.equal((await signUpload({ title: " ", bytes: 10, mime: "video/mp4" }, ctx)).status, 400);
   assert.equal(calls.length, 0);
   assert.equal(videos.size, 0);
+});
+
+test("sign: a file over the old 5 GB limit is fine, in parts of the right size", async () => {
+  const { ctx } = setup();
+  const res = await signUpload({ title: "Long stream", bytes: 6 * 1024 * MB, mime: "video/mp4" }, ctx);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.partSize, partSizeFor(6 * 1024 * MB));
+  assert.equal(res.body.parts.length, Math.ceil((6 * 1024 * MB) / res.body.partSize));
 });
 
 test("sign: starts a multipart upload and presigns one URL per 16 MB part", async () => {
@@ -139,7 +147,7 @@ test("sign: starts a multipart upload and presigns one URL per 16 MB part", asyn
   assert.equal(url.pathname, "/" + res.body.key);
   assert.equal(url.searchParams.get("partNumber"), "3");
   assert.equal(url.searchParams.get("uploadId"), "upload-1");
-  assert.equal(url.searchParams.get("X-Amz-Expires"), "21600");
+  assert.equal(url.searchParams.get("X-Amz-Expires"), String(PART_URL_TTL_S));
   assert.ok(url.searchParams.get("X-Amz-Signature"));
   // No checksum the browser would have to send.
   assert.equal(url.searchParams.get("x-amz-sdk-checksum-algorithm"), null);
