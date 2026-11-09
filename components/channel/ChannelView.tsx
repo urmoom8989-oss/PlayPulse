@@ -1,6 +1,7 @@
 import { ChannelShorts } from "@/components/shorts/ChannelShorts";
 import { channelByHandle } from "@/lib/channels/server";
 import { flagOn } from "@/lib/flags";
+import { statsOn } from "@/lib/stats/server";
 import { previewChannel, type Channel } from "@/lib/channels/types";
 import { ChannelAbout, ChannelHeader, NoVideos, type ChannelTab } from "./ChannelHeader";
 import { ChannelDbNotice, ChannelMissing, ChannelsNotSetUp, ChannelsOff } from "./ChannelNotices";
@@ -46,10 +47,21 @@ export async function ChannelView({ params, tab }: { params: Promise<{ handle: s
       );
     }
     case "ready": {
-      const [shorts, channelsTab] = await Promise.all([flagOn("shorts"), flagOn("privacy_settings")]);
+      const [shorts, channelsTab, analytics] = await Promise.all([
+        flagOn("shorts"),
+        flagOn("privacy_settings"),
+        state.isOwner ? statsOn() : false,
+      ]);
       return (
         <div data-channel-state="ready">
-          <ChannelHeader channel={state.channel} tab={tab} isOwner={state.isOwner} shorts={shorts} channelsTab={channelsTab} />
+          <ChannelHeader
+            channel={state.channel}
+            tab={tab}
+            isOwner={state.isOwner}
+            shorts={shorts}
+            channelsTab={channelsTab}
+            analytics={analytics}
+          />
           <TabBody tab={tab} channel={state.channel} isOwner={state.isOwner} live />
         </div>
       );
