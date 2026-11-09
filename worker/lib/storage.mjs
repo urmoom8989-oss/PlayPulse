@@ -3,6 +3,7 @@
 import { createReadStream, createWriteStream } from "node:fs";
 import { readdir, readFile, stat } from "node:fs/promises";
 import { join, relative, sep } from "node:path";
+import { Transform } from "node:stream";
 import { pipeline } from "node:stream/promises";
 import {
   DeleteObjectsCommand,
@@ -156,10 +157,23 @@ export function createStorage(client, bucket, { sleep = wait, now = Date.now, ra
       }
     },
 
-    async download(key, path, signal) {
+    /** Saves an object to a file. onBytes(got), when given, hears how many bytes are in so far. */
+    async download(key, path, signal, onBytes) {
       const out = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }), { abortSignal: signal });
       if (!out.Body) throw new Error("R2 sent no body");
-      await pipeline(out.Body, createWriteStream(path), { signal });
+      if (!onBytes) {
+        await pipeline(out.Body, createWriteStream(path), { signal });
+        return;
+      }
+      let got = 0;
+      const count = new Transform({
+        transform(chunk, _encoding, done) {
+          got += chunk.length;
+          onBytes(got);
+          done(null, chunk);
+        },
+      });
+      await pipeline(out.Body, count, createWriteStream(path), { signal });
     },
 
     /**

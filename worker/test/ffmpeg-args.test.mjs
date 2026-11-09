@@ -122,11 +122,11 @@ test("the progress parser reads out_time_us across chunk borders", () => {
 });
 
 test("encode percent stays inside the encode share of the bar", () => {
-  assert.equal(encodePercent(0, 100), 5);
-  assert.equal(encodePercent(50, 100), 47);
+  assert.equal(encodePercent(0, 100), 11);
+  assert.equal(encodePercent(50, 100), 50);
   assert.equal(encodePercent(100, 100), 90);
   assert.equal(encodePercent(500, 100), 90);
-  assert.equal(encodePercent(10, 0), 5);
+  assert.equal(encodePercent(10, 0), 11);
 });
 
 test("encode percent can be given its own share (low quality first, then HD)", () => {
