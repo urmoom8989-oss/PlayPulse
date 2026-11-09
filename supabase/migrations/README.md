@@ -29,6 +29,7 @@ Every change to the database lives in this folder as a numbered SQL file.
 | `022_upload_categories_publish.sql` | `videos.category`; `update_upload_details` with a category; `save_upload_thumbnail` for a custom thumbnail picked during the upload, kept when the encoder finishes; `publish_video`, the explicit Publish |
 | `023_open_uploads_usernames.sql` | `create_upload` without the 10 a day limit (the rest of the function is kept as it is); usernames are 3 to 24 characters of anything except emoji and invisible characters, keep their case (taken is still decided without case), in `username_is_valid`, `handle_new_user` and `complete_signup` |
 | `024_player_extras.sql` | the `player_extras` flag (off): chapters from the description, clickable timestamps in descriptions and comments, the player's right-click menu (Loop, Copy video URL, Copy video URL at current time, Stats for nerds), double tap to skip 10 seconds on phones, autoplay (Up next's switch, an 8 second countdown, a wall of nine videos with it off) and captions (the CC button, Subtitles/CC, caption options); nothing is stored |
+| `025_upload_any_size.sql` | `create_upload` takes videos of any size up to 5 TiB (the storage's own limit for one file; it was 5 GiB), and the `videos_source_bytes_range` check to match |
 
 ## How to apply them
 
