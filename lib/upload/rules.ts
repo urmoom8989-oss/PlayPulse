@@ -1,18 +1,34 @@
 // Upload rules shared by the /upload page, the API routes and the tests.
-// Keep in step with public.create_upload(): 021_upload_size.sql sets the size
-// limit and 023_open_uploads_usernames.sql removed the daily limit.
+// Keep in step with public.create_upload(): 025_upload_any_size.sql sets the
+// size limit and 023_open_uploads_usernames.sql removed the daily limit.
 // No imports on purpose, so Node can load this file directly.
 // There is no daily upload limit: 023 removed it.
 
-export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024; // 5 GB
+/**
+ * No size limit of our own: 5 TiB is the most S3-compatible storage keeps in
+ * one object, so it is the only limit left.
+ */
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024 * 1024; // 5 TiB
 /** Every part is 16 MB except the last one. S3-compatible multipart uploads require at least 5 MB per part. */
 export const PART_SIZE = 16 * 1024 * 1024;
+/** S3-compatible storage takes at most 10,000 parts per upload. */
+export const MAX_PARTS = 10_000;
+
+/**
+ * The part size for a file: 16 MB, or bigger (whole MB) for files over
+ * 160 GB, so a file never needs more than 10,000 parts.
+ */
+export function partSizeFor(bytes: number): number {
+  const mb = 1024 * 1024;
+  if (!Number.isFinite(bytes) || bytes <= PART_SIZE * MAX_PARTS) return PART_SIZE;
+  return Math.ceil(bytes / MAX_PARTS / mb) * mb;
+}
 /** How many parts upload at the same time. */
 export const PARALLEL_PARTS = 3;
 /** A failed part is tried again this many times before the upload gives up. */
 export const PART_RETRIES = 3;
-/** How long the presigned part URLs work, in seconds. */
-export const PART_URL_TTL_S = 6 * 60 * 60;
+/** How long the presigned part URLs work, in seconds: 7 days, the most S3 signatures allow, for very big files. */
+export const PART_URL_TTL_S = 7 * 24 * 60 * 60;
 
 export const TITLE_MAX = 100;
 export const DESCRIPTION_MAX = 5000;
@@ -83,7 +99,7 @@ export function titleFromFileName(name: string): string {
 export type Part = { partNumber: number; start: number; end: number };
 
 /** Splits a file of `bytes` into numbered parts. `end` is exclusive, like Blob.slice. */
-export function planParts(bytes: number, partSize = PART_SIZE): Part[] {
+export function planParts(bytes: number, partSize = partSizeFor(bytes)): Part[] {
   if (!Number.isSafeInteger(bytes) || bytes <= 0) return [];
   const parts: Part[] = [];
   for (let start = 0, n = 1; start < bytes; start += partSize, n++) {
@@ -188,7 +204,7 @@ export function uploadErrorText(code: string | null | undefined): string {
     case "file_empty":
       return "This file is empty.";
     case "file_too_big":
-      return "This file is bigger than 5 GB, the most one upload can be.";
+      return "This file is bigger than 5 TB, the most storage can keep in one file.";
     case "bad_type":
       return "Only MP4, MOV, WebM and MKV videos can be uploaded.";
     case "daily_limit":

@@ -1,4 +1,4 @@
--- 027_bell_privacy.sql
+-- 028_bell_privacy.sql
 -- Two 2020 settings:
 --
 -- 1. Bell options (the bell_options flag). The bell next to SUBSCRIBED opens
@@ -25,7 +25,7 @@
 --      page yet; the setting is kept for when they do.
 -- And feature_on(key, uid), the one flag check later files use.
 --
--- Run after 026_search_spelling.sql. Safe to run more than once.
+-- Run after 027_search_spelling.sql. Safe to run more than once.
 
 -- A flag check for SQL --------------------------------------------------------------------
 

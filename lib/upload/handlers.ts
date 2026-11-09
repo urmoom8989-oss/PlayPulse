@@ -4,12 +4,12 @@
 // Only relative imports, so Node can load this file directly in the tests.
 
 import {
-  PART_SIZE,
   PART_URL_TTL_S,
   detailsProblem,
   fileProblemCode,
   isUuid,
   keyBelongsTo,
+  partSizeFor,
   planParts,
   uploadErrorText,
   type Details,
@@ -271,7 +271,7 @@ export async function signUpload(rawBody: unknown, ctx: UploadContext): Promise<
       videoId,
       key,
       uploadId,
-      partSize: PART_SIZE,
+      partSize: partSizeFor(bytes),
       expiresAt: new Date(Date.now() + PART_URL_TTL_S * 1000).toISOString(),
       parts: plan.map((p, i) => ({ partNumber: p.partNumber, url: urls[i] })),
     },

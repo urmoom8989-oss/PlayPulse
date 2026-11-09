@@ -33,7 +33,7 @@ test("Search instead for keeps the filters and adds exact=1", () => {
 });
 
 test("026 adds the word list, the function for everyone and the flag off", () => {
-  const sql = readFileSync(new URL("../supabase/migrations/026_search_spelling.sql", import.meta.url), "utf8");
+  const sql = readFileSync(new URL("../supabase/migrations/027_search_spelling.sql", import.meta.url), "utf8");
   assert.match(sql, /alter table public\.search_words enable row level security/);
   assert.match(sql, /revoke all on public\.search_words from anon, authenticated/);
   assert.match(sql, /grant execute on function public\.search_spelling\(text\) to anon, authenticated/);

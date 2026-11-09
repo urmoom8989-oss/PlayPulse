@@ -24,7 +24,7 @@ test("my_subscriptions rows carry the level", () => {
 });
 
 test("027: levels kept in step, privacy not readable, flags off", () => {
-  const sql = readFileSync(new URL("../supabase/migrations/027_bell_privacy.sql", import.meta.url), "utf8");
+  const sql = readFileSync(new URL("../supabase/migrations/028_bell_privacy.sql", import.meta.url), "utf8");
   assert.match(sql, /check \(notify_level in \('all', 'personalized', 'none'\)\)/);
   assert.match(sql, /create trigger subscriptions_sync_notify/);
   assert.match(sql, /revoke select \(subscriptions_private, playlists_private\) on public\.profiles from anon, authenticated/);
