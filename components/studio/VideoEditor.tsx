@@ -1,5 +1,6 @@
 "use client";
 
+import { BroadcastPanel } from "@/components/live/BroadcastPanel";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
@@ -454,6 +455,7 @@ export function VideoEditor({
               ))}
             </div>
           </div>
+          {!preview && <BroadcastPanel videoId={video.id} ready={ready} />}
         </aside>
       </div>
     </div>

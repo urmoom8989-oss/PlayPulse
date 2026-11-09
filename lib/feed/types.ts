@@ -2,6 +2,7 @@
 // Everything here is safe to show: no keys, no owner ids.
 // Only relative imports, so Node can load this file directly.
 
+import type { CardBroadcast } from "../live/types.ts";
 import { playbackUrls } from "../watch/media.ts";
 
 /** channel_shorts: one channel's shorts (feature 11), newest first. */
@@ -24,6 +25,8 @@ export type FeedCard = {
   channel: FeedChannel;
   /** Vertical and a minute or less (feature 11). */
   isShort: boolean;
+  /** A Premiere or live broadcast (028), added after the rows are read. */
+  broadcast?: CardBroadcast | null;
 };
 
 export type FeedPage = { cards: FeedCard[]; next: string | null };

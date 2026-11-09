@@ -1,5 +1,6 @@
 "use client";
 
+import { notificationText } from "@/lib/live/state";
 import Link from "next/link";
 import { Thumb } from "@/components/Thumb";
 import { useCallback, useEffect, useState } from "react";
@@ -143,7 +144,7 @@ export function NotificationsBell() {
                   <Avatar name={v.channel.name} url={v.channel.avatarUrl} size={48} />
                   <span className="min-w-0 flex-1">
                     <span className="line-clamp-3 text-[14px] leading-5 text-text">
-                      {v.channel.name} uploaded: {v.title}
+                      {notificationText(v.channel.name, v.title, v.broadcast)}
                     </span>
                     <span className="mt-1 block text-[13px] leading-[18px] text-text-2">{timeAgo(v.publishedAt, now || Date.now())}</span>
                   </span>

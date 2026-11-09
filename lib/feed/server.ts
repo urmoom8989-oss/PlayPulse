@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/server";
 import { readPublicBase } from "@/lib/watch/media";
 import { decodeCursor, encodeCursor } from "./cursor";
 import { TRENDING_COUNT } from "./score";
+import { withBroadcasts } from "@/lib/live/server";
 import { rowToCard, type FeedCard, type FeedKind, type FeedPage, type FeedRow } from "./types";
 
 /** The public bucket domain, when set (see the Watch page section of the README). */
@@ -73,7 +74,7 @@ export async function feedState(
 
   const rows = (Array.isArray(data) ? data : []) as FeedRow[];
   const publicBase = mediaPublicBase();
-  const cards = rows.map((r) => rowToCard(r, publicBase));
+  const cards = await withBroadcasts(rows.map((r) => rowToCard(r, publicBase)));
   const last = rows[rows.length - 1];
   const next =
     kind !== "trending" && last && rows.length === limit ? encodeCursor({ publishedAt: last.published_at, id: last.id }) : null;
@@ -90,5 +91,5 @@ export async function relatedCards(videoId: string, limit = 12): Promise<FeedCar
   const { data, error } = await supabase.rpc("related_videos", { video_id: videoId, lim: limit });
   if (error) return null;
   const publicBase = mediaPublicBase();
-  return ((Array.isArray(data) ? data : []) as FeedRow[]).map((r) => rowToCard(r, publicBase));
+  return withBroadcasts(((Array.isArray(data) ? data : []) as FeedRow[]).map((r) => rowToCard(r, publicBase)));
 }

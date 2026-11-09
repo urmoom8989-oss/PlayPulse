@@ -4,6 +4,8 @@ import { ChannelMessage } from "@/components/channel/ChannelNotices";
 import { CommentsSection, CommentsUnavailable } from "@/components/comments/CommentsSection";
 import { ErrorIcon } from "@/components/icons";
 import { WatchProcessing } from "@/components/processing/WatchProcessing";
+import { Countdown } from "@/components/live/Countdown";
+import { LiveChat } from "@/components/live/LiveChat";
 import { Player } from "@/components/watch/Player";
 import { UpNext } from "@/components/watch/UpNext";
 import { VideoInfo } from "@/components/watch/VideoInfo";
@@ -129,27 +131,41 @@ async function Watch({ searchParams }: { searchParams: PageProps<"/watch">["sear
     }
     case "ready": {
       const { video, upNext, preview, engagement, comments } = state;
+      const broadcast = video.broadcast ?? null;
+      const endsAt = broadcast ? Date.parse(broadcast.at) + (video.durationS ?? 0) * 1000 : null;
       return (
-        <div data-watch-state="ready" data-preview={preview ? "1" : undefined}>
+        <div data-watch-state="ready" data-preview={preview ? "1" : undefined} data-broadcast={broadcast?.state}>
           {!preview && <VideoJsonLd video={video} />}
           <WatchLayout
             player={
-              <Player
-                key={video.id}
-                videoId={video.id}
-                src={video.src}
-                poster={video.thumbnail}
-                spriteVtt={video.spriteVtt}
-                durationS={video.durationS}
-                startAt={parseStart(t)}
-                engagement={engagement}
-                description={video.description}
-                upNext={upNext}
-                channelName={video.channel.name}
-              />
+              broadcast?.state === "upcoming" ? (
+                <Countdown key={video.id} videoId={video.id} broadcast={broadcast} poster={video.thumbnail} />
+              ) : (
+                <Player
+                  key={video.id}
+                  videoId={video.id}
+                  src={video.src}
+                  poster={video.thumbnail}
+                  spriteVtt={video.spriteVtt}
+                  durationS={video.durationS}
+                  startAt={parseStart(t)}
+                  engagement={engagement}
+                  description={video.description}
+                  upNext={upNext}
+                  channelName={video.channel.name}
+                  live={broadcast?.state === "live" && endsAt !== null ? { endsAt } : null}
+                />
+              )
             }
             info={<VideoInfo video={video} engagement={engagement} />}
-            side={<UpNext videos={upNext} channel={video.channel} />}
+            side={
+              <>
+                {broadcast && (
+                  <LiveChat key={video.id} videoId={video.id} broadcast={broadcast} durationS={video.durationS} isOwner={video.isOwner} />
+                )}
+                <UpNext videos={upNext} channel={video.channel} />
+              </>
+            }
             comments={
               comments === "no-db" ? (
                 <CommentsUnavailable />

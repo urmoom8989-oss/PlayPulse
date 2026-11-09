@@ -18,6 +18,7 @@ import { formatDate, formatViews } from "@/lib/watch/format";
 import type { WatchVideo } from "@/lib/watch/types";
 import { SubscribeButton } from "@/components/subscriptions/SubscribeButton";
 import { SubscriberCount } from "@/components/subscriptions/SubscriberCount";
+import { BroadcastMeta } from "@/components/live/BroadcastMeta";
 import { LikeButtons } from "./LikeButtons";
 import { ShareDialog } from "./ShareDialog";
 import { TimestampText } from "./TimestampText";
@@ -126,7 +127,17 @@ export function VideoInfo({
       <div className="flex flex-wrap items-center justify-between gap-y-1 border-b border-divider pb-2 pt-1">
         <p className="py-1 text-[14px] leading-5 text-text-2" data-watch-meta>
           <VisibilityNote visibility={video.visibility} />
-          {formatViews(video.views)} · {formatDate(video.date)}
+          {video.broadcast && video.broadcast.state !== "ended" ? (
+            <BroadcastMeta videoId={video.id} broadcast={video.broadcast} />
+          ) : video.broadcast ? (
+            <>
+              {formatViews(video.views)} · <BroadcastMeta videoId={video.id} broadcast={video.broadcast} />
+            </>
+          ) : (
+            <>
+              {formatViews(video.views)} · {formatDate(video.date)}
+            </>
+          )}
         </p>
         <div className="-mx-1.5 flex items-center sm:mx-0">
           <LikeButtons key={video.id} videoId={video.id} engagement={engagement} />

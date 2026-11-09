@@ -5,6 +5,7 @@ import { getCurrentUser } from "@/lib/auth";
 import { flagOn } from "@/lib/flags";
 import { readSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { withBroadcasts } from "@/lib/live/server";
 import { readPublicBase } from "@/lib/watch/media";
 import { decodeSearchCursor, encodeSearchCursor } from "./cursor";
 import { filtersToSql, normalizeQuery, showsChannels, showsVideos, type SearchFilters } from "./query";
@@ -89,7 +90,7 @@ export async function searchVideos(q: string, filters: SearchFilters, cursor: st
   return {
     kind: "ready",
     page: {
-      videos: rows.map((r) => rowToSearchVideo(r, publicBase)),
+      videos: await withBroadcasts(rows.map((r) => rowToSearchVideo(r, publicBase))),
       next: last && rows.length === SEARCH_PAGE_SIZE ? encodeSearchCursor({ key: Number(last.sort_key), id: last.id }) : null,
     },
   };

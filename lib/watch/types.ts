@@ -1,5 +1,7 @@
 // What the watch page hands to the browser. Everything here is safe to show:
-// no keys, no owner ids. No imports, so the tests can load it.
+// no keys, no owner ids. Only type imports, so the tests can load it.
+
+import type { Broadcast } from "../live/state.ts";
 
 export type WatchChannel = {
   id: string;
@@ -29,6 +31,8 @@ export type WatchVideo = {
   /** The hover sprite's .vtt, or null when the video has none. */
   spriteVtt: string | null;
   channel: WatchChannel;
+  /** A Premiere or live broadcast (028), or null for a plain upload. */
+  broadcast?: Broadcast | null;
 };
 
 export type UpNextVideo = {

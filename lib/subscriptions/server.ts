@@ -6,6 +6,7 @@ import { rowToCard, type FeedPage, type FeedRow } from "@/lib/feed/types";
 import { flagOn } from "@/lib/flags";
 import { readSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
+import { broadcastAlerts, withBroadcasts } from "@/lib/live/server";
 import { readPublicBase } from "@/lib/watch/media";
 import { levelOf, subErrorCode, type NotifyLevel, type SubAction } from "./rules";
 import { rowToGuideChannel, type GuideChannel, type MySubscriptionRow, type SubResult } from "./types";
@@ -73,16 +74,28 @@ export async function subscriptionsFeed(
   return {
     kind: "ready",
     page: {
-      cards: rows.map((r) => rowToCard(r, publicBase)),
+      cards: await withBroadcasts(rows.map((r) => rowToCard(r, publicBase))),
       next: last && rows.length === limit ? encodeCursor({ publishedAt: last.published_at, id: last.id }) : null,
     },
     now: Date.now(),
   };
 }
 
-/** The notifications menu: the last uploads from channels with the bell on. */
-export function notificationsFeed() {
-  return subscriptionsFeed({ onlyNotify: true, limit: NOTIFICATION_COUNT });
+/**
+ * The notifications menu: the last uploads from channels with the bell on,
+ * and broadcasts the person set a reminder for once they start (028).
+ */
+export async function notificationsFeed(): Promise<SubsFeedState> {
+  const [uploads, alerts] = await Promise.all([
+    subscriptionsFeed({ onlyNotify: true, limit: NOTIFICATION_COUNT }),
+    broadcastAlerts(NOTIFICATION_COUNT),
+  ]);
+  if (uploads.kind !== "ready" || alerts.length === 0) return uploads;
+  const seen = new Set(alerts.map((c) => c.id));
+  const cards = [...alerts, ...uploads.page.cards.filter((c) => !seen.has(c.id))]
+    .sort((a, b) => Date.parse(b.publishedAt) - Date.parse(a.publishedAt))
+    .slice(0, NOTIFICATION_COUNT);
+  return { ...uploads, page: { ...uploads.page, cards } };
 }
 
 export type MySubsState =

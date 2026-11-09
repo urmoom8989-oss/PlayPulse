@@ -83,6 +83,10 @@ again. See [`supabase/migrations/README.md`](../supabase/migrations/README.md).
 - [ ] `023_open_uploads_usernames.sql` (no daily upload limit, usernames with any characters but emoji)
 - [ ] `024_player_extras.sql` (the `player_extras` flag: chapters, autoplay, end screens, captions)
 - [ ] `025_upload_any_size.sql` (no upload size limit of our own: up to 5 TiB, the storage's limit)
+- [ ] `026_shortcuts_hover.sql` (the `more_shortcuts` and `hover_previews` flags)
+- [ ] `027_search_spelling.sql` (spelling correction for search, the `search_spelling` flag)
+- [ ] `028_bell_privacy.sql` (bell options and privacy settings, two flags)
+- [ ] `029_live.sql` (Premieres, live from an upload and live chat, the `premieres` and `live` flags)
 
 Then make yourself an admin (sign up on the site first):
 

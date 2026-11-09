@@ -1,5 +1,7 @@
 import Link from "next/link";
 import { HoverPreview } from "@/components/feed/HoverPreview";
+import { CardBadge, onAirOrSoon } from "@/components/live/CardBadge";
+import { cardMeta } from "@/lib/live/state";
 import { viewsLabel } from "@/lib/feed/format";
 import type { FeedCard } from "@/lib/feed/types";
 import { formatTime, timeAgo } from "@/lib/watch/format";
@@ -44,10 +46,14 @@ export function VideoCard({
             {rank}
           </span>
         )}
-        {video.durationS !== null && (
-          <span className="absolute bottom-1 right-1 bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 tracking-[0.5px] text-white">
-            {formatTime(video.durationS)}
-          </span>
+        {onAirOrSoon(video.broadcast) ? (
+          <CardBadge broadcast={video.broadcast} />
+        ) : (
+          video.durationS !== null && (
+            <span className="absolute bottom-1 right-1 bg-black/80 px-1 py-[3px] text-[12px] font-medium leading-3 tracking-[0.5px] text-white">
+              {formatTime(video.durationS)}
+            </span>
+          )
         )}
         <ThumbProgress videoId={video.id} />
       </Link>
@@ -64,7 +70,7 @@ export function VideoCard({
               {video.channel.name}
             </Link>
             <span className="sm:hidden"> · </span>
-            {viewsLabel(video.views)} · {timeAgo(video.publishedAt, now)}
+            {(onAirOrSoon(video.broadcast) && cardMeta(video.broadcast, now)) || `${viewsLabel(video.views)} · ${timeAgo(video.publishedAt, now)}`}
           </p>
         </div>
       </div>

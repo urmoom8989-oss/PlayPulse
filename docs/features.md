@@ -346,6 +346,46 @@ quality that fits the card, and everything is let go as soon as the pointer
 leaves. Nothing loads until someone hovers. Touch screens never get it (they
 have no hover), and nor do browsers set to reduced motion or data saver.
 
+### Premieres and live
+
+Behind the `premieres` and `live` flags (`029_live.sql`, both off at first). A
+ready upload can be broadcast: everybody watches it at the same point, like a
+stream, with live chat.
+
+- **Premiere** (any channel): in **Studio > Video details > Premiere and
+  live**, pick when it starts and **Schedule Premiere**. A private video
+  becomes public, so the watch page and the cards show it, but nobody gets the
+  video files before it starts.
+- **Live** (only channels with `channels.can_go_live`, which the file sets for
+  @typicalgamer): **Go live now**, or **Schedule live** for later. It streams
+  the upload as a live broadcast.
+- **Before it starts**, the player's place shows the thumbnail with "Premieres
+  in 1:05:09" (or "Live in"), the date and **Set reminder**. The line under the
+  title says how many are waiting. Live chat is open as a waiting room. At zero
+  the page loads the player by itself. A reminder puts the broadcast in the top
+  bar's bell once it starts (for a day). **Cancel** in the studio takes it back
+  to a plain upload until it starts.
+- **While it is on**, the media route hands out the playlists cut at "now" (only
+  the segments that have aired, as a growing EVENT playlist, never cached), so
+  the player starts at the live edge, can rewind to the start, and the bar
+  shows **LIVE** instead of the time: red at the live edge, grey when behind
+  (a click goes back to live). The line under the title says "40 watching now ·
+  Started streaming 5 minutes ago" (or "Premiere in progress"). There are no
+  captions while it is on.
+- **Live chat** on the right, above Up next: signed in people post up to 200
+  characters, no links, the word list from moderation applies, at most one
+  message every 2 seconds and 20 a minute. The channel's owner shows with a
+  yellow badge and can remove any message; authors can remove their own.
+  Without websockets it asks for new messages every 2.5 seconds.
+- **Afterwards** it is a normal video ("Streamed live on ..." or "Premiered
+  ..."), and **Show chat replay** plays the chat back as the video reaches the
+  moment each message was sent.
+- Cards show **PREMIERE** or **UPCOMING** with "Premieres in 2 hours", and a red
+  **LIVE NOW** (or **PREMIERING NOW**) with "12 watching", in place of the
+  duration and views.
+- Watching now counts signed in viewers by account and everybody else by the
+  `sv` cookie, for 30 seconds after their last ping (every 15 seconds).
+
 ### How the player gets the video
 
 The bucket is private, so the browser cannot read it directly. The player asks

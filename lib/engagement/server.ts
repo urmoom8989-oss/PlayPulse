@@ -84,7 +84,7 @@ export async function react(videoId: string, kind: Reaction | null): Promise<Rea
  * or broken (route handlers only, where cookies can be set). Answers the
  * hash that goes to the database, never the cookie itself.
  */
-async function viewerKey(): Promise<string> {
+export async function viewerKey(): Promise<string> {
   const store = await cookies();
   let value = store.get(VIEWER_COOKIE)?.value;
   if (!isViewerCookie(value)) {
