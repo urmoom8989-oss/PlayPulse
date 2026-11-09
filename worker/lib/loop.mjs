@@ -119,6 +119,17 @@ export async function runLoop(deps) {
   const { pollMs = POLL_MS, log } = deps;
   const cleaned = await cleanWorkDir(deps.config.workDir);
   await markIdle(deps.config.stateDir);
+  // During an update the old encoder runs for a few more seconds. It gives its
+  // jobs back when it stops; taking jobs before then would let both work on one.
+  const startWait = deps.config.startWaitMs ?? 0;
+  if (startWait > 0) {
+    log("start", {}, `waiting ${startWait / 1000}s for the encoder this one replaces to stop`);
+    await sleep(startWait, deps.stopSignal);
+    if (deps.stopSignal?.aborted) {
+      log("stop", { worker: deps.config.workerName }, "stopped");
+      return;
+    }
+  }
   // Jobs this worker's slots were running before a restart go back in the queue at once.
   const released = deps.db.release ? await deps.db.release(deps.config.workerName).catch(() => 0) : null;
   // Without 037's heartbeats, a second slot could take over a long encode: one at a time then.
