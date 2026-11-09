@@ -18,7 +18,7 @@
   --red: #cc0000;
   /* Brand teal (lib/brand.ts): the mark, active guide icons and thumbnail progress. */
   --mark: #0f766e;
-  /* The brand green as a button with white text (Subscribe, the Bots page): the same in both themes, 5.5:1 with white. */
+  /* The brand green behind SUBSCRIBE's white text: the same in both themes, 5.5:1 with white. */
   --brand-button: #0f766e;
   --logo-word: #0f766e;
   --divider: #e5e5e5;
@@ -181,26 +181,6 @@
   }
 
   .btn-blue:disabled {
-    opacity: 0.5;
-  }
-
-  /* The same in the brand green, for Subscribe and the Bots page. */
-  .btn-green {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    height: 36px;
-    padding: 0 16px;
-    border-radius: 2px;
-    background: var(--brand-button);
-    color: #ffffff;
-    font-size: 14px;
-    font-weight: 500;
-    letter-spacing: 0.007px;
-    text-transform: uppercase;
-  }
-
-  .btn-green:disabled {
     opacity: 0.5;
   }
 

@@ -131,7 +131,7 @@ function VideoOrderForm({ video, send, busy, onClose }: { video: BotVideo; send:
         <button type="button" className="btn-text" onClick={onClose}>
           Cancel
         </button>
-        <button type="submit" className="btn-green" disabled={busy || Boolean(problem)} data-bot-submit>
+        <button type="submit" className="btn-blue" disabled={busy || Boolean(problem)} data-bot-submit>
           Add bots
         </button>
       </div>
@@ -167,7 +167,7 @@ function SubscribersCard({ panel, send, busy }: { panel: Panel; send: Send; busy
       <form onSubmit={submit} className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,180px)_minmax(0,220px)_auto] sm:items-end">
         <NumberField label="Subscribers to add" name="subscribers" value={subs} onChange={setSubs} />
         <WindowSelect value={over} onChange={setOver} />
-        <button type="submit" className="btn-green sm:justify-self-start" disabled={busy || Boolean(problem)} data-bot-subscribe>
+        <button type="submit" className="btn-blue sm:justify-self-start" disabled={busy || Boolean(problem)} data-bot-subscribe>
           Add subscribers
         </button>
       </form>
