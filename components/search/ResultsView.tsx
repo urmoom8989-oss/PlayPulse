@@ -1,6 +1,8 @@
 import { EmptyState } from "@/components/EmptyState";
 import { SearchIcon } from "@/components/icons";
-import { parseFilters, queryWords, readQuery, showsVideos } from "@/lib/search/query";
+import Link from "next/link";
+import { parseFilters, queryWords, readExact, readQuery, resultsHref, showsVideos, type SearchFilters } from "@/lib/search/query";
+import { exactHref, markCorrection } from "@/lib/search/spelling";
 import { searchResults } from "@/lib/search/server";
 import { ChannelResult } from "./ChannelResult";
 import { FilterPanel } from "./FilterPanel";
@@ -35,6 +37,47 @@ function Message({ state, title, hint }: { state: string; title: string; hint: s
   );
 }
 
+/** The corrected words in bold italic, the rest plain, like 2020. */
+function Corrected({ typed, corrected }: { typed: string; corrected: string }) {
+  return (
+    <>
+      {markCorrection(typed, corrected).map((w, i) => (
+        <span key={i}>
+          {i > 0 && " "}
+          {w.changed ? <b className="font-medium italic">{w.text}</b> : w.text}
+        </span>
+      ))}
+    </>
+  );
+}
+
+/** "Showing results for" / "Search instead for", or "Did you mean". */
+function Spelling({ q, filters, spelling }: { q: string; filters: SearchFilters; spelling: { mode: "showing" | "did-you-mean"; corrected: string } }) {
+  if (spelling.mode === "showing") {
+    return (
+      <div className="px-3 pb-2 pt-1 search:px-0" data-search-spelling="showing">
+        <p className="text-[16px] leading-[22px] text-text">
+          Showing results for <Corrected typed={q} corrected={spelling.corrected} />
+        </p>
+        <p className="text-[14px] leading-5 text-text-2">
+          Search instead for{" "}
+          <Link href={exactHref(q, filters)} className="text-link hover:underline" data-search-instead>
+            {q}
+          </Link>
+        </p>
+      </div>
+    );
+  }
+  return (
+    <p className="px-3 pb-2 pt-1 text-[16px] leading-[22px] text-text search:px-0" data-search-spelling="did-you-mean">
+      Did you mean:{" "}
+      <Link href={resultsHref(spelling.corrected, filters)} className="text-link hover:underline" data-search-did-you-mean>
+        <Corrected typed={q} corrected={spelling.corrected} />
+      </Link>
+    </p>
+  );
+}
+
 /**
  * /results?search_query=<q>. With the search flag off (or no database) a
  * placeholder shows. Reads the request, so it is rendered inside <Suspense>.
@@ -43,7 +86,7 @@ export async function ResultsView({ searchParams }: { searchParams: PageProps<"/
   const params = await searchParams;
   const q = readQuery(params);
   const filters = parseFilters(params);
-  const state = await searchResults(q, filters);
+  const state = await searchResults(q, filters, readExact(params));
 
   switch (state.kind) {
     case "off":
@@ -80,7 +123,7 @@ export async function ResultsView({ searchParams }: { searchParams: PageProps<"/
         </div>
       );
     case "ready": {
-      const words = queryWords(q);
+      const words = queryWords(state.shown);
       const none = state.page.videos.length === 0 && state.channels.length === 0;
       return (
         <div className={frame} data-search-state={none ? "none" : "ready"} data-search-query={q}>
@@ -88,6 +131,7 @@ export async function ResultsView({ searchParams }: { searchParams: PageProps<"/
           <div className="px-3 search:px-0">
             <FilterPanel q={q} filters={filters} />
           </div>
+          {state.spelling && <Spelling q={q} filters={filters} spelling={state.spelling} />}
           {none ? (
             <Message state="none" title="No results found" hint="Try different keywords or remove search filters" />
           ) : (
@@ -99,7 +143,7 @@ export async function ResultsView({ searchParams }: { searchParams: PageProps<"/
                   ))}
                 </div>
               )}
-              <ResultsList key={`${q}|${JSON.stringify(filters)}`} q={q} filters={filters} words={words} initial={state.page} now={state.now} />
+              <ResultsList key={`${state.shown}|${JSON.stringify(filters)}`} q={state.shown} filters={filters} words={words} initial={state.page} now={state.now} />
             </div>
           )}
         </div>

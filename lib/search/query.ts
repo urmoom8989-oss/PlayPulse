@@ -96,6 +96,11 @@ export function readQuery(params: ParamSource): string {
   return normalizeQuery(read(params, "search_query"));
 }
 
+/** ?exact=1: "Search instead for", so no spelling correction. */
+export function readExact(params: ParamSource): boolean {
+  return read(params, "exact") === "1";
+}
+
 /** The filters from the URL. Unknown values are dropped; relevance is the default. */
 export function parseFilters(params: ParamSource): SearchFilters {
   const out: SearchFilters = {};

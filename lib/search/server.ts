@@ -7,8 +7,9 @@ import { readSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { readPublicBase } from "@/lib/watch/media";
 import { decodeSearchCursor, encodeSearchCursor } from "./cursor";
-import { filtersToSql, showsChannels, showsVideos, type SearchFilters } from "./query";
+import { filtersToSql, normalizeQuery, showsChannels, showsVideos, type SearchFilters } from "./query";
 import { CHANNELS_ONLY, CHANNELS_ON_TOP, SEARCH_PAGE_SIZE, SUGGEST_LIMIT } from "./rules";
+import { spellingMode, type SpellingMode } from "./spelling";
 import { dedupeSuggestions } from "./suggest";
 import {
   rowToSearchChannel,
@@ -96,16 +97,21 @@ export async function searchVideos(q: string, filters: SearchFilters, cursor: st
 
 export type ResultsState =
   | { kind: "off" | "no-db" | "empty-query" | Problem }
-  | { kind: "ready"; page: SearchPage; channels: SearchChannel[]; now: number };
+  | {
+      kind: "ready";
+      page: SearchPage;
+      channels: SearchChannel[];
+      now: number;
+      /** The query the results are for: what was typed, or its correction ("showing"). */
+      shown: string;
+      /** The correction, when there is one (the search_spelling flag). */
+      spelling: { mode: Exclude<SpellingMode, "none">; corrected: string } | null;
+    };
 
-/** The first page of /results: channel rows (when they fit the filters) and videos. */
-export async function searchResults(q: string, filters: SearchFilters): Promise<ResultsState> {
-  const gate = await searchGate();
-  if (gate !== "on") return { kind: gate };
-  if (!q) return { kind: "empty-query" };
-  const supabase = await searchClient();
-  if (!supabase) return { kind: "no-db" };
+type FirstPage = { kind: "ready"; page: SearchPage; channels: SearchChannel[] } | { kind: "off" | "no-db" | Problem };
 
+/** Channel rows (when they fit the filters) and the first page of videos for one query. */
+async function firstPage(supabase: NonNullable<Awaited<ReturnType<typeof searchClient>>>, q: string, filters: SearchFilters): Promise<FirstPage> {
   const channelCall = showsChannels(filters)
     ? supabase.rpc("search_channels", { q, lim: filters.type === "channel" ? CHANNELS_ONLY : CHANNELS_ON_TOP })
     : null;
@@ -116,7 +122,45 @@ export async function searchResults(q: string, filters: SearchFilters): Promise<
     if (problem !== "failed") return { kind: problem };
   }
   const rows = (channels && Array.isArray(channels.data) ? channels.data : []) as SearchChannelRow[];
-  return { kind: "ready", page: videos.page, channels: rows.map(rowToSearchChannel), now: Date.now() };
+  return { kind: "ready", page: videos.page, channels: rows.map(rowToSearchChannel) };
+}
+
+/** The closest known spelling of the query, or null (no correction, flag off, 026 not applied). */
+async function correctionFor(supabase: NonNullable<Awaited<ReturnType<typeof searchClient>>>, q: string): Promise<string | null> {
+  const user = await getCurrentUser();
+  if (!(await flagOn("search_spelling", user?.id ?? null))) return null;
+  const { data, error } = await supabase.rpc("search_spelling", { q });
+  if (error || typeof data !== "string") return null;
+  const fixed = normalizeQuery(data);
+  return fixed && fixed !== q.toLowerCase() ? fixed : null;
+}
+
+/**
+ * The first page of /results: channel rows (when they fit the filters) and
+ * videos. With the search_spelling flag, a query that finds nothing shows the
+ * results of its correction instead, and one that finds something gets a
+ * "Did you mean". `exact` (from "Search instead for") skips the correction.
+ */
+export async function searchResults(q: string, filters: SearchFilters, exact: boolean = false): Promise<ResultsState> {
+  const gate = await searchGate();
+  if (gate !== "on") return { kind: gate };
+  if (!q) return { kind: "empty-query" };
+  const supabase = await searchClient();
+  if (!supabase) return { kind: "no-db" };
+
+  const [typed, corrected] = await Promise.all([firstPage(supabase, q, filters), exact ? null : correctionFor(supabase, q)]);
+  if (typed.kind !== "ready") return { kind: typed.kind };
+  const found = typed.page.videos.length > 0 || typed.channels.length > 0;
+  const mode = spellingMode(q, corrected, found, exact);
+  if (mode === "showing" && corrected) {
+    const fixed = await firstPage(supabase, corrected, filters);
+    if (fixed.kind === "ready" && (fixed.page.videos.length > 0 || fixed.channels.length > 0)) {
+      return { ...fixed, now: Date.now(), shown: corrected, spelling: { mode, corrected } };
+    }
+    // The correction finds nothing either: plain "No results found".
+    return { ...typed, now: Date.now(), shown: q, spelling: null };
+  }
+  return { ...typed, now: Date.now(), shown: q, spelling: mode === "did-you-mean" && corrected ? { mode, corrected } : null };
 }
 
 export type SuggestState = { kind: "off" | "no-db" | Problem } | { kind: "ready"; suggestions: string[] };

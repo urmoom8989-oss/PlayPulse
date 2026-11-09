@@ -531,6 +531,25 @@ from `X-Forwarded-For`, which Caddy sets (see `ops/app/`). Somebody calling
 the database directly can make up that header, so the per address limit only
 holds for visits through the site.
 
+### Spelling correction
+
+Behind the `search_spelling` flag (`026_search_spelling.sql`, off at first):
+
+- When a search finds nothing but a close spelling finds something, the page
+  shows that spelling's results under **Showing results for** *the fix*, with
+  **Search instead for** *what you typed* (that link adds `&exact=1`, so it is
+  not corrected again).
+- When a search finds something and a close spelling exists, **Did you mean:**
+  *the fix* sits above the results as a link.
+- The fix only uses words that are really on the site: the titles and tags of
+  public videos and the names and handles of channels, kept in the
+  `search_words` table, rebuilt every 30 minutes with pg_cron (or by running
+  `select public.refresh_search_words();`). A word counts as close when it is
+  one edit away (two for longer words), the same letters with two swapped, or
+  very similar. Short words, numbers and words that are already on the site are
+  never changed. The changed words show in bold italic.
+- Each correction counts toward the 240 suggestion requests a minute.
+
 `node scripts/search-shots.mjs` starts `next dev` against a small local stand
 in for Supabase with made up channels and videos, checks the suggestions
 dropdown with the keyboard, recent searches, the results page, infinite
