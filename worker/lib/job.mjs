@@ -22,7 +22,7 @@ import {
   thumbnailName,
 } from "./ffmpeg.mjs";
 import { pickRenditions } from "./ladder.mjs";
-import { DISK_MARGIN_BYTES, DISK_SOURCE_FACTOR, HD_FROM, JOB_TIMEOUT_MS, PROGRESS_EVERY_MS, THUMBNAIL_AT, jobTimeoutMs } from "./limits.mjs";
+import { DISK_MARGIN_BYTES, DISK_SOURCE_FACTOR, HD_FROM, JOB_TIMEOUT_MS, PROGRESS_EVERY_MS, THUMBNAIL_AT, X264_HD_PRESET, jobTimeoutMs } from "./limits.mjs";
 import { human, limitText, seconds } from "./log.mjs";
 import { buildProbeArgs, parseProbe } from "./probe.mjs";
 import { run as realRun } from "./run.mjs";
@@ -68,7 +68,7 @@ export function renditionsJson(renditions) {
 
 /**
  * Runs one job. Never throws: failures go to encode_failed.
- * @returns {Promise<"done" | "queued" | "failed" | "lost">}
+ * @returns {Promise<"done" | "handed" | "queued" | "failed" | "lost">} ("handed": the low quality is out and the HD part is back in the queue, 039)
  */
 export async function processJob(job, deps) {
   const {
@@ -145,10 +145,12 @@ export async function processJob(job, deps) {
     // 3. Download.
     let t = now();
     // The bar moves while the file comes in (the first 10%), so a slow download does not look stuck.
-    // In pieces, 4 at a time, each fetched again if its connection drops.
-    await storage.download(job.sourceKey, input, signal, (got) => void progress((PROGRESS_STEPS.downloaded * got) / size), { size });
+    // In pieces, 4 at a time, each fetched again if its connection drops. The
+    // HD part of a video that plays already keeps its bar where it was.
+    const onBytes = job.hdOnly ? undefined : (got) => void progress((PROGRESS_STEPS.downloaded * got) / size);
+    await storage.download(job.sourceKey, input, signal, onBytes, { size });
     log("download", ids, `${human(size)} in ${seconds(now() - t)}`);
-    await progress(PROGRESS_STEPS.downloaded, true);
+    if (!job.hdOnly) await progress(PROGRESS_STEPS.downloaded, true);
 
     // 4. Probe.
     let probe;
@@ -237,7 +239,14 @@ export async function processJob(job, deps) {
       const sent = await upload(out, prefix, steps.thumbnails, steps.uploadEnd);
       log("upload", ids, `${sent.files} files, ${human(sent.bytes)} in ${seconds(now() - t)}`);
 
-      // 8. The video plays: at low quality while HD is made, or done.
+      // 8. The video plays: at low quality while HD is made, or done. With
+      // smart order (039) the HD part goes back to the queue for the HD lane,
+      // so the next upload's low quality comes first.
+      if (split && job.handoff) {
+        await db.sdHandoff(job.jobId, details(low));
+        log("sd", ids, `${low.map((r) => r.name).join(", ")} playable in ${seconds(now() - started)}, HD queued`);
+        return "handed";
+      }
       if (split) {
         await db.sdReady(job.jobId, details(low));
         log("sd", ids, `${low.map((r) => r.name).join(", ")} playable in ${seconds(now() - started)}, HD next`);
@@ -251,7 +260,7 @@ export async function processJob(job, deps) {
       // 8b. HD: the renditions from 720p up, their own master playlist (not uploaded).
       t = now();
       await progress(steps.hdStart, true);
-      await encode(high, steps.hdStart, steps.hdEnd, { masterName: HD_MASTER_PLAYLIST });
+      await encode(high, steps.hdStart, steps.hdEnd, { masterName: HD_MASTER_PLAYLIST, preset: X264_HD_PRESET });
       log("encode", ids, `${high.length} HD renditions in ${seconds(now() - t)}`);
       t = now();
       let files = 0;

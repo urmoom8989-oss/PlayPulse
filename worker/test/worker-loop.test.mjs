@@ -18,7 +18,7 @@ const KEY = `uploads/${OWNER}/${VIDEO}/source.mp4`;
 const BYTES = 4096;
 
 /** A Supabase client whose rpc() behaves like the functions in 006_processing.sql. */
-function fakeSupabase({ jobs = [], claimError = null, progressAnswer = null, sdFirst = false } = {}) {
+function fakeSupabase({ jobs = [], claimError = null, progressAnswer = null, sdFirst = false, lanes = false } = {}) {
   const calls = [];
   const rows = jobs.map((j, i) => ({
     job_id: `00000000-0000-0000-0000-00000000000${i + 1}`,
@@ -40,7 +40,11 @@ function fakeSupabase({ jobs = [], claimError = null, progressAnswer = null, sdF
       switch (name) {
         case "claim_encode_job": {
           if (claimError) return { data: null, error: { message: claimError } };
-          const job = rows.find((r) => r.status === "queued");
+          // Before 039 there is no claim_encode_job with a lane.
+          if ("lane" in args && !lanes) return { data: null, error: { code: "PGRST202", message: "Could not find the function" } };
+          const fits = (r) => r.status === "queued" && (args.lane === "sd" ? !r.hdOnly : args.lane === "hd" ? r.hdOnly === true : true);
+          // Low quality first: the HD parts after every video that still needs its low quality.
+          const job = rows.filter(fits).sort((a, b) => Number(Boolean(a.hdOnly)) - Number(Boolean(b.hdOnly)))[0];
           if (!job) return { data: [], error: null };
           job.status = "running";
           job.attempts++;
@@ -55,7 +59,7 @@ function fakeSupabase({ jobs = [], claimError = null, progressAnswer = null, sdF
             source_mime: job.source_mime,
             attempt: job.attempts,
             // 038 and later answer hd_only too.
-            ...(sdFirst ? { hd_only: job.hdOnly === true } : {}),
+            ...(sdFirst || lanes ? { hd_only: job.hdOnly === true } : {}),
           };
           return { data: [row], error: null };
         }
@@ -70,6 +74,11 @@ function fakeSupabase({ jobs = [], claimError = null, progressAnswer = null, sdF
         case "encode_sd_ready":
           byId(args.job_id).sdReady = args;
           return { data: "ready", error: null };
+        case "encode_sd_handoff": {
+          const job = byId(args.job_id);
+          Object.assign(job, { sdReady: args, status: "queued", hdOnly: true, attempts: 0, worker: null });
+          return { data: "queued", error: null };
+        }
         case "encode_failed": {
           const job = byId(args.job_id);
           job.error = args.error;
@@ -134,8 +143,8 @@ function fakeRun({ failEncode = 0, hang = false, probe = PROBE, whisper = null, 
   const runs = [];
   let encodes = 0;
   let heard = 0;
-  const fn = async (cmd, args, { cwd, signal, onStdout } = {}) => {
-    runs.push({ cmd, args });
+  const fn = async (cmd, args, { cwd, signal, onStdout, priority } = {}) => {
+    runs.push({ cmd, args, priority });
     if (cmd === "ffprobe") return probe;
     // whisper-cli: `whisper(n, args, signal)` gives the JSON of its nth run, or throws.
     if (cmd === "whisper-cli") {
@@ -842,6 +851,86 @@ test("stopped while it waits at start, the worker takes nothing", async () => {
     assert.ok(!s.supabase.calls.some((c) => c.name === "claim_encode_job"));
     assert.equal(s.supabase.rows[0].status, "queued");
     assert.ok(s.lines.at(-1).startsWith("stop "));
+  } finally {
+    await s.cleanup();
+  }
+});
+
+const VIDEO_2 = "aaaaaaaa-bbbb-cccc-dddd-000000000002";
+const presetOf = (r) => r.args[r.args.indexOf("-preset") + 1];
+
+test("smart order (039): the low quality hands HD back, and the next upload's low quality comes before it", async () => {
+  const s = await setup({ jobs: [{}, { video_id: VIDEO_2 }], lanes: true, probe: PROBE_1080 });
+  try {
+    // 1: the first video's 360p, then its HD goes back to the queue.
+    assert.equal(await tick(s.deps), "handed");
+    assert.deepEqual(s.supabase.rows.map((r) => [r.status, r.hdOnly === true]), [["queued", true], ["queued", false]]);
+    assert.ok(rpcNames(s).includes("encode_sd_handoff") && !rpcNames(s).includes("encode_done"));
+    assert.ok(s.lines.some((l) => l.startsWith("sd ") && l.includes("HD queued")));
+    // 2: the second upload's 360p comes before the first one's HD.
+    assert.equal(await tick(s.deps), "handed");
+    assert.equal(s.supabase.rows[1].sdReady.renditions.length, 1);
+    // 3 and 4: the HD parts, oldest first, with the faster HD preset.
+    const before = s.supabase.calls.length;
+    assert.equal(await tick(s.deps), "done");
+    const hdCalls = s.supabase.calls.slice(before);
+    // The bar is not sent back to the download share for a video that plays already.
+    const pcts = hdCalls.filter((c) => c.name === "encode_progress").map((c) => c.args.pct);
+    assert.ok(pcts.every((p) => p >= 33), `progress was ${pcts}`);
+    assert.equal(await tick(s.deps), "done");
+    assert.deepEqual(s.supabase.rows.map((r) => r.status), ["done", "done"]);
+    const encodes = encodeRuns(s);
+    assert.deepEqual(encodes.map((r) => streamNames(r).join("+")), ["360p", "360p", "720p+1080p", "720p+1080p"]);
+    assert.deepEqual(encodes.map(presetOf), ["veryfast", "veryfast", "superfast", "superfast"]);
+    assert.equal(await tick(s.deps), "idle");
+  } finally {
+    await s.cleanup();
+  }
+});
+
+test("two lanes: slot 1 makes low quality, slot 2 makes HD at the lowest CPU priority", async () => {
+  const s = await setup({ jobs: [{}], lanes: true, probe: PROBE_1080 });
+  try {
+    const stop = new AbortController();
+    const db = s.deps.db;
+    const lanes = [];
+    const counted = {
+      ...db,
+      claim: async (w, lane) => {
+        lanes.push(`${w} ${lane}`);
+        const job = await db.claim(w, lane);
+        if (!job && s.supabase.rows.every((r) => r.status === "done")) stop.abort();
+        return job;
+      },
+      release: async () => 0,
+    };
+    await runLoop({ ...s.deps, db: counted, config: { ...s.deps.config, encodeSlots: 2 }, stopSignal: stop.signal, pollMs: 10 });
+    assert.ok(lanes.includes("test-box/1 sd") && lanes.includes("test-box/2 hd"), lanes.join(", "));
+    assert.equal(s.supabase.rows[0].status, "done");
+    const encodes = encodeRuns(s);
+    assert.deepEqual(encodes.map((r) => [streamNames(r).join("+"), r.priority]), [["360p", undefined], ["720p+1080p", 19]]);
+    // Everything the HD lane ran (its probe too) was at the lowest priority.
+    const hdStart = s.run.runs.findIndex((r) => r.priority === 19);
+    assert.ok(hdStart > 0 && s.run.runs.slice(hdStart).every((r) => r.priority === 19));
+  } finally {
+    await s.cleanup();
+  }
+});
+
+test("without 039 the claim leaves the lane out, and asks with it again only after a while", async () => {
+  const s = await setup({ jobs: [{}, {}], sdFirst: true });
+  try {
+    let t = 0;
+    const db = createDb(s.supabase, { now: () => t });
+    assert.ok(await db.claim("box", "sd"));
+    const claims = () => s.supabase.calls.filter((c) => c.name === "claim_encode_job").map((c) => ("lane" in c.args ? "lane" : "plain"));
+    assert.deepEqual(claims(), ["lane", "plain"]);
+    const job = await db.claim("box", "sd");
+    assert.equal(job.handoff, false);
+    assert.deepEqual(claims(), ["lane", "plain", "plain"]);
+    t = 11 * 60 * 1000;
+    await db.claim("box", "sd");
+    assert.deepEqual(claims(), ["lane", "plain", "plain", "lane", "plain"]);
   } finally {
     await s.cleanup();
   }

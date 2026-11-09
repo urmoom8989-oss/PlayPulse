@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { drainCleanup } from "./cleanup.mjs";
 import { processJob } from "./job.mjs";
 import { CLEANUP_EVERY_MS, HEARTBEAT_MS, POLL_MS, YAPIN_EVERY_MS } from "./limits.mjs";
+import { run as realRun } from "./run.mjs";
 import { drainYapin } from "./yapin.mjs";
 
 /** Resolves after ms, or right away when the signal aborts. */
@@ -50,6 +51,20 @@ export function slotName(workerName, slot, slots) {
 }
 
 /**
+ * Smart order (039): with two slots or more, slot 2 is the HD lane (720p and
+ * up, one video at a time, at the lowest CPU priority so new uploads come
+ * first) and the others make low quality. One slot does both, low quality
+ * first. A database without 039 ignores lanes.
+ */
+export function slotLane(slot, slots) {
+  if (slots < 2) return null;
+  return slot === 2 ? "hd" : "sd";
+}
+
+/** The lowest CPU priority (nice 19), for everything the HD lane runs. */
+export const HD_LANE_PRIORITY = 19;
+
+/**
  * One turn of the loop. Returns the job's result, "idle" when there was
  * nothing to do, or "error" when the database could not be asked.
  */
@@ -57,7 +72,7 @@ export async function tick(deps) {
   const { db, log, config, heartbeatMs = HEARTBEAT_MS } = deps;
   let job;
   try {
-    job = await db.claim(config.workerName);
+    job = await db.claim(config.workerName, config.lane ?? null);
   } catch (err) {
     log("claim", {}, `could not ask for a job: ${err.message}`);
     return "error";
@@ -114,6 +129,15 @@ async function slotLoop(deps, slot) {
   }
 }
 
+/** One slot's deps: its name, its lane, and in the HD lane every command at the lowest priority. */
+function laneDeps(deps, slot, slots) {
+  const lane = slotLane(slot, slots);
+  const config = { ...deps.config, workerName: slotName(deps.config.workerName, slot, slots), lane };
+  if (lane !== "hd") return { ...deps, config };
+  const run = deps.run ?? realRun;
+  return { ...deps, config, run: (cmd, args, opts = {}) => run(cmd, args, { ...opts, priority: HD_LANE_PRIORITY }) };
+}
+
 /** Runs ENCODE_SLOTS slots until the stop signal aborts. */
 export async function runLoop(deps) {
   const { pollMs = POLL_MS, log } = deps;
@@ -146,7 +170,7 @@ export async function runLoop(deps) {
   if (!deps.config.siteUrl) log("yapin", {}, "SITE_URL is not set: Yapin' announcements are not posted");
   await Promise.all(
     Array.from({ length: slots }, (_, i) =>
-      slotLoop({ ...deps, config: { ...deps.config, workerName: slotName(deps.config.workerName, i + 1, slots) } }, i + 1),
+      slotLoop(laneDeps(deps, i + 1, slots), i + 1),
     ),
   );
   log("stop", { worker: deps.config.workerName }, "stopped");

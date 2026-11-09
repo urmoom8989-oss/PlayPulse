@@ -61,7 +61,8 @@ export function isWaiting(s: Pick<LiveStatus, "status" | "hdPending">): boolean 
  * plays at low quality while HD is made shows the job's percent, not 100.
  */
 export function progressFor(status: LiveStatus["status"], job: JobInfo | null, hdPending = false): number | null {
-  if (status === "ready") return hdPending && job ? (job.status === "running" ? job.progress : 0) : 100;
+  // Waiting for the HD lane (039), the bar stays where the low quality left it.
+  if (status === "ready") return hdPending && job ? job.progress : 100;
   if (!isActive(status) || !job) return null;
   return job.status === "running" ? job.progress : 0;
 }
@@ -74,7 +75,8 @@ export function progressFor(status: LiveStatus["status"], job: JobInfo | null, h
 export function processingLine(s: Pick<LiveStatus, "status" | "job" | "progress" | "hdPending">): string | null {
   // Low quality first (038): it plays already, HD comes later.
   if (s.status === "ready" && s.hdPending) {
-    return s.job?.status === "running" ? `HD processing, ${s.progress ?? s.job.progress}%` : "HD processing";
+    if (s.job?.status === "running") return `HD processing, ${s.progress ?? s.job.progress}%`;
+    return s.job?.status === "queued" ? "HD waiting to process" : "HD processing";
   }
   if (!isActive(s.status) || !s.job) return null;
   if (s.job.status === "running") return `Processing, ${s.progress ?? s.job.progress}%`;

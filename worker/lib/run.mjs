@@ -1,18 +1,27 @@
 // Runs ffmpeg and ffprobe. The job takes `run` as a dependency so the tests
 // can swap in a fake.
 import { spawn } from "node:child_process";
+import { setPriority } from "node:os";
 
 /**
  * Runs a command and resolves with its stdout when it exits with 0.
  * Rejects with the last lines of stderr otherwise. The signal kills it.
  * @param {string} cmd
  * @param {string[]} args
- * @param {{ cwd?: string, signal?: AbortSignal, onStdout?: (chunk: string) => void }} [opts]
+ * `priority` (a nice value, 19 is the lowest) lets other work have the CPU first.
+ * @param {{ cwd?: string, signal?: AbortSignal, onStdout?: (chunk: string) => void, priority?: number }} [opts]
  */
-export function run(cmd, args, { cwd, signal, onStdout } = {}) {
+export function run(cmd, args, { cwd, signal, onStdout, priority } = {}) {
   return new Promise((resolve, reject) => {
     if (signal?.aborted) return reject(signal.reason ?? new Error("aborted"));
     const child = spawn(cmd, args, { cwd, stdio: ["ignore", "pipe", "pipe"] });
+    if (priority !== undefined && child.pid) {
+      try {
+        setPriority(child.pid, priority);
+      } catch {
+        // Not allowed here: it runs at the normal priority.
+      }
+    }
     let stdout = "";
     let stderr = "";
     const kill = () => child.kill("SIGKILL");

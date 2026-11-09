@@ -280,10 +280,12 @@ shows a preview of the page.
 
 A separate encoder box turns every finished upload into HLS at 360p, 720p and
 1080p (never bigger than the upload), makes three thumbnails and a hover
-preview sprite, and marks the video ready. It processes 2 videos at once by
-default (`ENCODE_SLOTS`, `037_parallel_encodes.sql`), and people with nothing
-processing go first, so one person's long upload does not hold up everybody
-else's. Low quality comes first (`038_sd_first.sql`): an upload of 720p or more
+preview sprite, and marks the video ready. Two encodes side by side on one
+box each ran about 3.5 times slower, so it works in smart order
+(`039_smart_order.sql`): one lane makes every new upload's 360p, one after the
+other, and another makes 720p and up, one video at a time, at the lowest CPU
+priority, so a long HD encode never holds up anybody's 360p. People with
+nothing processing go first (`037_parallel_encodes.sql`). Low quality comes first (`038_sd_first.sql`): an upload of 720p or more
 plays at 360p within minutes, and 720p and 1080p are added to it when they are
 done, like YouTube in 2020. Until then the player's quality menu says "HD is
 still processing" and the studio says "HD processing, 64%". Right after an upload the
