@@ -6,6 +6,7 @@ import { useFlag } from "@/lib/store/session";
 import { useUpload } from "@/lib/store/upload";
 import { PublishButton } from "./PublishButton";
 import { UploadStatus } from "./UploadStatus";
+import { CardsEditor } from "@/components/cards/CardsEditor";
 import {
   ACCEPT,
   DESCRIPTION_MAX,
@@ -279,6 +280,27 @@ function ThumbnailPicker() {
  * for a vertical file of 60 seconds or less; greyed out with the reason for
  * anything else. Unticking keeps a qualifying video out of Snips.
  */
+/** Cards in the "Video elements" step (041): saved on the video when the upload is done. */
+function UploadCards() {
+  const on = useFlag("video_cards");
+  const cards = useUpload((s) => s.cards);
+  const setCards = useUpload((s) => s.setCards);
+  const phase = useUpload((s) => s.phase);
+  if (!on) return null;
+  return (
+    <section className="mt-6" aria-label="Cards" data-upload-cards>
+      <h3 className="text-[16px] font-medium leading-[22px] text-text">Cards</h3>
+      <p className="mt-1 text-[13px] leading-[18px] text-text-2">
+        Point viewers to a video, a channel or a website. Each card slides in at the top right of the player at its time. Up to 5; you can change them later in
+        the studio.
+      </p>
+      <div className="mt-3">
+        <CardsEditor value={cards} onChange={setCards} disabled={phase === "done" || phase === "failed"} />
+      </div>
+    </section>
+  );
+}
+
 function ShortChoice() {
   const on = useFlag("shorts");
   const short = useUpload((s) => s.short);
@@ -392,6 +414,7 @@ function DetailsForm({ step }: { step: 0 | 1 | 2 }) {
             </label>
             <ThumbnailPicker />
             <ShortChoice />
+            <UploadCards />
           </>
         )}
 

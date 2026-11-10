@@ -9,6 +9,8 @@ import { parseTags, studioErrorMessage, TAGS_MAX, tagsProblem, thumbnailFileProb
 import type { CommentsMode, StudioRow, Visibility } from "@/lib/studio/types";
 import { formatTime } from "@/lib/watch/format";
 import { PublishButton } from "@/components/upload/PublishButton";
+import { StudioCards } from "@/components/cards/StudioCards";
+import type { WatchCard } from "@/lib/cards/rules";
 import { ArrowBackIcon, CheckIcon, CloseIcon, EyeIcon, ImageIcon, LinkIcon, LockIcon } from "../icons";
 
 export type Still = { name: string; url: string };
@@ -78,6 +80,7 @@ export function VideoEditor({
   uploadsConfigured,
   preview,
   statsOn = false,
+  cards = null,
 }: {
   video: StudioRow;
   stills: Still[];
@@ -89,6 +92,8 @@ export function VideoEditor({
   preview?: boolean;
   /** The Analytics link next to Save, with the stats flag. */
   statsOn?: boolean;
+  /** The video's cards (041); null hides the Cards box (the video_cards flag is off). */
+  cards?: WatchCard[] | null;
 }) {
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -361,6 +366,12 @@ export function VideoEditor({
               </ul>
             )}
           </Box>
+
+          {cards && (
+            <Box title="Cards" hint="Up to 5 cards that point viewers to a video, a channel or a website. Each one slides in at the top right of the player at its time. Cards save on their own.">
+              <StudioCards videoId={video.id} initial={cards} durationS={video.durationS ?? null} preview={preview} />
+            </Box>
+          )}
 
           {commentsOn && (
             <Box title="Comments" hint={`The channel default is ${channelDefault === "held" ? "hold all for review" : channelDefault === "off" ? "off" : "allow all"}.`}>

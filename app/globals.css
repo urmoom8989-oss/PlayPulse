@@ -443,7 +443,28 @@ html:has([data-embed-page]) [data-site-footer] {
   animation: pp-tile-in 300ms cubic-bezier(0, 0, 0.2, 1) both;
 }
 
+/* Cards (041): the message slides in from the right, the list from the right edge. */
+@keyframes pp-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+@keyframes pp-panel-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+.pp-card-teaser {
+  animation: pp-slide-in-right 250ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+.pp-card-panel {
+  animation: pp-panel-in 220ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .pp-card-teaser,
+  .pp-card-panel,
   .pp-drawer-in,
   .pp-drawer-out,
   .pp-scrim-in,

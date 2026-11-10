@@ -1,6 +1,7 @@
 // What the watch page hands to the browser. Everything here is safe to show:
 // no keys, no owner ids. Only type imports, so the tests can load it.
 
+import type { WatchCard } from "../cards/rules.ts";
 import type { Broadcast } from "../live/state.ts";
 
 export type WatchChannel = {
@@ -35,6 +36,8 @@ export type WatchVideo = {
   broadcast?: Broadcast | null;
   /** Low quality first (038): it plays, and 720p and up are still being made. */
   hdPending?: boolean;
+  /** Cards (041): what slides in at the top right of the player, and the i list. */
+  cards?: WatchCard[];
 };
 
 export type UpNextVideo = {
