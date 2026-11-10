@@ -368,7 +368,7 @@ export function VideoEditor({
           </Box>
 
           {cards && (
-            <Box title="Cards" hint="Up to 5 cards that point viewers to a video, a channel or a website. Each one slides in at the top right of the player at its time. Cards save on their own.">
+            <Box title="Cards" hint="Up to 5 cards that point viewers to one of your videos, a channel or a website. Each one slides in at the top right of the player at its time. Cards save on their own.">
               <StudioCards videoId={video.id} initial={cards} durationS={video.durationS ?? null} preview={preview} />
             </Box>
           )}

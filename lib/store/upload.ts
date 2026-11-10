@@ -51,6 +51,8 @@ type UploadState = {
   short: ShortBox;
   /** Cards from the "Video elements" step (041), saved when the upload is done. */
   cards: CardDraft[];
+  /** The picked file's length, read in the browser: the cards' time slider runs to it. */
+  fileDurationS: number | null;
   pick: (file: File) => void;
   goToStep: (step: 0 | 1 | 2) => void;
   startUpload: () => Promise<void>;
@@ -118,6 +120,7 @@ export const useUpload = create<UploadState>((set, get) => ({
   notice: null,
   short: checkingShort,
   cards: [],
+  fileDurationS: null,
 
   pick(file) {
     if (running || !["idle", "draft"].includes(get().phase)) return;
@@ -149,13 +152,14 @@ export const useUpload = create<UploadState>((set, get) => ({
       notice: null,
       short: checkingShort,
       cards: [],
+      fileDurationS: null,
     });
 
     const seq = ++picks;
     void probeVideoFile(file).then((shape) => {
       if (seq !== picks) return;
       const problem = shortProblem(shape);
-      set({ short: { state: "ready", problem, on: problem === null } });
+      set({ short: { state: "ready", problem, on: problem === null }, fileDurationS: shape?.durationS ?? null });
     });
   },
 
@@ -357,5 +361,6 @@ function initialView() {
     notice: null,
     short: checkingShort,
     cards: [] as CardDraft[],
+    fileDurationS: null,
   };
 }
