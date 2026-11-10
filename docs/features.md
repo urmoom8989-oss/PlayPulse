@@ -500,6 +500,22 @@ Behind the `playlists` flag (`043_playlists.sql`, on for everyone). Like 2020:
   dark band, VIEW FULL PLAYLIST), and the guide lists them under Library and
   History (four, then Show more).
 
+### Channel watermark
+
+Behind the `watermark` flag (`044_watermarks.sql`, on for everyone). Like
+2020's branding watermark:
+
+- In the studio's Channel customization, "Video watermark": upload a PNG, JPG
+  or WebP (fitted into 150 x 150 with see-through edges, saved in the public
+  `watermarks` bucket) and pick the display time: End of video (the last 15
+  seconds), Custom start time (m:ss to the end) or Entire video. Change and
+  Remove are there too.
+- On the channel's videos the picture sits in the bottom right corner of the
+  player, see-through until the pointer is on it, and moves up with the
+  controls. On hover the channel's name and SUBSCRIBE slide out beside it.
+  Clicking subscribes (signed out, sign in first); once subscribed it opens
+  the channel. Not on Premieres and live broadcasts, embeds, or the end screen.
+
 ### Swipe down to refresh
 
 Behind the `pull_to_refresh` flag (`040_links_and_pull_refresh.sql`, on for

@@ -182,6 +182,7 @@ async function Watch({ searchParams }: { searchParams: PageProps<"/watch">["sear
                   cards={video.cards ?? []}
                   paidPromotion={video.paidPromotion === true}
                   listNext={playlist && listNext ? watchInList(listNext.id, playlist.header.id) : null}
+                  watermark={video.watermark ?? null}
                 />
               )
             }

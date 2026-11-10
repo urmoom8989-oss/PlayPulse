@@ -48,6 +48,7 @@ Every change to the database lives in this folder as a numbered SQL file.
 | `041_cards.sql` | cards: `video_cards` (RLS, the owner reads), `video_cards_for(video_id)` for the player and the editor, `set_video_cards(video_id, cards)` replaces the owner's cards (up to 5), the `video_cards` flag |
 | `042_upload_options.sql` | upload options: `videos.publish_at`, `draft` and `paid_promotion`, `set_upload_options(video_id, visibility, publish_at, paid_promotion, draft)` for the owner (a schedule keeps the video private), `publish_scheduled()` for the worker every minute, `video_paid_promotion(video_id)` for the player, the `upload_options` flag |
 | `043_playlists.sql` | playlists: `playlists` and `playlist_items` (RLS, the owner reads), Watch later made by `my_playlists(video_id)`, `create_playlist`, `update_playlist`, `delete_playlist`, `set_playlist_video`, `move_playlist_video` for the owner, `playlist_header` and `playlist_videos` for anyone who may see the playlist, the `playlists` flag |
+| `044_watermarks.sql` | the channel watermark: `channels.watermark_url`, `watermark_show` (`entire`, `end`, `custom`) and `watermark_start_s`, readable by everyone, set with `set_channel_watermark(url, show, start_s)` on your own channel; the public `watermarks` bucket (1 MB, owner folders); the `watermark` flag |
 
 ## How to apply them
 

@@ -101,6 +101,7 @@ again. See [`supabase/migrations/README.md`](../supabase/migrations/README.md).
 - [ ] `041_cards.sql` (cards: up to 5 per video, added in the uploader and the studio)
 - [ ] `042_upload_options.sql` (Unlisted and Schedule in the uploader, drafts, "Includes paid promotion")
 - [ ] `043_playlists.sql` (playlists: Save, Watch later, the playlist page with Play all, the panel next to the player)
+- [ ] `044_watermarks.sql` (the channel watermark in the player's corner, set in Channel customization)
 
 Then make yourself an admin (sign up on the site first):
 
