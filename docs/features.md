@@ -472,6 +472,34 @@ In the uploader, like 2020:
   not public yet) and the paid promotion box. Content shows "Scheduled: goes
   public ..." for scheduled videos.
 
+### Playlists
+
+Behind the `playlists` flag (`043_playlists.sql`, on for everyone). Like 2020:
+
+- **Save** under a video opens "Save to...": Watch later and your playlists,
+  each with a tick that saves or takes the video out at once ("Added to ..."
+  at the bottom left), and "Create new playlist" with a name (up to 150
+  characters) and Public, Unlisted or Private. Signed out, Save goes to sign
+  in. Every account has one Watch later list, always private.
+- **The playlist page**, `/playlist?list=<id>`: the first video's picture and
+  Play all, the name, "12 videos · Last updated on ...", who can see it,
+  Share, the description and the owner; the videos in order on the right. The
+  owner renames it and edits the description in place (the pencils), picks
+  Public, Unlisted or Private, deletes it (the menu), and reorders the videos
+  by dragging a row by its handle, or with Move to top, Move up, Move down
+  and Move to bottom in each video's menu, where Remove takes it out.
+  Anyone can open public and unlisted playlists; private ones and Watch
+  later only their owner. Videos the viewer can't watch are left out and
+  counted ("1 unavailable video is hidden").
+- **Playing a playlist**, `/watch?v=<id>&list=<id>`: the playlist box sits
+  above Up next with the name, "owner - 3 / 12" and the videos, the one
+  playing marked and scrolled into view; the arrow folds it. When a video
+  ends the next one in the playlist plays, whatever autoplay says; after the
+  last one the end screen shows as usual.
+- **Library** lists Watch later and your playlists as cards (the count on a
+  dark band, VIEW FULL PLAYLIST), and the guide lists them under Library and
+  History (four, then Show more).
+
 ### Swipe down to refresh
 
 Behind the `pull_to_refresh` flag (`040_links_and_pull_refresh.sql`, on for

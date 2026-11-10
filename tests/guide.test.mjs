@@ -15,6 +15,8 @@ test("each link appears with its feature, in 2019 order", () => {
   assert.deepEqual(mainGuide({ feed: true, subscriptions: true }), ["home", "trending", "subscriptions"]);
   assert.deepEqual(mainGuide({ subscriptions: true }), ["home", "subscriptions"]);
   assert.deepEqual(youGuide({ engagement: true }), ["library", "history"]);
+  assert.deepEqual(youGuide({ playlists: true }), ["library"]);
+  assert.deepEqual(youGuide({ engagement: true, playlists: true }), ["library", "history"]);
   assert.equal(searchShown({ search: true }), true);
 });
 

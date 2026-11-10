@@ -117,6 +117,8 @@ type Props = {
   cards?: WatchCard[];
   /** "Includes paid promotion" in the corner for the first seconds (042). */
   paidPromotion?: boolean;
+  /** Played from a playlist (043): where the next video in it plays, right when this one ends. */
+  listNext?: string | null;
 };
 
 type Menu = null | "main" | "quality" | "speed" | "subtitles" | "caption-options" | `caption-${CaptionSetting}`;
@@ -176,6 +178,7 @@ export function Player({
   hdPending = false,
   cards = [],
   paidPromotion = false,
+  listNext = null,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -876,6 +879,11 @@ export function Player({
           setPlaying(false);
           setEnded(true);
           saveResume(videoId, e.currentTarget.duration, e.currentTarget.duration);
+          // A playlist goes on to its next video, like 2020, whatever autoplay says.
+          if (listNext && !embed) {
+            router.push(listNext);
+            return;
+          }
           if (extras && !embed) setEnding(endChoice(autoplay, next !== null, wall.length));
         }}
         onWaiting={() => setWaiting(true)}

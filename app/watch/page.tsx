@@ -8,6 +8,9 @@ import { WatchProcessing } from "@/components/processing/WatchProcessing";
 import { Countdown } from "@/components/live/Countdown";
 import { LiveChat } from "@/components/live/LiveChat";
 import { Player } from "@/components/watch/Player";
+import { PlaylistPanel } from "@/components/playlists/PlaylistPanel";
+import { nextInList, watchInList } from "@/lib/playlists/rules";
+import { watchPanel } from "@/lib/playlists/server";
 import { UpNext } from "@/components/watch/UpNext";
 import { VideoInfo } from "@/components/watch/VideoInfo";
 import { WatchLayout } from "@/components/watch/WatchLayout";
@@ -68,6 +71,7 @@ async function Watch({ searchParams }: { searchParams: PageProps<"/watch">["sear
   const params = await searchParams;
   const v = typeof params.v === "string" ? params.v : null;
   const t = typeof params.t === "string" ? params.t : null;
+  const list = typeof params.list === "string" ? params.list : null;
   const state = await watchPageState(v);
 
   switch (state.kind) {
@@ -148,6 +152,9 @@ async function Watch({ searchParams }: { searchParams: PageProps<"/watch">["sear
     }
     case "ready": {
       const { video, upNext, preview, engagement, comments } = state;
+      // Played from a playlist (043): its panel above Up next, and the next video in it when this one ends.
+      const playlist = preview ? null : await watchPanel(list);
+      const listNext = playlist ? nextInList(playlist.items, video.id) : null;
       const broadcast = video.broadcast ?? null;
       const endsAt = broadcast ? Date.parse(broadcast.at) + (video.durationS ?? 0) * 1000 : null;
       return (
@@ -174,6 +181,7 @@ async function Watch({ searchParams }: { searchParams: PageProps<"/watch">["sear
                   hdPending={video.hdPending === true}
                   cards={video.cards ?? []}
                   paidPromotion={video.paidPromotion === true}
+                  listNext={playlist && listNext ? watchInList(listNext.id, playlist.header.id) : null}
                 />
               )
             }
@@ -183,6 +191,7 @@ async function Watch({ searchParams }: { searchParams: PageProps<"/watch">["sear
                 {broadcast && (
                   <LiveChat key={video.id} videoId={video.id} broadcast={broadcast} durationS={video.durationS} isOwner={video.isOwner} />
                 )}
+                {playlist && <PlaylistPanel header={playlist.header} items={playlist.items} videoId={video.id} />}
                 <UpNext videos={upNext} channel={video.channel} />
               </>
             }
