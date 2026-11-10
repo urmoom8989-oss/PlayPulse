@@ -23,6 +23,7 @@ import { useLang, useT } from "@/lib/i18n/client";
 import { dateIn, viewsIn } from "@/lib/i18n/format";
 import { LikeButtons } from "./LikeButtons";
 import { ShareDialog } from "./ShareDialog";
+import { RichText } from "./RichText";
 import { TimestampText } from "./TimestampText";
 
 function ActionButton({
@@ -71,10 +72,15 @@ function VisibilityNote({ visibility }: { visibility: WatchVideo["visibility"] }
   );
 }
 
-/** The description, folded to three lines with SHOW MORE, like 2019. Timestamps are links with player extras. */
+/**
+ * The description, folded to three lines with SHOW MORE, like 2019. With the
+ * description_links flag, web addresses and #hashtags are links; timestamps
+ * are links with player extras.
+ */
 function Description({ text, videoId }: { text: string; videoId: string }) {
   const t = useT();
   const extras = useFlag("player_extras");
+  const links = useFlag("description_links");
   const [open, setOpen] = useState(false);
   const [long, setLong] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -90,7 +96,13 @@ function Description({ text, videoId }: { text: string; videoId: string }) {
         ref={ref}
         className={`whitespace-pre-wrap break-words text-[14px] leading-5 text-text ${open ? "" : "line-clamp-3"}`}
       >
-        {extras ? <TimestampText text={text} videoId={videoId} /> : text}
+        {links ? (
+          <RichText text={text} videoId={videoId} times={extras} />
+        ) : extras ? (
+          <TimestampText text={text} videoId={videoId} />
+        ) : (
+          text
+        )}
       </div>
       {(long || open) && (
         <button

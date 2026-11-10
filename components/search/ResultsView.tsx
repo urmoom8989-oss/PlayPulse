@@ -85,7 +85,14 @@ function Spelling({ q, filters, spelling }: { q: string; filters: SearchFilters;
  * /results?search_query=<q>. With the search flag off (or no database) a
  * placeholder shows. Reads the request, so it is rendered inside <Suspense>.
  */
-export async function ResultsView({ searchParams }: { searchParams: PageProps<"/results">["searchParams"] }) {
+export async function ResultsView({
+  searchParams,
+  heading,
+}: {
+  searchParams: PageProps<"/results">["searchParams"];
+  /** A visible title over the results (the hashtag page), instead of the hidden one. */
+  heading?: string;
+}) {
   const params = await searchParams;
   const q = readQuery(params);
   const filters = parseFilters(params);
@@ -130,7 +137,13 @@ export async function ResultsView({ searchParams }: { searchParams: PageProps<"/
       const none = state.page.videos.length === 0 && state.channels.length === 0;
       return (
         <div className={frame} data-search-state={none ? "none" : "ready"} data-search-query={q}>
-          <h1 className="sr-only">Search results for {q}</h1>
+          {heading ? (
+            <h1 className="mb-3 px-3 text-[24px] font-normal leading-8 text-text search:px-0" data-results-heading>
+              {heading}
+            </h1>
+          ) : (
+            <h1 className="sr-only">Search results for {q}</h1>
+          )}
           <div className="px-3 search:px-0">
             <FilterPanel q={q} filters={filters} />
           </div>

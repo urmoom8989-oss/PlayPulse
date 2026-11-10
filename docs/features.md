@@ -424,6 +424,27 @@ the browser:
   the language and the look. On phones the picture in picture button makes room
   for CC.
 
+### Description links and hashtags
+
+Behind the `description_links` flag (`040_links_and_pull_refresh.sql`, on for
+everyone). In a video's description:
+
+- Web addresses (`https://...`, `www....`) open in a new tab. Punctuation that
+  ends the sentence stays outside the link. Only http and https become links.
+- `#hashtags` (letters, digits and `_`, with at least one letter) open
+  `/hashtag/<tag>`: the videos found for the tag under a big `#tag` title.
+- Timestamps still jump the player with player extras.
+
+### Swipe down to refresh
+
+Behind the `pull_to_refresh` flag (`040_links_and_pull_refresh.sql`, on for
+everyone). On phones and tablets only (a touch screen without hover): at the
+top of a page, pull down and let go after about 110 px; a round arrow follows
+the finger, turns into a spinner, and the page reloads. The browser's own pull
+to refresh and bounce are turned off while it is on, so the two never both
+run. The Snips feed (which swipes up and down itself), open dialogs, the video
+and text fields are left alone. Desktop never sees it.
+
 ### More keyboard shortcuts
 
 Behind the `more_shortcuts` flag (`026_shortcuts_hover.sql`, off at first), all
