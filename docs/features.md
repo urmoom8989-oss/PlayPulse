@@ -438,9 +438,11 @@ everyone). In a video's description:
 ### Cards
 
 Behind the `video_cards` flag (`041_cards.sql`, on for everyone). Like 2020,
-a video can have up to 5 cards, each pointing at a video (public or
-unlisted), a channel (@handle) or a website, with an optional message of up
-to 30 characters and the time it shows up.
+a video can have up to 5 cards, each pointing at one of your videos (picked
+from a list of your public and unlisted videos), a channel (@handle) or a
+website, with an optional message of up to 30 characters and the time it
+shows up, set with a slider along the video (in the uploader the length is
+read from the file; when it can't be, the time is typed).
 
 - Add them in the uploader's "Video elements" step (saved when the upload is
   done) or in the studio's video editor (the Cards box has its own Save).

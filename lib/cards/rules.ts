@@ -7,8 +7,15 @@ export const CARD_TEASER_MS = 5000;
 
 export type CardKind = "video" | "channel" | "link";
 
-/** A card as the uploader and the studio editor hold it while it is typed. */
-export type CardDraft = { kind: CardKind; target: string; message: string; start: string };
+/**
+ * A card as the uploader and the studio editor hold it while it is made.
+ * `label`: the name of a video card's video when it is not one of yours (a
+ * card saved before, pointing at another channel's video).
+ */
+export type CardDraft = { kind: CardKind; target: string; message: string; start: string; label?: string };
+
+/** One of your videos, for the video card's list (GET /api/studio/cards/videos). */
+export type CardVideoChoice = { id: string; title: string; durationS: number | null; visibility: "public" | "unlisted" };
 
 /** A card as set_video_cards() takes it. */
 export type CardPayload =
@@ -29,7 +36,7 @@ export type WatchCard = {
 
 export const KIND_LABELS: Record<CardKind, string> = { video: "Video", channel: "Channel", link: "Link" };
 export const KIND_HINTS: Record<CardKind, string> = {
-  video: "A video link or ID",
+  video: "One of your videos",
   channel: "A channel @handle",
   link: "A web address",
 };
@@ -84,7 +91,7 @@ export function linkFrom(text: string): string | null {
 
 /** What is wrong with a card, or null. `durationS` checks the time against the video's length. */
 export function cardProblem(d: CardDraft, durationS: number | null = null): string | null {
-  if (d.kind === "video" && !videoIdFrom(d.target)) return "Paste a video link or ID";
+  if (d.kind === "video" && !videoIdFrom(d.target)) return "Choose a video";
   if (d.kind === "channel" && !handleFrom(d.target)) return "Type a channel @handle";
   if (d.kind === "link" && !linkFrom(d.target)) return "Type a web address";
   if (d.message.trim().length > CARD_MESSAGE_MAX) return `Up to ${CARD_MESSAGE_MAX} characters`;
@@ -111,9 +118,8 @@ export function toPayload(drafts: CardDraft[], durationS: number | null = null):
 
 /** A saved card back in the editor. */
 export function draftFrom(card: WatchCard): CardDraft {
-  const target =
-    card.kind === "video" ? `/watch?v=${card.video?.id ?? ""}` : card.kind === "channel" ? `@${card.channel?.handle ?? ""}` : (card.url ?? "");
-  return { kind: card.kind, target, message: card.message, start: formatStart(card.startS) };
+  const target = card.kind === "video" ? (card.video?.id ?? "") : card.kind === "channel" ? `@${card.channel?.handle ?? ""}` : (card.url ?? "");
+  return { kind: card.kind, target, message: card.message, start: formatStart(card.startS), ...(card.video ? { label: card.video.title } : {}) };
 }
 
 /** A new, empty card. */

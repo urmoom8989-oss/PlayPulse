@@ -37,7 +37,7 @@ export function StudioCards({ videoId, initial, durationS, preview = false }: { 
 
   return (
     <div data-studio-cards>
-      <CardsEditor value={cards} onChange={setCards} durationS={durationS} disabled={busy || preview} />
+      <CardsEditor value={cards} onChange={setCards} durationS={durationS} excludeId={videoId} disabled={busy || preview} />
       <div className="mt-3 flex items-center gap-3">
         <button type="button" onClick={save} disabled={!dirty || busy || preview} className="btn-blue" data-cards-save>
           {busy ? "Saving..." : "Save cards"}

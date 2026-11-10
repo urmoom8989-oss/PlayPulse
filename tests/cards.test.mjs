@@ -44,7 +44,9 @@ test("what each kind of card points at", () => {
 });
 
 test("a card's problems, and the payload for set_video_cards", () => {
-  assert.equal(cardProblem({ kind: "video", target: "nope", message: "", start: "0:00" }), "Paste a video link or ID");
+  assert.equal(cardProblem({ kind: "video", target: "", message: "", start: "0:00" }), "Choose a video");
+  // The list gives the video's id; a pasted link from before still works.
+  assert.equal(cardProblem({ kind: "video", target: ID, message: "", start: "0:00" }), null);
   assert.equal(cardProblem({ kind: "link", target: "example.com", message: "x".repeat(31), start: "0:00" }), "Up to 30 characters");
   assert.equal(cardProblem({ kind: "channel", target: "@bob", message: "", start: "9:99" }), "Use a time like 1:30");
   assert.equal(cardProblem({ kind: "channel", target: "@bob", message: "", start: "5:00" }, 120), "That is after the video ends");
@@ -60,7 +62,7 @@ test("a card's problems, and the payload for set_video_cards", () => {
       { kind: "link", url: "https://example.com/", message: "Merch", start_s: 45 },
     ],
   });
-  assert.deepEqual(toPayload([emptyCard(), { kind: "link", target: "x", message: "", start: "0" }]), { error: "Paste a video link or ID", index: 0 });
+  assert.deepEqual(toPayload([emptyCard(), { kind: "link", target: "x", message: "", start: "0" }]), { error: "Choose a video", index: 0 });
   assert.equal("error" in toPayload(Array.from({ length: CARDS_MAX + 1 }, () => emptyCard("channel"))), true);
 });
 
@@ -75,7 +77,7 @@ test("cards from the database, back in the editor, and on the player", () => {
   assert.equal(cards.length, 3, "a video card whose video is gone is left out");
   assert.equal(cards[0].video.durationS, 61.5);
   assert.deepEqual(cards.map(draftFrom), [
-    { kind: "video", target: `/watch?v=${ID}`, message: "", start: "0:12" },
+    { kind: "video", target: ID, message: "", start: "0:12", label: "Part 2" },
     { kind: "channel", target: "@bob", message: "Go sub", start: "0:30" },
     { kind: "link", target: "https://www.example.com/shop", message: "", start: "0:45" },
   ]);
@@ -94,4 +96,9 @@ test("041: cards are the owner's to change, anyone who can watch reads them", ()
   assert.match(sql, /grant execute on function public\.video_cards_for\(uuid\) to anon, authenticated, service_role/);
   assert.match(sql, /revoke execute on function public\.set_video_cards\(uuid, jsonb\) from public, anon/);
   assert.match(sql, /'video_cards',/);
+});
+
+test("the time slider's values: whole seconds along the video, shown as m:ss", () => {
+  // The slider sets "start" with formatStart and reads it back with parseStart.
+  for (const s of [0, 1, 59, 60, 61, 599, 3599, 3600, 4000]) assert.equal(parseStart(formatStart(s)), s);
 });

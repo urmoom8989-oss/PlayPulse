@@ -286,16 +286,17 @@ function UploadCards() {
   const cards = useUpload((s) => s.cards);
   const setCards = useUpload((s) => s.setCards);
   const phase = useUpload((s) => s.phase);
+  const durationS = useUpload((s) => s.fileDurationS);
   if (!on) return null;
   return (
     <section className="mt-6" aria-label="Cards" data-upload-cards>
       <h3 className="text-[16px] font-medium leading-[22px] text-text">Cards</h3>
       <p className="mt-1 text-[13px] leading-[18px] text-text-2">
-        Point viewers to a video, a channel or a website. Each card slides in at the top right of the player at its time. Up to 5; you can change them later in
+        Point viewers to one of your videos, a channel or a website. Each card slides in at the top right of the player at its time. Up to 5; you can change them later in
         the studio.
       </p>
       <div className="mt-3">
-        <CardsEditor value={cards} onChange={setCards} disabled={phase === "done" || phase === "failed"} />
+        <CardsEditor value={cards} onChange={setCards} durationS={durationS} disabled={phase === "done" || phase === "failed"} />
       </div>
     </section>
   );
