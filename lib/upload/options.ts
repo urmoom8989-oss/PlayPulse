@@ -6,7 +6,7 @@ import type { UploadOptions } from "./options-rules";
 
 // set_upload_options() (042_upload_options.sql) for the signed in owner.
 
-const CODES = ["not_signed_in", "not_found", "removed", "in_trash", "bad_visibility", "bad_schedule"];
+const CODES = ["not_signed_in", "not_found", "removed", "in_trash", "bad_visibility", "bad_schedule", "suspended"];
 
 export async function saveUploadOptions(videoId: string, o: UploadOptions): Promise<{ visibility: string } | { error: string }> {
   const supabase = await createClient();

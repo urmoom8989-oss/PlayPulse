@@ -62,6 +62,8 @@ export function optionsErrorText(code: string): string {
       return "This video was removed.";
     case "in_trash":
       return "This video is in the trash.";
+    case "suspended":
+      return "Your channel is suspended, so the video stays private.";
     case "off":
       return "Scheduling and drafts are switched off right now.";
     case "not_set_up":

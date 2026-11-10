@@ -66,6 +66,7 @@ test("042: owner only, scheduled videos stay private, the worker publishes them"
   assert.match(sql, /grant execute on function public\.video_paid_promotion\(uuid\) to anon, authenticated, service_role/);
   // A private video's paid promotion is only the owner's to read.
   assert.match(sql, /v\.visibility <> 'private' or v\.owner_id = \(select auth\.uid\(\)\)/);
+  assert.match(sql, /c\.suspended_at is not null/);
   assert.match(sql, /'upload_options',/);
   assert.match(sql, /on conflict \(key\) do nothing/);
   assert.doesNotMatch(sql, /\u2014/);

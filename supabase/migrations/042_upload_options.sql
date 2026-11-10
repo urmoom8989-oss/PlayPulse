@@ -14,7 +14,9 @@
 -- sets all four for one of the caller's videos. A publish_at keeps the video
 -- private until then; public sets published_at once it is ready, like
 -- publish_video(). Errors: not_signed_in, not_found, removed, in_trash,
--- bad_visibility, bad_schedule (in the past or more than a year away).
+-- bad_visibility, bad_schedule (in the past or more than a year away), and
+-- suspended from 016's guard for a public or unlisted video of a suspended
+-- channel. publish_scheduled() leaves videos of suspended channels waiting.
 --
 -- Run after 041_cards.sql. Safe to run more than once.
 
@@ -100,7 +102,9 @@ begin
      and x.publish_at <= now()
      and x.deleted_at is null
      and x.removed_at is null
-     and x.status in ('uploaded', 'processing', 'ready');
+     and x.status in ('uploaded', 'processing', 'ready')
+     -- 016's guard refuses these, and one refusal would stop the whole round.
+     and not exists (select 1 from public.channels c where c.id = x.channel_id and c.suspended_at is not null);
   get diagnostics n = row_count;
   return n;
 end;
