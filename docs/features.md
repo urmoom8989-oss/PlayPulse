@@ -435,6 +435,21 @@ everyone). In a video's description:
   `/hashtag/<tag>`: the videos found for the tag under a big `#tag` title.
 - Timestamps still jump the player with player extras.
 
+### Cards
+
+Behind the `video_cards` flag (`041_cards.sql`, on for everyone). Like 2020,
+a video can have up to 5 cards, each pointing at a video (public or
+unlisted), a channel (@handle) or a website, with an optional message of up
+to 30 characters and the time it shows up.
+
+- Add them in the uploader's "Video elements" step (saved when the upload is
+  done) or in the studio's video editor (the Cards box has its own Save).
+- On the player, when a card's time comes during playback, its message (or
+  what it points at) slides in at the top right for 5 seconds. The "i" there,
+  shown with the controls, opens the list of cards on the right of the player.
+  Video and channel cards open on the site, links in a new tab.
+- A video card is left out for viewers while its video is private or gone.
+
 ### Swipe down to refresh
 
 Behind the `pull_to_refresh` flag (`040_links_and_pull_refresh.sql`, on for

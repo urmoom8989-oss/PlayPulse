@@ -72,6 +72,8 @@ import { cueAt, parseSpriteVtt, type SpriteCue } from "@/lib/watch/vtt";
 import { ChapterTrack } from "./ChapterTrack";
 import { CaptionOverlay } from "./CaptionOverlay";
 import { AutoplayCountdown, EndScreenWall } from "./EndScreen";
+import type { WatchCard } from "@/lib/cards/rules";
+import { VideoCards } from "./VideoCards";
 import { PlayerContextMenu } from "./PlayerContextMenu";
 import { StatsForNerds } from "./StatsForNerds";
 import { useCaptions } from "./useCaptions";
@@ -108,6 +110,8 @@ type Props = {
   live?: { endsAt: number } | null;
   /** Low quality first (038): 720p and up are still being made; the quality menu says so. */
   hdPending?: boolean;
+  /** Cards (041): messages that slide in at their time, and the i list. */
+  cards?: WatchCard[];
 };
 
 type Menu = null | "main" | "quality" | "speed" | "subtitles" | "caption-options" | `caption-${CaptionSetting}`;
@@ -165,6 +169,7 @@ export function Player({
   channelName = "",
   live = null,
   hdPending = false,
+  cards = [],
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -966,6 +971,8 @@ export function Player({
         <AutoplayCountdown video={next} channelName={channelName} onPlay={playNext} onCancel={cancelAutoplay} />
       )}
       {ending === "wall" && <EndScreenWall videos={wall} channelName={channelName} />}
+
+      <VideoCards cards={cards} time={time} chrome={showChrome} hidden={ending !== null || Boolean(error)} />
 
       {captionTrack && ending === null && !error && (
         <CaptionOverlay

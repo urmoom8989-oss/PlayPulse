@@ -172,6 +172,7 @@ async function Watch({ searchParams }: { searchParams: PageProps<"/watch">["sear
                   channelName={video.channel.name}
                   live={broadcast?.state === "live" && endsAt !== null ? { endsAt } : null}
                   hdPending={video.hdPending === true}
+                  cards={video.cards ?? []}
                 />
               )
             }

@@ -4,6 +4,7 @@ import { ChannelMessage } from "@/components/channel/ChannelNotices";
 import { PreviewNotice, StudioNoDb, StudioNotSetUp, StudioOff, StudioPage } from "@/components/studio/StudioNotices";
 import { VideoEditor } from "@/components/studio/VideoEditor";
 import { UUID } from "@/lib/studio/http";
+import { cardsForEditor } from "@/lib/cards/server";
 import { statsOn } from "@/lib/stats/server";
 import { studioVideo } from "@/lib/studio/server";
 
@@ -12,7 +13,7 @@ export const metadata = { title: "Video details | PlayPulse" };
 async function EditGate({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!UUID.test(id)) notFound();
-  const [state, stats] = await Promise.all([studioVideo(id.toLowerCase()), statsOn()]);
+  const [state, stats, cards] = await Promise.all([studioVideo(id.toLowerCase()), statsOn(), cardsForEditor(id.toLowerCase())]);
   switch (state.kind) {
     case "off":
       return <StudioOff />;
@@ -45,6 +46,7 @@ async function EditGate({ params }: { params: Promise<{ id: string }> }) {
               uploadsConfigured={state.uploadsConfigured}
               preview={state.preview}
               statsOn={stats}
+              cards={state.preview ? null : cards}
             />
           </div>
         </StudioPage>

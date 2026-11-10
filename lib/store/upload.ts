@@ -14,6 +14,7 @@ import {
   type Details,
 } from "../upload/rules.ts";
 import { thumbnailFileProblem } from "../studio/rules.ts";
+import { cardProblem, toPayload, type CardDraft } from "../cards/rules.ts";
 
 export type UploadPhase = "idle" | "draft" | "signing" | "uploading" | "finishing" | "done" | "failed";
 
@@ -48,12 +49,15 @@ type UploadState = {
   /** A short line under the drop zone, like "Upload cancelled". */
   notice: string | null;
   short: ShortBox;
+  /** Cards from the "Video elements" step (041), saved when the upload is done. */
+  cards: CardDraft[];
   pick: (file: File) => void;
   goToStep: (step: 0 | 1 | 2) => void;
   startUpload: () => Promise<void>;
   setDetails: (patch: Partial<Details>) => void;
   setThumbnailFile: (file: File | null) => void;
   setShortOn: (on: boolean) => void;
+  setCards: (cards: CardDraft[]) => void;
   cancel: () => Promise<void>;
   reset: () => void;
 };
@@ -113,6 +117,7 @@ export const useUpload = create<UploadState>((set, get) => ({
   error: null,
   notice: null,
   short: checkingShort,
+  cards: [],
 
   pick(file) {
     if (running || !["idle", "draft"].includes(get().phase)) return;
@@ -143,6 +148,7 @@ export const useUpload = create<UploadState>((set, get) => ({
       error: null,
       notice: null,
       short: checkingShort,
+      cards: [],
     });
 
     const seq = ++picks;
@@ -254,6 +260,12 @@ export const useUpload = create<UploadState>((set, get) => ({
       if (useSession.getState().flags.shorts && box.state === "ready" && box.problem === null) {
         void postJson("/api/shorts/choice", { videoId: signed.videoId, on: box.on }).catch(() => undefined);
       }
+      // Cards from the "Video elements" step: the ones that are filled in and right.
+      const ready = get().cards.filter((c) => c.target.trim() !== "" && cardProblem(c) === null);
+      const payload = toPayload(ready);
+      if (useSession.getState().flags.video_cards && ready.length > 0 && "cards" in payload) {
+        void postJson("/api/studio/cards", { videoId: signed.videoId, cards: payload.cards }).catch(() => undefined);
+      }
     } catch (err) {
       if (err instanceof UploadCancelled || controller.signal.aborted) return;
       running = null;
@@ -287,6 +299,10 @@ export const useUpload = create<UploadState>((set, get) => ({
         .catch((err) => set({ thumbnailError: err instanceof Error ? err.message : "The thumbnail upload did not finish. Try again." }))
         .finally(() => set({ thumbnailSaving: false }));
     }
+  },
+
+  setCards(cards) {
+    set({ cards });
   },
 
   setShortOn(on) {
@@ -340,5 +356,6 @@ function initialView() {
     error: null,
     notice: null,
     short: checkingShort,
+    cards: [] as CardDraft[],
   };
 }
