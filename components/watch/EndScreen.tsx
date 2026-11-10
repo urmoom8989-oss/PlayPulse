@@ -43,7 +43,7 @@ export function AutoplayCountdown({
   return (
     <div
       data-autoplay-countdown={left}
-      className="absolute inset-x-0 top-0 bottom-[49px] z-20 flex flex-col items-center justify-center bg-black/75 px-4 text-center text-white"
+      className="pp-fade-in absolute inset-x-0 top-0 bottom-[49px] z-20 flex flex-col items-center justify-center bg-black/75 px-4 text-center text-white"
     >
       <p className="text-[15px] text-[#cccccc]">
         Up next in <span data-autoplay-seconds>{left}</span>
@@ -94,14 +94,16 @@ export function EndScreenWall({ videos, channelName }: { videos: UpNextVideo[]; 
   return (
     <div
       data-end-screen={videos.length}
-      className="absolute inset-x-0 top-0 bottom-[49px] z-20 grid grid-cols-3 grid-rows-3 gap-1 bg-black p-1 sm:gap-2 sm:p-3"
+      className="pp-fade-in absolute inset-x-0 top-0 bottom-[49px] z-20 grid grid-cols-3 grid-rows-3 gap-1 bg-black p-1 sm:gap-2 sm:p-3"
     >
-      {videos.map((v) => (
+      {videos.map((v, i) => (
         <Link
           key={v.id}
           href={`/watch?v=${v.id}`}
           data-end-screen-video={v.id}
-          className="group/tile relative block min-h-0 overflow-hidden bg-[#222]"
+          // The tiles come up one after another, row by row.
+          style={{ animationDelay: `${80 + i * 45}ms` }}
+          className="pp-tile-in group/tile relative block min-h-0 overflow-hidden bg-[#222]"
         >
           {v.thumbnail && <Thumb src={v.thumbnail} alt="" sizes="(min-width: 1024px) 400px, 33vw" />}
           <span className="absolute inset-0 bg-gradient-to-b from-black/80 via-black/10 to-transparent opacity-90 transition-opacity group-hover/tile:opacity-100" />

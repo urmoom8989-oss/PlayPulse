@@ -369,13 +369,13 @@
   top: 8px;
 }
 
-/* /embed/<id> (feature 16): the player alone, without the top bar, guide or footer. */
 /* Swipe down to refresh (components/PullToRefresh.tsx) replaces the browser's own pull and bounce at the top. */
 html[data-pull-refresh="on"],
 html[data-pull-refresh="on"] body {
   overscroll-behavior-y: none;
 }
 
+/* /embed/<id> (feature 16): the player alone, without the top bar, guide or footer. */
 html:has([data-embed-page]),
 html:has([data-embed-page]) body {
   overflow: hidden;
@@ -389,4 +389,68 @@ html:has([data-embed-page]) body > .skip-link,
 html:has([data-embed-page]) body > .flex > :not(:has([data-embed-page])),
 html:has([data-embed-page]) [data-site-footer] {
   display: none;
+}
+
+/*
+ * Motion, 2020 style: the guide drawer slides in from the left over a fading
+ * scrim (and back out), and the end screen fades in with its tiles coming up
+ * one after another. With reduced motion the moves take a millisecond, so the
+ * same events still fire.
+ */
+@keyframes pp-slide-in-left {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes pp-slide-out-left {
+  to {
+    transform: translateX(-100%);
+  }
+}
+@keyframes pp-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes pp-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes pp-tile-in {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+}
+
+.pp-drawer-in {
+  animation: pp-slide-in-left 200ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+.pp-drawer-out {
+  animation: pp-slide-out-left 160ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+.pp-scrim-in {
+  animation: pp-fade-in 200ms linear both;
+}
+.pp-scrim-out {
+  animation: pp-fade-out 160ms linear both;
+}
+.pp-fade-in {
+  animation: pp-fade-in 250ms ease-out both;
+}
+.pp-tile-in {
+  animation: pp-tile-in 300ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pp-drawer-in,
+  .pp-drawer-out,
+  .pp-scrim-in,
+  .pp-scrim-out,
+  .pp-fade-in,
+  .pp-tile-in {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
 }
