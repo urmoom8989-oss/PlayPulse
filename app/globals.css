@@ -370,6 +370,12 @@
 }
 
 /* /embed/<id> (feature 16): the player alone, without the top bar, guide or footer. */
+/* Swipe down to refresh (components/PullToRefresh.tsx) replaces the browser's own pull and bounce at the top. */
+html[data-pull-refresh="on"],
+html[data-pull-refresh="on"] body {
+  overscroll-behavior-y: none;
+}
+
 html:has([data-embed-page]),
 html:has([data-embed-page]) body {
   overflow: hidden;

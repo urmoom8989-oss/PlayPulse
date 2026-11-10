@@ -44,6 +44,7 @@ Every change to the database lives in this folder as a numbered SQL file.
 | `037_parallel_encodes.sql` | several videos processing at once: `encode_jobs.heartbeat_at` (`encode_heartbeat`, and every `encode_progress`), a job counts as stopped after 10 minutes without one (2 h 15 min for workers without heartbeats), `claim_encode_job` puts people with nothing processing first, `encode_release(worker)` gives back a restarted worker's jobs |
 | `038_sd_first.sql` | low quality first: `videos.hd_pending`, `encode_sd_ready(...)` (ready at low quality while the job keeps running for HD), `encode_done` clears `hd_pending`, a final failure after the low quality is out leaves the video ready, `claim_encode_job` also hands out the HD part of a ready video and answers `hd_only`, `video_hd_pending(video_id)` for the player |
 | `039_smart_order.sql` | smart order: `claim_encode_job(worker, lane)` (lane `sd`: videos that still need their low quality, `hd`: the HD part of videos that play already, none: any, low quality first), `encode_sd_handoff(...)` puts the HD part back in the queue with fresh tries and keeps its progress |
+| `040_links_and_pull_refresh.sql` | the `description_links` (links and #hashtags in descriptions, `/hashtag/<tag>`) and `pull_to_refresh` (phones and tablets only) flags, on for everyone |
 
 ## How to apply them
 

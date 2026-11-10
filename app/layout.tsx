@@ -6,6 +6,7 @@ import { OnboardingGuard } from "@/components/OnboardingGuard";
 import { FlagPanelGate } from "@/components/flags/FlagPanelGate";
 import { SiteFooter } from "@/components/launch/SiteFooter";
 import { PathTracker } from "@/components/PathTracker";
+import { PullToRefresh } from "@/components/PullToRefresh";
 import { SearchKey } from "@/components/SearchKey";
 import { TopBar } from "@/components/TopBar";
 import { themeScript } from "@/lib/theme";
@@ -51,6 +52,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <FlagPanelGate />
         </Suspense>
         <SearchKey />
+        <Suspense fallback={null}>
+          <PullToRefresh />
+        </Suspense>
         <div className="flex">
           <Guide />
           <div className="flex min-w-0 flex-1 flex-col">
