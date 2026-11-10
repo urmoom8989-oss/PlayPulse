@@ -74,6 +74,8 @@ import { CaptionOverlay } from "./CaptionOverlay";
 import { AutoplayCountdown, EndScreenWall } from "./EndScreen";
 import type { WatchCard } from "@/lib/cards/rules";
 import { VideoCards } from "./VideoCards";
+import { Watermark } from "./Watermark";
+import type { PlayerWatermark } from "@/lib/channels/watermark-rules";
 
 /** How long "Includes paid promotion" stays at the start of a video (042), like 2020. */
 const PAID_PROMOTION_S = 10;
@@ -119,6 +121,8 @@ type Props = {
   paidPromotion?: boolean;
   /** Played from a playlist (043): where the next video in it plays, right when this one ends. */
   listNext?: string | null;
+  /** The channel's watermark in the bottom right corner (044). */
+  watermark?: PlayerWatermark | null;
 };
 
 type Menu = null | "main" | "quality" | "speed" | "subtitles" | "caption-options" | `caption-${CaptionSetting}`;
@@ -179,6 +183,7 @@ export function Player({
   cards = [],
   paidPromotion = false,
   listNext = null,
+  watermark = null,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -987,6 +992,10 @@ export function Player({
       {ending === "wall" && <EndScreenWall videos={wall} channelName={channelName} />}
 
       <VideoCards cards={cards} time={time} chrome={showChrome} hidden={ending !== null || Boolean(error)} />
+
+      {watermark && !embed && (
+        <Watermark watermark={watermark} time={time} duration={duration} raised={showChrome} hidden={ending !== null || Boolean(error) || !started} />
+      )}
 
       {paidPromotion && ending === null && !error && time < PAID_PROMOTION_S && (
         <div

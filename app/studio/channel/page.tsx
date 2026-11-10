@@ -3,6 +3,8 @@ import { Suspense } from "react";
 import { FormSkeleton } from "@/components/auth/AuthCard";
 import { ChannelsNotSetUp, ChannelsOff } from "@/components/channel/ChannelNotices";
 import { ChannelEditor } from "@/components/studio/ChannelEditor";
+import { WatermarkEditor } from "@/components/studio/WatermarkEditor";
+import { studioWatermark } from "@/lib/channels/watermark-server";
 import { myChannel } from "@/lib/channels/server";
 import { previewChannel } from "@/lib/channels/types";
 
@@ -30,12 +32,15 @@ async function StudioGate() {
           <ChannelEditor channel={previewChannel("your_channel")} disabled />
         </div>
       );
-    case "ready":
+    case "ready": {
+      const watermark = await studioWatermark(state.channel.id);
       return (
         <div data-channel-state="ready">
           <ChannelEditor channel={state.channel} />
+          {watermark.on && <WatermarkEditor ownerId={state.channel.ownerId} initial={watermark.watermark} />}
         </div>
       );
+    }
   }
 }
 

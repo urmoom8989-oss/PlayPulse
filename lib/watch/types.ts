@@ -3,6 +3,7 @@
 
 import type { WatchCard } from "../cards/rules.ts";
 import type { Broadcast } from "../live/state.ts";
+import type { PlayerWatermark } from "../channels/watermark-rules.ts";
 
 export type WatchChannel = {
   id: string;
@@ -40,6 +41,8 @@ export type WatchVideo = {
   cards?: WatchCard[];
   /** "Includes paid promotion" at the start of the video (042). */
   paidPromotion?: boolean;
+  /** The channel's watermark in the player's corner (044). */
+  watermark?: PlayerWatermark | null;
 };
 
 export type UpNextVideo = {
