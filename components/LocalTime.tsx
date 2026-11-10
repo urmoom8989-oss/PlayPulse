@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useHydrated } from "@/lib/hydrated";
 import { scheduleLabel } from "@/lib/upload/options-rules";
 
 /**
@@ -9,7 +9,6 @@ import { scheduleLabel } from "@/lib/upload/options-rules";
  * the browser.
  */
 export function LocalTime({ at }: { at: string }) {
-  const [text, setText] = useState("");
-  useEffect(() => setText(scheduleLabel(at)), [at]);
-  return <time dateTime={at}>{text}</time>;
+  const hydrated = useHydrated();
+  return <time dateTime={at}>{hydrated ? scheduleLabel(at) : ""}</time>;
 }

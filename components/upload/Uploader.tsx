@@ -7,7 +7,7 @@ import { useUpload } from "@/lib/store/upload";
 import { PublishButton } from "./PublishButton";
 import { UploadStatus } from "./UploadStatus";
 import { CardsEditor } from "@/components/cards/CardsEditor";
-import { defaultSchedule, scheduleLabel, scheduleProblem, toLocalInput, fromLocalInput } from "@/lib/upload/options-rules";
+import { defaultSchedule, scheduleLabel, scheduleProblem, fromLocalInput } from "@/lib/upload/options-rules";
 import {
   ACCEPT,
   DESCRIPTION_MAX,
@@ -460,7 +460,6 @@ function VisibilityChoice({ active }: { active: boolean }) {
               <input
                 type="datetime-local"
                 value={scheduleAt}
-                min={toLocalInput(new Date(Date.now() + 5 * 60 * 1000))}
                 onChange={(e) => setScheduleAt(e.target.value)}
                 disabled={!active}
                 aria-label="Publish on"
@@ -468,7 +467,7 @@ function VisibilityChoice({ active }: { active: boolean }) {
                 data-schedule-at
               />
               <p className={`mt-1 text-[12px] ${problem ? "text-[var(--error)]" : "text-text-2"}`}>
-                {problem ?? `Goes public on ${scheduleLabel(fromLocalInput(scheduleAt) ?? new Date())}, your time.`}
+                {problem ?? `Goes public on ${scheduleLabel(fromLocalInput(scheduleAt) ?? scheduleAt)}, your time.`}
               </p>
             </div>
           )}
