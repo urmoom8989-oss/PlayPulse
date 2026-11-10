@@ -177,5 +177,15 @@ export function createDb(supabase, { now = Date.now } = {}) {
       const { error } = await supabase.rpc("yapin_post_result", { post_id: id, ok: result.ok, tries: result.tries, error: result.error });
       if (error) throw rpcError("yapin_post_result", error);
     },
+
+    /** 042: scheduled videos whose time has come go public. The number, or null before 042. */
+    async publishScheduled() {
+      const { data, error } = await supabase.rpc("publish_scheduled");
+      if (error) {
+        if (isMissingFunction(error)) return null;
+        throw rpcError("publish_scheduled", error);
+      }
+      return Number(data) || 0;
+    },
   };
 }

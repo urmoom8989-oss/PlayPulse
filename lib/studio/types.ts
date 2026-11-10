@@ -35,6 +35,10 @@ export type StudioRow = {
   appeal?: "open" | "dismissed" | "actioned" | null;
   /** A failed video: the encoder's last error, and whether Retry can work (033, the retry_failed flag). */
   failReason?: string | null;
+  /** 042: saved as a draft to finish later, the time it goes public, "Includes paid promotion". */
+  draft?: boolean;
+  publishAt?: string | null;
+  paidPromotion?: boolean;
   /** Ready at low quality while HD is still being made (038). */
   hdPending?: boolean;
   canRetry?: boolean;

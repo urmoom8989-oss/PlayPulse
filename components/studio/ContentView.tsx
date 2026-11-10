@@ -27,6 +27,7 @@ import {
 import { Menu, MenuItem } from "../Menu";
 import { RemovedNotice } from "../moderation/RemovedNotice";
 import { RetryButton } from "../processing/RetryButton";
+import { LocalTime } from "../LocalTime";
 
 const VIS: Record<Visibility, { label: string; Icon: typeof EyeIcon }> = {
   public: { label: "Public", Icon: EyeIcon },
@@ -486,6 +487,19 @@ export function ContentView({
                           </>
                         )}
                       </div>
+                      {!trash && v.draft && (
+                        <p className="mt-1 text-[12px] leading-4 text-text-2" data-draft={v.id}>
+                          <span className="mr-1.5 rounded-[2px] bg-hover px-1.5 py-0.5 font-medium uppercase text-text">Draft</span>
+                          <Link href={`/studio/video/${v.id}/edit`} className="text-[var(--studio-accent)] hover:underline">
+                            Edit draft
+                          </Link>
+                        </p>
+                      )}
+                      {!trash && v.publishAt && (
+                        <p className="mt-1 text-[12px] leading-4 text-text-2" data-scheduled={v.id}>
+                          Scheduled: goes public <LocalTime at={v.publishAt} />
+                        </p>
+                      )}
                       {!trash && v.status === "ready" && v.hdPending && (
                         <p className="mt-1 text-[12px] leading-4 text-text-2" data-hd-pending={v.id}>
                           HD is still processing. It plays in lower quality until then.

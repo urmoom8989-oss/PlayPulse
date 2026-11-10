@@ -46,6 +46,7 @@ Every change to the database lives in this folder as a numbered SQL file.
 | `039_smart_order.sql` | smart order: `claim_encode_job(worker, lane)` (lane `sd`: videos that still need their low quality, `hd`: the HD part of videos that play already, none: any, low quality first), `encode_sd_handoff(...)` puts the HD part back in the queue with fresh tries and keeps its progress |
 | `040_links_and_pull_refresh.sql` | the `description_links` (links and #hashtags in descriptions, `/hashtag/<tag>`) and `pull_to_refresh` (phones and tablets only) flags, on for everyone |
 | `041_cards.sql` | cards: `video_cards` (RLS, the owner reads), `video_cards_for(video_id)` for the player and the editor, `set_video_cards(video_id, cards)` replaces the owner's cards (up to 5), the `video_cards` flag |
+| `042_upload_options.sql` | upload options: `videos.publish_at`, `draft` and `paid_promotion`, `set_upload_options(video_id, visibility, publish_at, paid_promotion, draft)` for the owner (a schedule keeps the video private), `publish_scheduled()` for the worker every minute, `video_paid_promotion(video_id)` for the player, the `upload_options` flag |
 
 ## How to apply them
 

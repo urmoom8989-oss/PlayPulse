@@ -15,6 +15,7 @@ import {
 } from "../upload/rules.ts";
 import { thumbnailFileProblem } from "../studio/rules.ts";
 import { cardProblem, toPayload, type CardDraft } from "../cards/rules.ts";
+import { fromLocalInput, optionsErrorText, scheduleProblem, type UploadOptions } from "../upload/options-rules.ts";
 
 export type UploadPhase = "idle" | "draft" | "signing" | "uploading" | "finishing" | "done" | "failed";
 
@@ -53,13 +54,22 @@ type UploadState = {
   cards: CardDraft[];
   /** The picked file's length, read in the browser: the cards' time slider runs to it. */
   fileDurationS: number | null;
+  /** "Includes paid promotion" (042). */
+  paidPromotion: boolean;
+  /** Schedule (042): the datetime-local value it goes public at, or null when not scheduled. */
+  scheduleAt: string | null;
+  /** How the finished upload was saved: as a draft, scheduled, or neither. */
+  outcome: "draft" | "scheduled" | null;
   pick: (file: File) => void;
   goToStep: (step: 0 | 1 | 2) => void;
-  startUpload: () => Promise<void>;
+  /** Uploads with the chosen visibility; `asDraft` from any step saves it as a private draft to finish later. */
+  startUpload: (asDraft?: boolean) => Promise<void>;
   setDetails: (patch: Partial<Details>) => void;
   setThumbnailFile: (file: File | null) => void;
   setShortOn: (on: boolean) => void;
   setCards: (cards: CardDraft[]) => void;
+  setPaidPromotion: (on: boolean) => void;
+  setScheduleAt: (value: string | null) => void;
   cancel: () => Promise<void>;
   reset: () => void;
 };
@@ -121,6 +131,9 @@ export const useUpload = create<UploadState>((set, get) => ({
   short: checkingShort,
   cards: [],
   fileDurationS: null,
+  paidPromotion: false,
+  scheduleAt: null,
+  outcome: null,
 
   pick(file) {
     if (running || !["idle", "draft"].includes(get().phase)) return;
@@ -153,6 +166,9 @@ export const useUpload = create<UploadState>((set, get) => ({
       short: checkingShort,
       cards: [],
       fileDurationS: null,
+      paidPromotion: false,
+      scheduleAt: null,
+      outcome: null,
     });
 
     const seq = ++picks;
@@ -168,15 +184,21 @@ export const useUpload = create<UploadState>((set, get) => ({
     set({ step, error: null });
   },
 
-  async startUpload() {
+  async startUpload(asDraft = false) {
     const { phase, step, file, details, thumbnailFile } = get();
-    if (phase !== "draft" || step !== 2 || !file || running) return;
+    if (phase !== "draft" || (!asDraft && step !== 2) || !file || running) return;
     const problem = detailsProblem(details);
     if (problem) {
       set({ error: problem });
       return;
     }
-    const publishAfterUpload = details.visibility === "public";
+    const scheduleAt = asDraft ? null : get().scheduleAt;
+    const scheduleError = scheduleAt === null ? null : scheduleProblem(scheduleAt);
+    if (scheduleError) {
+      set({ error: scheduleError });
+      return;
+    }
+    const publishAfterUpload = !asDraft && scheduleAt === null && details.visibility === "public";
 
     const mime = videoTypeFor(file);
     if (!mime) {
@@ -253,12 +275,32 @@ export const useUpload = create<UploadState>((set, get) => ({
         }
       }
 
+      // Unlisted, Schedule, Draft and Paid promotion (042), whatever was picked.
+      const paidPromotion = get().paidPromotion;
+      const when = scheduleAt === null ? null : fromLocalInput(scheduleAt);
+      const options: UploadOptions = asDraft
+        ? { visibility: "private", publishAt: null, paidPromotion, draft: true }
+        : when
+          ? { visibility: "private", publishAt: when.toISOString(), paidPromotion, draft: false }
+          : { visibility: finalDetails.visibility, publishAt: null, paidPromotion, draft: false };
+      // Plain Private and Public need nothing more: publish_video() already did Public.
+      const plain = options.visibility !== "unlisted" && !options.draft && !options.publishAt && !paidPromotion;
+      if (!plain) {
+        try {
+          await postJson("/api/upload/options", { videoId: signed.videoId, ...options }, controller.signal);
+        } catch (optionsError) {
+          const code = optionsError instanceof Error ? optionsError.message : "failed";
+          set({ publishError: optionsErrorText(code) });
+        }
+      }
+
       running = null;
       set({
         phase: "done",
         file: null,
         watchUrl: done.watchUrl,
         details: finalDetails,
+        outcome: asDraft ? "draft" : when ? "scheduled" : null,
       });
       const box = get().short;
       if (useSession.getState().flags.shorts && box.state === "ready" && box.problem === null) {
@@ -307,6 +349,14 @@ export const useUpload = create<UploadState>((set, get) => ({
 
   setCards(cards) {
     set({ cards });
+  },
+
+  setPaidPromotion(on) {
+    set({ paidPromotion: on });
+  },
+
+  setScheduleAt(value) {
+    set({ scheduleAt: value, error: null });
   },
 
   setShortOn(on) {
@@ -362,5 +412,8 @@ function initialView() {
     short: checkingShort,
     cards: [] as CardDraft[],
     fileDurationS: null,
+    paidPromotion: false,
+    scheduleAt: null as string | null,
+    outcome: null as "draft" | "scheduled" | null,
   };
 }

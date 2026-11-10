@@ -7,6 +7,7 @@ import { useUpload } from "@/lib/store/upload";
 import { PublishButton } from "./PublishButton";
 import { UploadStatus } from "./UploadStatus";
 import { CardsEditor } from "@/components/cards/CardsEditor";
+import { defaultSchedule, scheduleLabel, scheduleProblem, fromLocalInput } from "@/lib/upload/options-rules";
 import {
   ACCEPT,
   DESCRIPTION_MAX,
@@ -179,22 +180,48 @@ function DropZone({ disabled }: { disabled: boolean }) {
   );
 }
 
+/** The main button of the last step, for the picked visibility. */
+function actionLabel(visibility: string, scheduled: boolean): string {
+  if (scheduled) return "Schedule";
+  if (visibility === "public") return "Publish video";
+  if (visibility === "unlisted") return "Upload as unlisted";
+  return "Upload privately";
+}
+
 function DraftFooter() {
   const { details, error, step, goToStep, startUpload, reset } = useUpload();
-  const problem = detailsProblem(details);
+  const scheduleAt = useUpload((s) => s.scheduleAt);
+  const drafts = useFlag("upload_options");
+  const problem = detailsProblem(details) ?? (step === 2 && scheduleAt !== null ? scheduleProblem(scheduleAt) : null);
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
       <p className="text-[13px] leading-5 text-text-2">
         {step < 2
-          ? "Your video file will not upload until you finish the steps and choose an action."
-          : details.visibility === "public"
-            ? "Your video uploads now and will be public after processing."
-            : "Your video uploads now and stays private until you publish it."}
+          ? "Your video file will not upload until you finish the steps and choose an action, or save it as a draft."
+          : scheduleAt !== null
+            ? "Your video uploads now and goes public at the time you picked."
+            : details.visibility === "public"
+              ? "Your video uploads now and will be public after processing."
+              : details.visibility === "unlisted"
+                ? "Your video uploads now. Anyone with the link can watch it after processing."
+                : "Your video uploads now and stays private until you publish it."}
       </p>
       <div className="flex items-center gap-3">
         <button type="button" className="btn-text" onClick={reset}>
           Cancel
         </button>
+        {drafts && (
+          <button
+            type="button"
+            className="btn-text"
+            disabled={Boolean(detailsProblem(details))}
+            onClick={() => void startUpload(true)}
+            data-save-draft
+            title="Upload the file now and finish the details later in Your videos"
+          >
+            Save as draft
+          </button>
+        )}
         {step > 0 && (
           <button type="button" className="btn-text" onClick={() => goToStep((step - 1) as 0 | 1 | 2)}>
             Back
@@ -216,7 +243,7 @@ function DraftFooter() {
             disabled={Boolean(problem)}
             onClick={() => void startUpload()}
           >
-            {details.visibility === "public" ? "Publish video" : "Upload privately"}
+            {actionLabel(details.visibility, scheduleAt !== null)}
           </button>
         )}
       </div>
@@ -351,6 +378,105 @@ function LocalVideoPreview({ file }: { file: File }) {
   return <video ref={video} controls muted playsInline preload="metadata" className="aspect-video w-full bg-black object-contain" />;
 }
 
+/** "Includes paid promotion" (042), in the Details step like 2020's "More options". */
+function PaidPromotionBox() {
+  const on = useFlag("upload_options");
+  const paid = useUpload((s) => s.paidPromotion);
+  const setPaid = useUpload((s) => s.setPaidPromotion);
+  if (!on) return null;
+  return (
+    <section className="mt-6" aria-label="Paid promotion">
+      <h3 className="text-[16px] font-medium leading-[22px] text-text">Paid promotion</h3>
+      <label className="mt-2 flex cursor-pointer items-start gap-3 text-[14px] leading-5 text-text">
+        <input type="checkbox" checked={paid} onChange={(e) => setPaid(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--link)]" data-paid-promotion />
+        <span>
+          My video contains paid promotion like a product placement, sponsorship or endorsement
+          <span className="block text-[13px] text-text-2">Viewers see &quot;Includes paid promotion&quot; at the start of the video.</span>
+        </span>
+      </label>
+    </section>
+  );
+}
+
+/** The Visibility step: Public, Unlisted, Private, or Schedule a time it goes public (2020). */
+function VisibilityChoice({ active }: { active: boolean }) {
+  const details = useUpload((s) => s.details);
+  const setDetails = useUpload((s) => s.setDetails);
+  const scheduleAt = useUpload((s) => s.scheduleAt);
+  const setScheduleAt = useUpload((s) => s.setScheduleAt);
+  const options = useFlag("upload_options");
+  const choices = ([
+    ["public", "Public", "Anyone can watch once processing is complete."],
+    ["unlisted", "Unlisted", "Anyone with the video link can watch it."],
+    ["private", "Private", "Only you can watch this video."],
+  ] as const).filter(([v]) => options || v !== "unlisted");
+  const problem = scheduleAt === null ? null : scheduleProblem(scheduleAt);
+  const radio = "mt-1 h-4 w-4 accent-[var(--link)]";
+  return (
+    <fieldset className="mt-4 space-y-3" data-visibility-choice>
+      <legend className="text-[14px] leading-5 text-text-2">Choose when to publish and who can watch your video.</legend>
+      {choices.map(([visibility, label, description]) => (
+        <label key={visibility} className="flex cursor-pointer items-start gap-3 rounded-[4px] border border-divider p-4 hover:bg-hover">
+          <input
+            type="radio"
+            name="video-visibility"
+            value={visibility}
+            checked={scheduleAt === null && details.visibility === visibility}
+            onChange={() => {
+              setScheduleAt(null);
+              setDetails({ visibility });
+            }}
+            disabled={!active}
+            className={radio}
+          />
+          <span>
+            <span className="block text-[14px] font-medium text-text">{label}</span>
+            <span className="block text-[13px] leading-5 text-text-2">{description}</span>
+          </span>
+        </label>
+      ))}
+      {options && (
+        <div className="rounded-[4px] border border-divider p-4" data-schedule>
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="radio"
+              name="video-visibility"
+              value="schedule"
+              checked={scheduleAt !== null}
+              onChange={() => {
+                setDetails({ visibility: "private" });
+                setScheduleAt(defaultSchedule());
+              }}
+              disabled={!active}
+              className={radio}
+            />
+            <span>
+              <span className="block text-[14px] font-medium text-text">Schedule</span>
+              <span className="block text-[13px] leading-5 text-text-2">Pick a date and time to make your video public. It stays private until then.</span>
+            </span>
+          </label>
+          {scheduleAt !== null && (
+            <div className="mt-3 pl-7">
+              <input
+                type="datetime-local"
+                value={scheduleAt}
+                onChange={(e) => setScheduleAt(e.target.value)}
+                disabled={!active}
+                aria-label="Publish on"
+                className="h-10 rounded-[4px] border border-[var(--input-border)] bg-surface px-3 text-[14px] text-text outline-none focus:border-[var(--focus)]"
+                data-schedule-at
+              />
+              <p className={`mt-1 text-[12px] ${problem ? "text-[var(--error)]" : "text-text-2"}`}>
+                {problem ?? `Goes public on ${scheduleLabel(fromLocalInput(scheduleAt) ?? scheduleAt)}, your time.`}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
 function DetailsForm({ step }: { step: 0 | 1 | 2 }) {
   const details = useUpload((s) => s.details);
   const setDetails = useUpload((s) => s.setDetails);
@@ -397,6 +523,7 @@ function DetailsForm({ step }: { step: 0 | 1 | 2 }) {
                 className="mt-1 block w-full resize-y bg-transparent text-[15px] leading-[22px] text-text outline-none placeholder:text-text-3"
               />
             </label>
+            <PaidPromotionBox />
           </>
         )}
 
@@ -420,32 +547,7 @@ function DetailsForm({ step }: { step: 0 | 1 | 2 }) {
         )}
 
         {step === 2 && (
-          <fieldset className="mt-4 space-y-3">
-            <legend className="text-[14px] leading-5 text-text-2">Choose who can watch your video.</legend>
-            {([
-              ["private", "Private", "Only you can watch this video."],
-              ["public", "Public", "Anyone can watch once processing is complete."],
-            ] as const).map(([visibility, label, description]) => (
-              <label key={visibility} className="flex cursor-pointer items-start gap-3 rounded-[4px] border border-divider p-4 hover:bg-hover">
-                <input
-                  type="radio"
-                  name="video-visibility"
-                  value={visibility}
-                  checked={details.visibility === visibility}
-                  onChange={() => setDetails({ visibility })}
-                  disabled={!active}
-                  className="mt-1 h-4 w-4 accent-[var(--link)]"
-                />
-                <span>
-                  <span className="block text-[14px] font-medium text-text">{label}</span>
-                  <span className="block text-[13px] leading-5 text-text-2">{description}</span>
-                </span>
-              </label>
-            ))}
-            <p className="pt-2 text-[13px] leading-5 text-text-2">
-              Uploading will not begin until you choose {details.visibility === "public" ? "Publish video" : "Upload privately"}.
-            </p>
-          </fieldset>
+          <VisibilityChoice active={active} />
         )}
       </div>
 
@@ -513,6 +615,9 @@ function ProgressFooter() {
 
 function DoneView() {
   const { watchUrl, details, reset, published, publishError } = useUpload();
+  const outcome = useUpload((s) => s.outcome);
+  const scheduleAt = useUpload((s) => s.scheduleAt);
+  const when = scheduleAt ? fromLocalInput(scheduleAt) : null;
   const videoId = useUpload((s) => s.videoId);
   const thumbnailSaving = useUpload((s) => s.thumbnailSaving);
   // Only ever rendered in the browser, after an upload: window is there.
@@ -525,15 +630,26 @@ function DoneView() {
       ) : (
         <p className="mt-5 text-[20px] leading-7 text-text">Video uploaded. Processing starts soon.</p>
       )}
-      <p className="mt-2 max-w-[520px] text-[14px] leading-5 text-text-2">
+      <p className="mt-2 max-w-[520px] text-[14px] leading-5 text-text-2" data-upload-outcome={outcome ?? details.visibility}>
         <span className="font-medium text-text">{details.title}</span>
-        {published
-          ? " will be public once processing succeeds."
-          : " is uploaded and saved privately. Publishing will make it public after processing succeeds."}
+        {outcome === "draft"
+          ? " is saved as a draft. Finish the details and choose who can watch it any time from Your videos."
+          : outcome === "scheduled" && when
+            ? ` is scheduled. It goes public on ${scheduleLabel(when)}.`
+            : published
+              ? " will be public once processing succeeds."
+              : details.visibility === "unlisted"
+                ? " is unlisted: anyone with the link can watch it after processing."
+                : " is uploaded and saved privately. Publishing will make it public after processing succeeds."}
       </p>
       <p className="mt-1 text-[13px] text-text-2">Category: {details.category}</p>
+      {outcome === "draft" && videoId && (
+        <Link href={`/studio/video/${videoId}/edit`} className="btn-blue mt-4 inline-flex items-center" data-edit-draft>
+          Finish the draft
+        </Link>
+      )}
       <div className="mt-5">
-        {videoId && (published ? (
+        {videoId && outcome === null && (published ? (
           <p role="status" className="text-[14px] font-medium text-text">Published after processing succeeds.</p>
         ) : (
           <>
