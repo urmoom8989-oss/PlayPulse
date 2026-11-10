@@ -19,10 +19,10 @@ const KINDS: CardKind[] = ["video", "channel", "link"];
 const input =
   "h-10 w-full rounded-[4px] border border-[var(--input-border)] bg-surface px-3 text-[14px] text-text outline-none placeholder:text-text-3 focus:border-[var(--focus)] disabled:opacity-60";
 
-type VideoList = { state: "loading" } | { state: "ready"; videos: CardVideoChoice[] } | { state: "failed" };
+export type VideoList = { state: "loading" } | { state: "ready"; videos: CardVideoChoice[] } | { state: "failed" };
 
 /** Your public and unlisted videos, asked for once (GET /api/studio/cards/videos). */
-function useMyVideos(): VideoList {
+export function useMyVideos(): VideoList {
   const [list, setList] = useState<VideoList>({ state: "loading" });
   useEffect(() => {
     let live = true;
