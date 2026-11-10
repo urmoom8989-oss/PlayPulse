@@ -74,6 +74,9 @@ import { CaptionOverlay } from "./CaptionOverlay";
 import { AutoplayCountdown, EndScreenWall } from "./EndScreen";
 import type { WatchCard } from "@/lib/cards/rules";
 import { VideoCards } from "./VideoCards";
+
+/** How long "Includes paid promotion" stays at the start of a video (042), like 2020. */
+const PAID_PROMOTION_S = 10;
 import { PlayerContextMenu } from "./PlayerContextMenu";
 import { StatsForNerds } from "./StatsForNerds";
 import { useCaptions } from "./useCaptions";
@@ -112,6 +115,8 @@ type Props = {
   hdPending?: boolean;
   /** Cards (041): messages that slide in at their time, and the i list. */
   cards?: WatchCard[];
+  /** "Includes paid promotion" in the corner for the first seconds (042). */
+  paidPromotion?: boolean;
 };
 
 type Menu = null | "main" | "quality" | "speed" | "subtitles" | "caption-options" | `caption-${CaptionSetting}`;
@@ -170,6 +175,7 @@ export function Player({
   live = null,
   hdPending = false,
   cards = [],
+  paidPromotion = false,
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -973,6 +979,18 @@ export function Player({
       {ending === "wall" && <EndScreenWall videos={wall} channelName={channelName} />}
 
       <VideoCards cards={cards} time={time} chrome={showChrome} hidden={ending !== null || Boolean(error)} />
+
+      {paidPromotion && ending === null && !error && time < PAID_PROMOTION_S && (
+        <div
+          data-paid-promotion
+          className="pp-fade-in pointer-events-none absolute left-3 top-3 z-10 flex items-center gap-1.5 rounded-[2px] bg-black/60 px-2 py-1 text-[13px] font-medium text-white"
+        >
+          <svg viewBox="0 0 24 24" className="h-4 w-4" aria-hidden>
+            <path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z" fill="currentColor" />
+          </svg>
+          Includes paid promotion
+        </div>
+      )}
 
       {captionTrack && ending === null && !error && (
         <CaptionOverlay

@@ -452,6 +452,26 @@ read from the file; when it can't be, the time is typed).
   Video and channel cards open on the site, links in a new tab.
 - A video card is left out for viewers while its video is private or gone.
 
+### Unlisted, schedule, drafts and paid promotion
+
+Behind the `upload_options` flag (`042_upload_options.sql`, on for everyone).
+In the uploader, like 2020:
+
+- Visibility has Public, Unlisted, Private and Schedule. Schedule picks a date
+  and time (at least 5 minutes ahead, within a year, in your own time zone):
+  the video stays private until then and the encoder worker makes it public
+  within a minute of it. One still processing goes public when it is ready.
+- "Save as draft" at the bottom of any step uploads the file and keeps the
+  video private as a draft, so the uploader can be closed. The studio's
+  Content page marks it Draft with an "Edit draft" link; saving it in the
+  video editor finishes it.
+- "My video contains paid promotion" in the details step. Viewers then see
+  "Includes paid promotion" at the top left of the player for the first 10
+  seconds.
+- The studio's video editor has the same Schedule choice (while the video is
+  not public yet) and the paid promotion box. Content shows "Scheduled: goes
+  public ..." for scheduled videos.
+
 ### Swipe down to refresh
 
 Behind the `pull_to_refresh` flag (`040_links_and_pull_refresh.sql`, on for

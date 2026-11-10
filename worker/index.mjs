@@ -7,7 +7,8 @@
 // all to R2 under hls/<video>/ and calls encode_done. Then it writes the
 // video's auto-generated captions with whisper.cpp. One job at a time.
 // Between jobs it empties the R2 folders of videos the studio trash purged.
-// Beside all that, the channel bots run (lib/bots.mjs, the bots flag).
+// Beside all that, the channel bots run (lib/bots.mjs, the bots flag), and
+// once a minute scheduled videos whose time has come go public (lib/schedule.mjs).
 //
 // Settings come from the environment, see lib/env.mjs and ops/encoder/README.md.
 //   node index.mjs
@@ -18,6 +19,7 @@ import { readConfig } from "./lib/env.mjs";
 import { createLogger } from "./lib/log.mjs";
 import { runLoop, sleep } from "./lib/loop.mjs";
 import { run } from "./lib/run.mjs";
+import { runScheduler } from "./lib/schedule.mjs";
 import { createR2Client, createStorage } from "./lib/storage.mjs";
 
 const log = createLogger();
@@ -51,8 +53,10 @@ for (const sig of ["SIGTERM", "SIGINT"]) {
 
 const supabase = createSupabase(config.supabaseUrl, config.serviceRoleKey);
 const storage = createStorage(createR2Client(config.r2), config.bucket);
+const db = createDb(supabase);
 await Promise.all([
-  runLoop({ db: createDb(supabase), storage, log, config, stopSignal: stop.signal }),
+  runLoop({ db, storage, log, config, stopSignal: stop.signal }),
+  runScheduler({ db, log, stopSignal: stop.signal }),
   runBots({ db: createBotDb(supabase), storage, log, stopSignal: stop.signal }),
 ]);
 process.exit(0);

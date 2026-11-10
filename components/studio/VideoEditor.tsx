@@ -3,7 +3,7 @@
 import { BroadcastPanel } from "@/components/live/BroadcastPanel";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { DESCRIPTION_MAX, TITLE_MAX } from "@/lib/upload/rules";
 import { parseTags, studioErrorMessage, TAGS_MAX, tagsProblem, thumbnailFileProblem } from "@/lib/studio/rules";
 import type { CommentsMode, StudioRow, Visibility } from "@/lib/studio/types";
@@ -11,6 +11,8 @@ import { formatTime } from "@/lib/watch/format";
 import { PublishButton } from "@/components/upload/PublishButton";
 import { StudioCards } from "@/components/cards/StudioCards";
 import type { WatchCard } from "@/lib/cards/rules";
+import { defaultSchedule, fromLocalInput, scheduleProblem, toLocalInput } from "@/lib/upload/options-rules";
+import { LocalTime } from "@/components/LocalTime";
 import { ArrowBackIcon, CheckIcon, CloseIcon, EyeIcon, ImageIcon, LinkIcon, LockIcon } from "../icons";
 
 export type Still = { name: string; url: string };
@@ -81,6 +83,7 @@ export function VideoEditor({
   preview,
   statsOn = false,
   cards = null,
+  optionsOn = false,
 }: {
   video: StudioRow;
   stills: Still[];
@@ -94,6 +97,8 @@ export function VideoEditor({
   statsOn?: boolean;
   /** The video's cards (041); null hides the Cards box (the video_cards flag is off). */
   cards?: WatchCard[] | null;
+  /** 042: Schedule, finishing a draft and "Includes paid promotion". */
+  optionsOn?: boolean;
 }) {
   const router = useRouter();
   const fileInput = useRef<HTMLInputElement>(null);
@@ -104,12 +109,24 @@ export function VideoEditor({
     tags: video.tags.join(", "),
     mode: video.commentsMode,
     short: video.shortChoice ?? video.isShort,
+    paid: video.paidPromotion === true,
+    // The scheduled time in the viewer's own zone is only known in the browser: set after mount.
+    schedule: null as string | null,
+    draft: video.draft === true,
   };
   const [saved, setSaved] = useState(start);
   const [title, setTitle] = useState(start.title);
   const [description, setDescription] = useState(start.description);
   const [visibility, setVisibility] = useState<Visibility>(start.visibility);
   const [tagText, setTagText] = useState(start.tags);
+  const [paid, setPaid] = useState(start.paid);
+  const [scheduleAt, setScheduleAt] = useState<string | null>(start.schedule);
+  useEffect(() => {
+    if (!video.publishAt) return;
+    const local = toLocalInput(new Date(video.publishAt));
+    setScheduleAt(local);
+    setSaved((s) => ({ ...s, schedule: local }));
+  }, [video.publishAt]);
   const [mode, setMode] = useState<CommentsMode | null>(start.mode);
   const [short, setShort] = useState(start.short);
   const [thumb, setThumb] = useState<string>(video.thumbnailName ?? "thumb-1.webp");
@@ -131,8 +148,13 @@ export function VideoEditor({
     visibility !== saved.visibility ||
     tags.join(",") !== parseTags(saved.tags).join(",") ||
     mode !== saved.mode ||
-    short !== saved.short;
-  const canSave = dirty && !busy && !titleError && !descError && !tagError && !preview;
+    short !== saved.short ||
+    paid !== saved.paid ||
+    scheduleAt !== saved.schedule ||
+    // A draft can always be saved: saving finishes it.
+    saved.draft;
+  const scheduleError = scheduleAt !== null && scheduleAt !== saved.schedule ? scheduleProblem(scheduleAt) : null;
+  const canSave = dirty && !busy && !titleError && !descError && !tagError && !scheduleError && !preview;
   const ready = video.status === "ready";
   const canBeShort = video.isShort || video.shortChoice === false;
 
@@ -143,6 +165,8 @@ export function VideoEditor({
     setTagText(saved.tags);
     setMode(saved.mode);
     setShort(saved.short);
+    setPaid(saved.paid);
+    setScheduleAt(saved.schedule);
     setError(null);
   }
 
@@ -168,6 +192,19 @@ export function VideoEditor({
       if (shortsOn && canBeShort && short !== saved.short) {
         await post("/api/shorts/choice", { videoId: video.id, on: short });
         done = { ...done, short };
+        setSaved(done);
+      }
+      // 042: the schedule, paid promotion, and the draft is finished.
+      if (optionsOn && (paid !== saved.paid || scheduleAt !== saved.schedule || saved.draft)) {
+        const when = scheduleAt === null ? null : fromLocalInput(scheduleAt);
+        await post("/api/upload/options", {
+          videoId: video.id,
+          visibility: when ? "private" : visibility,
+          publishAt: when ? when.toISOString() : null,
+          paidPromotion: paid,
+          draft: false,
+        });
+        done = { ...done, paid, schedule: scheduleAt, draft: false };
         setSaved(done);
       }
       setNote("Changes saved");
@@ -248,6 +285,17 @@ export function VideoEditor({
           </button>
         </div>
       </div>
+
+      {saved.draft && (
+        <p className="mb-4 rounded-[2px] border-l-4 border-[var(--studio-accent)] bg-hover px-4 py-3 text-[14px] text-text" data-draft-banner>
+          This video is a draft. Finish the details, choose who can watch it, then Save.
+        </p>
+      )}
+      {video.publishAt && saved.schedule && !saved.draft && (
+        <p className="mb-4 rounded-[2px] bg-hover px-4 py-3 text-[14px] text-text" data-scheduled-banner>
+          Scheduled: goes public on <LocalTime at={(fromLocalInput(saved.schedule) ?? new Date(video.publishAt)).toISOString()} />.
+        </p>
+      )}
 
       {(error || note) && (
         <p role={error ? "alert" : "status"} className={`mb-4 text-[14px] ${error ? "text-[var(--error)]" : "text-text-2"}`} data-editor-message>
@@ -367,6 +415,25 @@ export function VideoEditor({
             )}
           </Box>
 
+          {optionsOn && (
+            <Box title="Paid promotion">
+              <label className="flex cursor-pointer items-start gap-3 text-[14px] leading-5 text-text">
+                <input
+                  type="checkbox"
+                  checked={paid}
+                  onChange={(e) => setPaid(e.target.checked)}
+                  disabled={preview}
+                  className="mt-0.5 h-[18px] w-[18px] accent-[var(--studio-accent)]"
+                  data-field="paid-promotion"
+                />
+                <span>
+                  My video contains paid promotion like a product placement, sponsorship or endorsement
+                  <span className="block text-[13px] text-text-2">Viewers see &quot;Includes paid promotion&quot; at the start of the video.</span>
+                </span>
+              </label>
+            </Box>
+          )}
+
           {cards && (
             <Box title="Cards" hint="Up to 5 cards that point viewers to one of your videos, a channel or a website. Each one slides in at the top right of the player at its time. Cards save on their own.">
               <StudioCards videoId={video.id} initial={cards} durationS={video.durationS ?? null} preview={preview} />
@@ -450,8 +517,11 @@ export function VideoEditor({
                     type="radio"
                     name="visibility"
                     value={v.value}
-                    checked={visibility === v.value}
-                    onChange={() => setVisibility(v.value)}
+                    checked={scheduleAt === null && visibility === v.value}
+                    onChange={() => {
+                      setScheduleAt(null);
+                      setVisibility(v.value);
+                    }}
                     disabled={preview}
                     className="mt-0.5 h-[18px] w-[18px] accent-[var(--studio-accent)]"
                   />
@@ -464,6 +534,42 @@ export function VideoEditor({
                   </span>
                 </label>
               ))}
+              {optionsOn && video.visibility !== "public" && (
+                <div className="px-4 py-3" data-schedule>
+                  <label className="flex cursor-pointer items-start gap-3">
+                    <input
+                      type="radio"
+                      name="visibility"
+                      value="schedule"
+                      checked={scheduleAt !== null}
+                      onChange={() => {
+                        setVisibility("private");
+                        setScheduleAt(saved.schedule ?? defaultSchedule());
+                      }}
+                      disabled={preview}
+                      className="mt-0.5 h-[18px] w-[18px] accent-[var(--studio-accent)]"
+                    />
+                    <span>
+                      <span className="text-[14px] text-text">Schedule</span>
+                      <span className="block text-[12px] text-text-2">Private until the time you pick, then public</span>
+                    </span>
+                  </label>
+                  {scheduleAt !== null && (
+                    <div className="mt-2 pl-[30px]">
+                      <input
+                        type="datetime-local"
+                        value={scheduleAt}
+                        onChange={(e) => setScheduleAt(e.target.value)}
+                        disabled={preview}
+                        aria-label="Publish on"
+                        className="h-9 w-full rounded-[4px] border border-[var(--input-border)] bg-surface px-2 text-[14px] text-text outline-none focus:border-[var(--studio-accent)]"
+                        data-schedule-at
+                      />
+                      {scheduleError && <p className="mt-1 text-[12px] text-[var(--error)]">{scheduleError}</p>}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
           {!preview && <BroadcastPanel videoId={video.id} ready={ready} />}

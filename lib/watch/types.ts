@@ -38,6 +38,8 @@ export type WatchVideo = {
   hdPending?: boolean;
   /** Cards (041): what slides in at the top right of the player, and the i list. */
   cards?: WatchCard[];
+  /** "Includes paid promotion" at the start of the video (042). */
+  paidPromotion?: boolean;
 };
 
 export type UpNextVideo = {

@@ -5,6 +5,7 @@ import { flagOn } from "@/lib/flags";
 import { readSupabaseConfig } from "@/lib/supabase/env";
 import { createClient } from "@/lib/supabase/server";
 import { failedJobsFor, hdPendingIds } from "@/lib/processing/server";
+import { uploadOptionsFor } from "@/lib/upload/options";
 import { canRetry } from "@/lib/processing/retry";
 import { readPublicBase } from "@/lib/watch/media";
 import { previewOverview, previewRows } from "./preview";
@@ -115,10 +116,20 @@ export async function studioContent(trash: boolean): Promise<ContentState> {
   const rows = (Array.isArray(data) ? data : []) as Record<string, unknown>[];
   const link = await withLinks(rows);
   const studioRows = rows.map((r) => rowToStudio(r, link));
-  return { kind: "ready", rows: trash ? studioRows : await withHd(gate, await withRetry(gate, studioRows)), now: Date.now() };
+  return {
+    kind: "ready",
+    rows: trash ? studioRows : await withOptions(gate, await withHd(gate, await withRetry(gate, studioRows))),
+    now: Date.now(),
+  };
 }
 
 /** Low quality first (038): ready videos whose HD is still being made say so. */
+/** 042: drafts, scheduled times and paid promotion; the rows as they are before 042. */
+async function withOptions(gate: { supabase: Db }, rows: StudioRow[]): Promise<StudioRow[]> {
+  const extra = await uploadOptionsFor(gate.supabase, rows.map((r) => r.id));
+  return extra.size === 0 ? rows : rows.map((r) => ({ ...r, ...(extra.get(r.id) ?? {}) }));
+}
+
 async function withHd(gate: { supabase: Db }, rows: StudioRow[]): Promise<StudioRow[]> {
   const hd = await hdPendingIds(gate.supabase, rows.filter((r) => r.status === "ready").map((r) => r.id));
   return hd.size === 0 ? rows : rows.map((r) => (hd.has(r.id) ? { ...r, hdPending: true } : r));
@@ -151,6 +162,8 @@ export type EditState =
       commentsOn: boolean;
       shortsOn: boolean;
       uploadsConfigured: boolean;
+      /** 042 is in and the upload_options flag is on: Schedule, drafts and paid promotion. */
+      optionsOn?: boolean;
       preview?: boolean;
     };
 
@@ -180,15 +193,18 @@ export async function studioVideo(id: string): Promise<EditState> {
     }
   }
   const custom = video.thumbnailName?.startsWith("custom-") && video.thumbnail ? { name: video.thumbnailName, url: video.thumbnail } : null;
-  const [commentsOn, shortsOn, channel] = await Promise.all([
+  const [commentsOn, shortsOn, channel, options, optionsOn] = await Promise.all([
     flagOn("comments", gate.user.id),
     flagOn("shorts", gate.user.id),
     gate.supabase.from("channels").select("comments_default").eq("owner_id", gate.user.id).maybeSingle(),
+    uploadOptionsFor(gate.supabase, [video.id]),
+    flagOn("upload_options", gate.user.id),
   ]);
   const d = (channel.data as { comments_default?: string } | null)?.comments_default;
   return {
     kind: "ready",
-    video,
+    video: { ...video, ...(options.get(video.id) ?? {}) },
+    optionsOn: optionsOn && options.size > 0,
     stills,
     custom,
     channelDefault: d === "off" || d === "held" ? d : "on",

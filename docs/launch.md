@@ -99,6 +99,7 @@ again. See [`supabase/migrations/README.md`](../supabase/migrations/README.md).
 - [ ] `039_smart_order.sql` (smart order: every new upload's 360p before anyone's HD, HD at a low CPU priority)
 - [ ] `040_links_and_pull_refresh.sql` (links and #hashtags in descriptions, swipe down to refresh on phones)
 - [ ] `041_cards.sql` (cards: up to 5 per video, added in the uploader and the studio)
+- [ ] `042_upload_options.sql` (Unlisted and Schedule in the uploader, drafts, "Includes paid promotion")
 
 Then make yourself an admin (sign up on the site first):
 

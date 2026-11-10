@@ -47,6 +47,7 @@ async function EditGate({ params }: { params: Promise<{ id: string }> }) {
               preview={state.preview}
               statsOn={stats}
               cards={state.preview ? null : cards}
+              optionsOn={state.optionsOn === true}
             />
           </div>
         </StudioPage>

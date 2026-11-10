@@ -271,6 +271,15 @@ watching and posts a few chat lines (the rates are in the one row of
 `public.bot_settings`). The log shows an `orders round done` line for each
 round that added something.
 
+## Scheduled videos
+
+Once a minute, beside the encodes, the worker calls `publish_scheduled()`
+(`supabase/migrations/042_upload_options.sql`, `lib/schedule.mjs`): videos
+scheduled in the uploader or the studio whose time has come go public. One
+still processing then goes public as soon as it is ready. No new settings. The
+log shows a `scheduled videos went public` line when some did. Before 042 is
+run it says so once and asks again every 10 minutes.
+
 ## Emptying the trash in R2
 
 Videos deleted in the studio stay in the trash for 30 days. Then the daily
