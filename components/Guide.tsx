@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { createContext, Suspense, useContext, type ComponentType } from "react";
+import { createContext, Suspense, useContext, useEffect, useState, type ComponentType } from "react";
 import { mainGuide, railGuide, youGuide, type GuideKey } from "@/lib/guide";
 import { useT } from "@/lib/i18n/client";
 import { useFlag, useSession } from "@/lib/store/session";
@@ -277,6 +277,18 @@ function GuideLayout() {
   // Neither has the creator studio, which brings its own left nav.
   const studioNav = useUi((s) => s.studioNav);
   const docked = useContext(PathContext) !== "/watch" && !studioNav;
+  // The drawer slides out before it goes: it stays a moment after closing.
+  const [wasOpen, setWasOpen] = useState(drawerOpen);
+  const [closing, setClosing] = useState(false);
+  if (drawerOpen !== wasOpen) {
+    setWasOpen(drawerOpen);
+    setClosing(!drawerOpen);
+  }
+  useEffect(() => {
+    if (!closing) return;
+    const done = setTimeout(() => setClosing(false), 250);
+    return () => clearTimeout(done);
+  }, [closing]);
 
   return (
     <>
@@ -293,12 +305,15 @@ function GuideLayout() {
         <GuideContent />
       </nav>
 
-      {drawerOpen && (
-        <div className="fixed inset-0 z-50">
-          <div onClick={close} aria-hidden className="absolute inset-0 bg-black/50" />
+      {(drawerOpen || closing) && (
+        <div className={`fixed inset-0 z-50 ${closing ? "pointer-events-none" : ""}`} data-drawer={closing ? "closing" : "open"}>
+          <div onClick={close} aria-hidden className={`absolute inset-0 bg-black/50 ${closing ? "pp-scrim-out" : "pp-scrim-in"}`} />
           <nav
             aria-label="Guide"
-            className="absolute inset-y-0 left-0 w-60 overflow-y-auto bg-surface"
+            className={`absolute inset-y-0 left-0 w-60 overflow-y-auto bg-surface ${closing ? "pp-drawer-out" : "pp-drawer-in"}`}
+            onAnimationEnd={(e) => {
+              if (closing && e.target === e.currentTarget) setClosing(false);
+            }}
           >
             <div className="flex h-14 items-center pl-4">
               <GuideButton />
