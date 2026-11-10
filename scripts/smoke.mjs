@@ -100,6 +100,30 @@ const checks = [
       /data-history-state="(off|no-db|signed-out|not-set-up|ready)"/.test(body) || "history page shows none of its states",
   },
   {
+    // Playlists (043): every state of the page is a page, never a crash.
+    path: "/playlist?list=00000000-0000-4000-8000-000000000000",
+    test: (body) => /data-playlist-state="(off|no-db|not-set-up|missing|ready)"/.test(body) || "playlist page shows none of its states",
+  },
+  {
+    path: "/library",
+    test: (body) => /data-library-state="/.test(body) || "library shows none of its states",
+  },
+  {
+    path: "/api/playlists",
+    allowStatus: [401, 403, 503],
+    test: (body) => {
+      const json = JSON.parse(body);
+      return typeof json.error === "string" || Array.isArray(json.playlists) || "neither playlists nor an error code";
+    },
+  },
+  {
+    path: "/api/playlists/00000000-0000-4000-8000-000000000000/videos",
+    method: "POST",
+    body: JSON.stringify({ videoId: "00000000-0000-4000-8000-000000000000", saved: true }),
+    allowStatus: [401, 403, 404, 503],
+    test: (body) => typeof JSON.parse(body).error === "string" || "no error code",
+  },
+  {
     path: "/history",
     test: (body) => /data-history-state="/.test(body) || "/history does not land on the history page",
   },

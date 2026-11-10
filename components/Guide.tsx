@@ -11,6 +11,7 @@ import { useUi } from "@/lib/store/ui";
 import { GuideFooterLinks } from "./launch/SiteFooter";
 import { GuideButton } from "./GuideButton";
 import { GuideSubscriptions } from "./subscriptions/GuideSubscriptions";
+import { GuidePlaylists } from "./playlists/GuidePlaylists";
 import { SubscriptionsSync } from "./subscriptions/SubscriptionsSync";
 import {
   AccountCircleIcon,
@@ -55,6 +56,7 @@ function useShellFlags() {
     shorts: useFlag("shorts"),
     subscriptions: useFlag("subscriptions"),
     engagement: useFlag("engagement"),
+    playlists: useFlag("playlists"),
   };
 }
 
@@ -161,6 +163,7 @@ function GuideContent({ onNavigate }: { onNavigate?: () => void }) {
           {you.map((key) => (
             <GuideLink key={key} item={ITEMS[key]} onClick={onNavigate} />
           ))}
+          {user && flags.playlists && <GuidePlaylists onNavigate={onNavigate} />}
         </Section>
       )}
 

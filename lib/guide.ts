@@ -11,6 +11,8 @@ export type ShellFlags = {
   subscriptions?: boolean;
   engagement?: boolean;
   search?: boolean;
+  /** Playlists (043): Library shows them, so it is there even without engagement. */
+  playlists?: boolean;
 };
 
 /** The first guide section: Home, then Snips (11), Trending (6), Subscriptions (7) as their flags go on. */
@@ -22,9 +24,13 @@ export function mainGuide(f: ShellFlags): GuideKey[] {
   return out;
 }
 
-/** The "you" section: Library and History, both part of feature 9 (engagement). Empty hides the section. */
+/**
+ * The "you" section: Library and History, both part of feature 9
+ * (engagement); Library alone with only playlists on. Empty hides the section.
+ */
 export function youGuide(f: ShellFlags): GuideKey[] {
-  return f.engagement ? ["library", "history"] : [];
+  if (f.engagement) return ["library", "history"];
+  return f.playlists ? ["library"] : [];
 }
 
 /** The 72 px icon rail: the main section plus Library when there is one. */

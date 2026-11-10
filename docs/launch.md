@@ -100,6 +100,7 @@ again. See [`supabase/migrations/README.md`](../supabase/migrations/README.md).
 - [ ] `040_links_and_pull_refresh.sql` (links and #hashtags in descriptions, swipe down to refresh on phones)
 - [ ] `041_cards.sql` (cards: up to 5 per video, added in the uploader and the studio)
 - [ ] `042_upload_options.sql` (Unlisted and Schedule in the uploader, drafts, "Includes paid promotion")
+- [ ] `043_playlists.sql` (playlists: Save, Watch later, the playlist page with Play all, the panel next to the player)
 
 Then make yourself an admin (sign up on the site first):
 

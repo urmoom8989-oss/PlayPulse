@@ -1,11 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ComponentType, type ReactNode } from "react";
 import { Avatar } from "@/components/Avatar";
 import { Menu } from "@/components/Menu";
 import { useReport } from "@/components/moderation/ReportMenuItem";
-import { useFlag } from "@/lib/store/session";
+import { useFlag, useSession } from "@/lib/store/session";
+import { SaveDialog } from "@/components/playlists/SaveDialog";
+import { useToast } from "@/components/playlists/Toast";
 import {
   LinkIcon,
   LockIcon,
@@ -131,6 +134,11 @@ export function VideoInfo({
   const t = useT();
   const lang = useLang();
   const [sharing, setSharing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const router = useRouter();
+  const playlists = useFlag("playlists");
+  const signedIn = useSession((s) => s.user !== null);
+  const [toastNode, toast] = useToast();
   const moderation = useFlag("moderation");
   const report = useReport("video", video.id);
   const channelHref = `/@${video.channel.handle}`;
@@ -159,7 +167,23 @@ export function VideoInfo({
         <div className="-mx-1.5 flex items-center sm:mx-0">
           <LikeButtons key={video.id} videoId={video.id} engagement={engagement} />
           <ActionButton Icon={ShareIcon} label={t("Share")} onClick={() => setSharing(true)} mirror data-share />
-          <ActionButton Icon={PlaylistAddIcon} label={t("Save")} title={t("Saving to a playlist arrives in a later feature.")} />
+          {playlists ? (
+            <ActionButton
+              Icon={PlaylistAddIcon}
+              label={t("Save")}
+              onClick={() => {
+                if (signedIn) {
+                  setSaving(true);
+                  return;
+                }
+                const here = window.location.pathname + window.location.search;
+                router.push(`/login?next=${encodeURIComponent(here)}`);
+              }}
+              data-save
+            />
+          ) : (
+            <ActionButton Icon={PlaylistAddIcon} label={t("Save")} title={t("Saving to a playlist arrives in a later feature.")} />
+          )}
           {moderation && !video.isOwner ? (
             <Menu
               label={t("More actions")}
@@ -200,6 +224,8 @@ export function VideoInfo({
       </div>
 
       {sharing && <ShareDialog videoId={video.id} title={video.title} onClose={() => setSharing(false)} />}
+      {saving && <SaveDialog videoId={video.id} onClose={() => setSaving(false)} toast={toast} />}
+      {toastNode}
       {report.dialog}
     </div>
   );
