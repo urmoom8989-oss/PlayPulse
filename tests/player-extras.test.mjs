@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { chapterAt, parseChapters, parseTimestamp, splitTimestamps } from "../lib/watch/chapters.ts";
 import { bufferAhead, menuPosition, nerdRows, watchLink } from "../lib/watch/nerds.ts";
-import { DOUBLE_TAP_MS, nextTap, tapSide, tapTotal } from "../lib/watch/taps.ts";
+import { DOUBLE_TAP_MS, TAP_CONTINUE_MS, nextTap, tapSide, tapTotal } from "../lib/watch/taps.ts";
 
 const DESCRIPTION = [
   "My video!",
@@ -90,7 +90,9 @@ test("double tap: halves, the time window and 10 more for each tap", () => {
   assert.equal(tapTotal(r.state.count), 20);
 
   assert.equal(nextTap(r.state, r.state.at + 100, "back").skip, 0, "the other half starts over");
-  assert.equal(nextTap(r.state, r.state.at + DOUBLE_TAP_MS + 1, "forward").skip, 0, "too slow starts over");
+  assert.equal(nextTap(r.state, r.state.at + DOUBLE_TAP_MS + 200, "forward").skip, 10, "while the note shows, a slower tap keeps skipping");
+  assert.equal(nextTap(r.state, r.state.at + TAP_CONTINUE_MS + 1, "forward").skip, 0, "after the note is gone it starts over");
+  assert.equal(nextTap(nextTap(null, 0, "forward").state, DOUBLE_TAP_MS + 1, "forward").skip, 0, "the second tap still has to be quick");
   assert.equal(nextTap(nextTap(null, 0, "back").state, 100, "back").skip, -10);
   assert.equal(tapTotal(1), 0);
 });

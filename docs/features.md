@@ -403,7 +403,8 @@ the browser:
   quality, and the player (hls.js or the browser's own HLS). Without hls.js the
   browser does not tell the page its codecs or connection speed.
 - **Double tap** on a phone: the left half goes back 10 seconds, the right half
-  forward, and each extra tap adds 10 more. A single tap still plays or pauses.
+  forward, and each extra tap adds 10 more (while the note shows, taps don't
+  have to be quick). A single tap still plays or pauses.
 - **Autoplay.** The Autoplay switch above Up next works and the browser
   remembers it (on until switched off). When a video ends with autoplay on,
   the player shows "Up next in 8" with the next video, a ring that counts
@@ -442,6 +443,10 @@ they are skipped.
   the right while the old one slides out to the left, and Back slides the
   other way; the menu's box grows or shrinks to the new page at the same time
   (250 ms, `components/watch/useMenuMotion.ts`).
+- **Double tap to skip** (phones, player extras): the arc on that side fades
+  in, a ripple grows out from the finger on every tap, the three arrows light
+  up one after another toward the skip, the seconds count up with the taps,
+  and it all fades out (`components/watch/DoubleTapNote.tsx`).
 
 ### Description links and hashtags
 
