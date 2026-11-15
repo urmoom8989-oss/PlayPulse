@@ -17,9 +17,7 @@ import {
   DefaultViewIcon,
   FullscreenExitIcon,
   FullscreenIcon,
-  PauseIcon,
   PipIcon,
-  PlayIcon,
   ReplayIcon,
   SettingsIcon,
   SubtitlesIcon,
@@ -82,8 +80,10 @@ import type { PlayerWatermark } from "@/lib/channels/watermark-rules";
 /** How long "Includes paid promotion" stays at the start of a video (042), like 2020. */
 const PAID_PROMOTION_S = 10;
 import { PlayerContextMenu } from "./PlayerContextMenu";
+import { PlayPauseIcon } from "./PlayPauseIcon";
 import { StatsForNerds } from "./StatsForNerds";
 import { useCaptions } from "./useCaptions";
+import { useMenuMotion } from "./useMenuMotion";
 
 type Props = {
   videoId: string;
@@ -130,6 +130,14 @@ type Props = {
 };
 
 type Menu = null | "main" | "quality" | "speed" | "subtitles" | "caption-options" | `caption-${CaptionSetting}`;
+
+/** How deep a settings page is: going deeper slides forward, going up slides back. */
+function menuDepth(page: NonNullable<Menu>): number {
+  if (page === "main") return 0;
+  if (page === "caption-options") return 2;
+  if (page.startsWith("caption-")) return 3;
+  return 1;
+}
 
 /** Controls fade out after this long without the mouse moving, while playing. */
 const IDLE_MS = 2500;
@@ -194,7 +202,6 @@ export function Player({
   const videoRef = useRef<HTMLVideoElement>(null);
   const barRef = useRef<HTMLDivElement>(null);
   const volumeRef = useRef<HTMLDivElement>(null);
-  const menuRef = useRef<HTMLDivElement>(null);
   const gearRef = useRef<HTMLButtonElement>(null);
   const hlsRef = useRef<Hls | null>(null);
   // Native HLS only: the renditions of the master playlist, by quality menu level.
@@ -220,7 +227,22 @@ export function Player({
   const [chosen, setChosen] = useState(AUTO);
   const [playingLevel, setPlayingLevel] = useState(-1);
   const [native, setNative] = useState(false);
-  const [menu, setMenu] = useState<Menu>(null);
+  const [menu, setMenuState] = useState<Menu>(null);
+  // The settings menu slides between its pages and fades in and out, like 2020.
+  const {
+    boxRef: menuRef,
+    panelRef: menuPanelRef,
+    ghostRef: menuGhostRef,
+    closeRef: menuCloseRef,
+    before: beforeMenu,
+  } = useMenuMotion(menu, menuDepth);
+  const setMenu = useCallback(
+    (next: Menu) => {
+      beforeMenu(next);
+      setMenuState(next);
+    },
+    [beforeMenu],
+  );
   const [active, setActive] = useState(true);
   const [hover, setHover] = useState<{ x: number; t: number; w: number } | null>(null);
   const [scrubbing, setScrubbing] = useState(false);
@@ -755,7 +777,7 @@ export function Player({
     };
     document.addEventListener("pointerdown", onDown);
     return () => document.removeEventListener("pointerdown", onDown);
-  }, [menu]);
+  }, [menu, menuRef, setMenu]);
 
   const pickQuality = (opt: QualityOption) => {
     setChosen(opt.level);
@@ -1114,7 +1136,8 @@ export function Player({
         {/* The bottom bar. */}
         <div className="relative flex h-9 items-center px-3 text-[#eeeeee]">
           <CtrlButton label={playing ? "Pause (k)" : ended ? "Replay" : "Play (k)"} onClick={togglePlay} data-play>
-            {playing ? <PauseIcon className="h-7 w-7" /> : ended ? <ReplayIcon className="h-6 w-6" /> : <PlayIcon className="h-7 w-7" />}
+            {/* Pause and play fold into each other; Replay once the video has ended. */}
+            {!playing && ended ? <ReplayIcon className="h-6 w-6" /> : <PlayPauseIcon playing={playing} className="h-9 w-9" />}
           </CtrlButton>
 
           <div className="group/vol flex items-center">
@@ -1202,9 +1225,14 @@ export function Player({
                 data-captions-button={captionTrack ? "on" : captions.tracks.length ? "off" : "none"}
               >
                 <SubtitlesIcon className={`h-6 w-6 ${captions.tracks.length ? "" : "opacity-50"}`} />
-                {captionTrack && (
-                  <span aria-hidden className="absolute bottom-[5px] left-1/2 h-[3px] w-[22px] -translate-x-1/2 rounded-[1px] bg-[var(--mark)]" />
-                )}
+                {/* The line under CC grows out from the middle when captions go on, and back in when they go off. */}
+                <span
+                  aria-hidden
+                  data-cc-line={captionTrack ? "on" : "off"}
+                  className={`absolute bottom-[5px] left-1/2 h-[3px] w-[22px] -translate-x-1/2 rounded-[1px] bg-[var(--mark)] transition-transform duration-[250ms] ease-[cubic-bezier(0,0,0.2,1)] motion-reduce:transition-none ${
+                    captionTrack ? "scale-x-100" : "scale-x-0"
+                  }`}
+                />
               </CtrlButton>
             )}
             <div className="relative">
@@ -1252,140 +1280,151 @@ export function Player({
           ref={menuRef}
           role="menu"
           data-settings-menu={menu}
-          className="absolute bottom-[49px] right-3 z-20 min-w-[251px] overflow-y-auto rounded-[2px] bg-[rgba(28,28,28,0.9)] py-2 text-[13px] font-medium text-[#eeeeee] [text-shadow:0_0_2px_rgba(0,0,0,.5)]"
-          style={playerH > 0 ? { maxHeight: Math.max(140, playerH - 60) } : undefined}
+          className="absolute bottom-[49px] right-3 z-20 min-w-[251px] overflow-hidden rounded-[2px] bg-[rgba(28,28,28,0.9)] text-[13px] font-medium text-[#eeeeee] [text-shadow:0_0_2px_rgba(0,0,0,.5)]"
         >
-          {menu === "main" && (
-            <>
-              <MenuRow onClick={() => setMenu("speed")} label="Playback speed" value={speedLabel(rate)} />
-              {extras && captions.tracks.length > 0 && (
-                <MenuRow
-                  onClick={() => setMenu("subtitles")}
-                  label={`Subtitles/CC (${captions.tracks.length})`}
-                  value={captionTrack ? captionTrack.name : "Off"}
-                  data-menu-subtitles
+          {/* Where the page being left slides away (useMenuMotion). */}
+          <div ref={menuGhostRef} aria-hidden className="pointer-events-none absolute inset-0" />
+          <div
+            ref={menuPanelRef}
+            key={menu}
+            data-settings-page={menu}
+            className="overflow-y-auto py-2"
+            style={playerH > 0 ? { maxHeight: Math.max(140, playerH - 60) } : undefined}
+          >
+            {menu === "main" && (
+              <>
+                <MenuRow onClick={() => setMenu("speed")} label="Playback speed" value={speedLabel(rate)} />
+                {extras && captions.tracks.length > 0 && (
+                  <MenuRow
+                    onClick={() => setMenu("subtitles")}
+                    label={`Subtitles/CC (${captions.tracks.length})`}
+                    value={captionTrack ? captionTrack.name : "Off"}
+                    data-menu-subtitles
+                  />
+                )}
+                <MenuRow onClick={() => setMenu("quality")} label="Quality" value={summary} />
+              </>
+            )}
+            {menu === "subtitles" && (
+              <>
+                <MenuBack
+                  onClick={() => setMenu("main")}
+                  label="Subtitles/CC"
+                  extra={
+                    <button
+                      type="button"
+                      onClick={() => setMenu("caption-options")}
+                      data-caption-options
+                      className="ml-auto h-full px-3 text-[13px] font-medium hover:bg-white/10"
+                    >
+                      Options
+                    </button>
+                  }
                 />
-              )}
-              <MenuRow onClick={() => setMenu("quality")} label="Quality" value={summary} />
-            </>
-          )}
-          {menu === "subtitles" && (
-            <>
-              <MenuBack
-                onClick={() => setMenu("main")}
-                label="Subtitles/CC"
-                extra={
-                  <button
-                    type="button"
-                    onClick={() => setMenu("caption-options")}
-                    data-caption-options
-                    className="ml-auto h-full px-3 text-[13px] font-medium hover:bg-white/10"
-                  >
-                    Options
-                  </button>
-                }
-              />
-              <MenuChoice
-                checked={captionTrack === null}
-                onClick={() => {
-                  showCaptions(null);
-                  setMenu(null);
-                }}
-                data-caption-track="off"
-              >
-                Off
-              </MenuChoice>
-              {captions.tracks.map((t) => (
                 <MenuChoice
-                  key={t.id}
-                  checked={captionTrack?.id === t.id}
+                  checked={captionTrack === null}
                   onClick={() => {
-                    showCaptions(t);
+                    showCaptions(null);
                     setMenu(null);
                   }}
-                  data-caption-track={t.lang || t.name}
+                  data-caption-track="off"
                 >
-                  {t.name}
+                  Off
                 </MenuChoice>
-              ))}
-            </>
-          )}
-          {menu === "caption-options" && (
-            <>
-              <MenuBack onClick={() => setMenu("subtitles")} label="Options" />
-              {CAPTION_SETTINGS.map(({ key, label }) => (
-                <MenuRow
-                  key={key}
-                  onClick={() => setMenu(`caption-${key}`)}
-                  label={label}
-                  value={captionValueLabel(captions.style, key)}
-                  data-caption-setting={key}
-                />
-              ))}
-              <button
-                type="button"
-                role="menuitem"
-                onClick={() => captions.setStyle(DEFAULT_CAPTION_STYLE)}
-                data-caption-reset
-                className="flex h-10 w-full items-center px-4 hover:bg-white/10"
-              >
-                Reset
-              </button>
-            </>
-          )}
-          {menu?.startsWith("caption-") && menu !== "caption-options" && (() => {
-            const key = menu.slice("caption-".length) as CaptionSetting;
-            const setting = CAPTION_SETTINGS.find((c) => c.key === key);
-            if (!setting) return null;
-            return (
-              <>
-                <MenuBack onClick={() => setMenu("caption-options")} label={setting.label} />
-                {captionChoices(key).map((c) => (
+                {captions.tracks.map((t) => (
                   <MenuChoice
-                    key={c.value}
-                    checked={captions.style[key] === c.value}
+                    key={t.id}
+                    checked={captionTrack?.id === t.id}
                     onClick={() => {
-                      captions.setStyle(setCaptionSetting(captions.style, key, c.value));
-                      setMenu("caption-options");
+                      showCaptions(t);
+                      setMenu(null);
                     }}
-                    data-caption-choice={c.value}
+                    data-caption-track={t.lang || t.name}
                   >
-                    {c.label}
+                    {t.name}
                   </MenuChoice>
                 ))}
               </>
-            );
-          })()}
-          {menu === "speed" && (
-            <>
-              <MenuBack onClick={() => setMenu("main")} label="Playback speed" />
-              <div className="max-h-[260px] overflow-y-auto">
-                {SPEEDS.map((r) => (
-                  <MenuChoice key={r} checked={rate === r} onClick={() => pickSpeed(r)}>
-                    {speedLabel(r)}
+            )}
+            {menu === "caption-options" && (
+              <>
+                <MenuBack onClick={() => setMenu("subtitles")} label="Options" />
+                {CAPTION_SETTINGS.map(({ key, label }) => (
+                  <MenuRow
+                    key={key}
+                    onClick={() => setMenu(`caption-${key}`)}
+                    label={label}
+                    value={captionValueLabel(captions.style, key)}
+                    data-caption-setting={key}
+                  />
+                ))}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => captions.setStyle(DEFAULT_CAPTION_STYLE)}
+                  data-caption-reset
+                  className="flex h-10 w-full items-center px-4 hover:bg-white/10"
+                >
+                  Reset
+                </button>
+              </>
+            )}
+            {menu?.startsWith("caption-") && menu !== "caption-options" && (() => {
+              const key = menu.slice("caption-".length) as CaptionSetting;
+              const setting = CAPTION_SETTINGS.find((c) => c.key === key);
+              if (!setting) return null;
+              return (
+                <>
+                  <MenuBack onClick={() => setMenu("caption-options")} label={setting.label} />
+                  {captionChoices(key).map((c) => (
+                    <MenuChoice
+                      key={c.value}
+                      checked={captions.style[key] === c.value}
+                      onClick={() => {
+                        captions.setStyle(setCaptionSetting(captions.style, key, c.value));
+                        setMenu("caption-options");
+                      }}
+                      data-caption-choice={c.value}
+                    >
+                      {c.label}
+                    </MenuChoice>
+                  ))}
+                </>
+              );
+            })()}
+            {menu === "speed" && (
+              <>
+                <MenuBack onClick={() => setMenu("main")} label="Playback speed" />
+                <div className="max-h-[260px] overflow-y-auto">
+                  {SPEEDS.map((r) => (
+                    <MenuChoice key={r} checked={rate === r} onClick={() => pickSpeed(r)}>
+                      {speedLabel(r)}
+                    </MenuChoice>
+                  ))}
+                </div>
+              </>
+            )}
+            {menu === "quality" && (
+              <>
+                <MenuBack onClick={() => setMenu("main")} label="Quality" />
+                {options.map((o) => (
+                  <MenuChoice key={o.level} checked={chosen === o.level} onClick={() => pickQuality(o)} data-quality-option={o.label}>
+                    {o.level === AUTO && chosen === AUTO && playingOpt ? `Auto (${playingOpt.label})` : o.label}
+                    {o.hd && <sup className="ml-0.5 text-[9px] font-bold text-[var(--mark)]">HD</sup>}
                   </MenuChoice>
                 ))}
-              </div>
-            </>
-          )}
-          {menu === "quality" && (
-            <>
-              <MenuBack onClick={() => setMenu("main")} label="Quality" />
-              {options.map((o) => (
-                <MenuChoice key={o.level} checked={chosen === o.level} onClick={() => pickQuality(o)} data-quality-option={o.label}>
-                  {o.level === AUTO && chosen === AUTO && playingOpt ? `Auto (${playingOpt.label})` : o.label}
-                  {o.hd && <sup className="ml-0.5 text-[9px] font-bold text-[var(--mark)]">HD</sup>}
-                </MenuChoice>
-              ))}
-              {hdPending && (
-                <p data-hd-pending className="mt-1 border-t border-white/20 px-4 pb-1 pt-3 text-[13px] font-normal leading-[18px] text-white/70">
-                  {t("HD is still processing. Check back later for higher quality.")}
-                </p>
-              )}
-            </>
-          )}
+                {hdPending && (
+                  <p data-hd-pending className="mt-1 border-t border-white/20 px-4 pb-1 pt-3 text-[13px] font-normal leading-[18px] text-white/70">
+                    {t("HD is still processing. Check back later for higher quality.")}
+                  </p>
+                )}
+              </>
+            )}
+          </div>
         </div>
       )}
+      {/* Where a closing settings menu fades out (useMenuMotion). */}
+      <div ref={menuCloseRef} aria-hidden className="pointer-events-none absolute inset-0 z-20" />
 
       {/* Double tap to skip (player extras). */}
       {tapNote && (
