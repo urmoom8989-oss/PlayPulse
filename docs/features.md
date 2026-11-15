@@ -424,6 +424,25 @@ the browser:
   the language and the look. On phones the picture in picture button makes room
   for CC.
 
+### Player motion
+
+Small animations in the player, like 2020, for everybody (no flag: they only
+change how the controls move). With "reduce motion" switched on in the system
+they are skipped.
+
+- **Play and pause** fold into each other: the two pause bars are the two
+  halves of the play triangle, and the points slide between the shapes over
+  200 ms (`lib/watch/morph.ts`, `components/watch/PlayPauseIcon.tsx`). A
+  change half way through folds back from where it is. Replay, once a video
+  has ended, does not fold.
+- **CC**: the line under the button grows out from the middle to both sides
+  when captions go on (250 ms) and shrinks back to the middle when they go off.
+- **Settings**: the menu fades in and out (100 ms). Going into a page
+  (Playback speed, Subtitles/CC, Options, Quality) slides the new page in from
+  the right while the old one slides out to the left, and Back slides the
+  other way; the menu's box grows or shrinks to the new page at the same time
+  (250 ms, `components/watch/useMenuMotion.ts`).
+
 ### Description links and hashtags
 
 Behind the `description_links` flag (`040_links_and_pull_refresh.sql`, on for
