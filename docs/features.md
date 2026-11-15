@@ -516,6 +516,27 @@ Behind the `watermark` flag (`044_watermarks.sql`, on for everyone). Like
   Clicking subscribes (signed out, sign in first); once subscribed it opens
   the channel. Not on Premieres and live broadcasts, embeds, or the end screen.
 
+### End screens
+
+Behind the `end_screens` flag (`045_end_screens.sql`, on for everyone). Like
+2020's end screen editor:
+
+- In the uploader's "Video elements" step and the studio's video editor,
+  "End screen": add up to 4 elements (Subscribe, Video, Channel; one
+  Subscribe at most) and drag them into place on a small player. Each has
+  its own time, the last 5 to 20 seconds. Overlapping elements are marked red
+  and can't be saved. Arrow keys nudge a focused element (Shift for bigger
+  steps).
+- Video: one of your videos, picked from a list. Channel: any channel by
+  @handle. Subscribe: your own channel picture.
+- On the player each element fades in when its time comes and stays until
+  the video ends; then Up next or the end screen wall takes over. A video
+  element shows its title, channel and views on hover and opens that video; a
+  channel element shows the name and subscribers and opens the channel;
+  Subscribe shows SUBSCRIBE beside the picture and subscribes (signed out,
+  sign in first). While they are on, cards and the watermark step aside. Not
+  on Premieres and live broadcasts or embeds.
+
 ### Swipe down to refresh
 
 Behind the `pull_to_refresh` flag (`040_links_and_pull_refresh.sql`, on for

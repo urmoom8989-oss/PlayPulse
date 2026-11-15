@@ -15,6 +15,7 @@ import {
 } from "../upload/rules.ts";
 import { thumbnailFileProblem } from "../studio/rules.ts";
 import { cardProblem, toPayload, type CardDraft } from "../cards/rules.ts";
+import { elementProblem, endProblem, toEndPayload, type EndDraft } from "../endscreens/rules.ts";
 import { fromLocalInput, optionsErrorText, scheduleProblem, type UploadOptions } from "../upload/options-rules.ts";
 
 export type UploadPhase = "idle" | "draft" | "signing" | "uploading" | "finishing" | "done" | "failed";
@@ -52,6 +53,8 @@ type UploadState = {
   short: ShortBox;
   /** Cards from the "Video elements" step (041), saved when the upload is done. */
   cards: CardDraft[];
+  /** The end screen from the "Video elements" step (045), saved when the upload is done. */
+  endScreen: EndDraft[];
   /** The picked file's length, read in the browser: the cards' time slider runs to it. */
   fileDurationS: number | null;
   /** "Includes paid promotion" (042). */
@@ -68,6 +71,7 @@ type UploadState = {
   setThumbnailFile: (file: File | null) => void;
   setShortOn: (on: boolean) => void;
   setCards: (cards: CardDraft[]) => void;
+  setEndScreen: (els: EndDraft[]) => void;
   setPaidPromotion: (on: boolean) => void;
   setScheduleAt: (value: string | null) => void;
   cancel: () => Promise<void>;
@@ -130,6 +134,7 @@ export const useUpload = create<UploadState>((set, get) => ({
   notice: null,
   short: checkingShort,
   cards: [],
+  endScreen: [],
   fileDurationS: null,
   paidPromotion: false,
   scheduleAt: null,
@@ -165,6 +170,7 @@ export const useUpload = create<UploadState>((set, get) => ({
       notice: null,
       short: checkingShort,
       cards: [],
+      endScreen: [],
       fileDurationS: null,
       paidPromotion: false,
       scheduleAt: null,
@@ -312,6 +318,11 @@ export const useUpload = create<UploadState>((set, get) => ({
       if (useSession.getState().flags.video_cards && ready.length > 0 && "cards" in payload) {
         void postJson("/api/studio/cards", { videoId: signed.videoId, cards: payload.cards }).catch(() => undefined);
       }
+      // The end screen: the elements that are filled in, when they fit together.
+      const els = get().endScreen.filter((d) => elementProblem(d) === null);
+      if (useSession.getState().flags.end_screens && els.length > 0 && endProblem(els) === null) {
+        void postJson("/api/studio/end-screen", { videoId: signed.videoId, elements: els.map(toEndPayload) }).catch(() => undefined);
+      }
     } catch (err) {
       if (err instanceof UploadCancelled || controller.signal.aborted) return;
       running = null;
@@ -349,6 +360,10 @@ export const useUpload = create<UploadState>((set, get) => ({
 
   setCards(cards) {
     set({ cards });
+  },
+
+  setEndScreen(endScreen) {
+    set({ endScreen });
   },
 
   setPaidPromotion(on) {
@@ -411,6 +426,7 @@ function initialView() {
     notice: null,
     short: checkingShort,
     cards: [] as CardDraft[],
+    endScreen: [] as EndDraft[],
     fileDurationS: null,
     paidPromotion: false,
     scheduleAt: null as string | null,

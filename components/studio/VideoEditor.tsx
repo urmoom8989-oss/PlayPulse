@@ -11,6 +11,8 @@ import { formatTime } from "@/lib/watch/format";
 import { PublishButton } from "@/components/upload/PublishButton";
 import { StudioCards } from "@/components/cards/StudioCards";
 import type { WatchCard } from "@/lib/cards/rules";
+import { StudioEndScreen } from "@/components/endscreens/StudioEndScreen";
+import type { EndElement } from "@/lib/endscreens/rules";
 import { defaultSchedule, fromLocalInput, scheduleProblem, toLocalInput } from "@/lib/upload/options-rules";
 import { useHydrated } from "@/lib/hydrated";
 import { LocalTime } from "@/components/LocalTime";
@@ -84,6 +86,7 @@ export function VideoEditor({
   preview,
   statsOn = false,
   cards = null,
+  endScreen = null,
   optionsOn = false,
 }: {
   video: StudioRow;
@@ -98,6 +101,8 @@ export function VideoEditor({
   statsOn?: boolean;
   /** The video's cards (041); null hides the Cards box (the video_cards flag is off). */
   cards?: WatchCard[] | null;
+  /** The video's end screen (045); null hides the End screen box (the end_screens flag is off). */
+  endScreen?: EndElement[] | null;
   /** 042: Schedule, finishing a draft and "Includes paid promotion". */
   optionsOn?: boolean;
 }) {
@@ -437,6 +442,12 @@ export function VideoEditor({
           {cards && (
             <Box title="Cards" hint="Up to 5 cards that point viewers to one of your videos, a channel or a website. Each one slides in at the top right of the player at its time. Cards save on their own.">
               <StudioCards videoId={video.id} initial={cards} durationS={video.durationS ?? null} preview={preview} />
+            </Box>
+          )}
+
+          {endScreen && (
+            <Box title="End screen" hint="Up to 4 elements over the last 5 to 20 seconds: a subscribe button, one of your videos or another channel. Drag them into place. The end screen saves on its own.">
+              <StudioEndScreen videoId={video.id} initial={endScreen} preview={preview} />
             </Box>
           )}
 

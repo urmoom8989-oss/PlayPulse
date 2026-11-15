@@ -5,6 +5,7 @@ import { PreviewNotice, StudioNoDb, StudioNotSetUp, StudioOff, StudioPage } from
 import { VideoEditor } from "@/components/studio/VideoEditor";
 import { UUID } from "@/lib/studio/http";
 import { cardsForEditor } from "@/lib/cards/server";
+import { endScreenForEditor } from "@/lib/endscreens/server";
 import { statsOn } from "@/lib/stats/server";
 import { studioVideo } from "@/lib/studio/server";
 
@@ -13,7 +14,12 @@ export const metadata = { title: "Video details | PlayPulse" };
 async function EditGate({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   if (!UUID.test(id)) notFound();
-  const [state, stats, cards] = await Promise.all([studioVideo(id.toLowerCase()), statsOn(), cardsForEditor(id.toLowerCase())]);
+  const [state, stats, cards, endScreen] = await Promise.all([
+    studioVideo(id.toLowerCase()),
+    statsOn(),
+    cardsForEditor(id.toLowerCase()),
+    endScreenForEditor(id.toLowerCase()),
+  ]);
   switch (state.kind) {
     case "off":
       return <StudioOff />;
@@ -47,6 +53,7 @@ async function EditGate({ params }: { params: Promise<{ id: string }> }) {
               preview={state.preview}
               statsOn={stats}
               cards={state.preview ? null : cards}
+              endScreen={state.preview ? null : endScreen}
               optionsOn={state.optionsOn === true}
             />
           </div>

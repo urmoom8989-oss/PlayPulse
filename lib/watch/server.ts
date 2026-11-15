@@ -6,6 +6,7 @@ import { flagOn } from "@/lib/flags";
 import { cardsFor } from "@/lib/cards/server";
 import { videoPaidPromotion } from "@/lib/upload/options";
 import { playerWatermark } from "@/lib/channels/watermark-server";
+import { endScreenFor } from "@/lib/endscreens/server";
 import { failedJobsFor, jobsFor, videoHdPending } from "@/lib/processing/server";
 import { canRetry } from "@/lib/processing/retry";
 import { progressFor, type LiveStatus } from "@/lib/processing/status";
@@ -208,7 +209,7 @@ export const watchPageState = cache(async function watchPageState(v: string | nu
   // Before a Premiere or live broadcast starts, viewers get the page without the files.
   if (!video.src && video.broadcast?.state !== "upcoming") return { kind: "missing" };
 
-  const [upNext, engagement, comments, broadcast, hdPending, cards, paidPromotion, watermark] = await Promise.all([
+  const [upNext, engagement, comments, broadcast, hdPending, cards, paidPromotion, watermark, endScreen] = await Promise.all([
     upNextFor(supabase, row, publicBase, user?.id ?? null),
     engagementFor(row.id),
     commentsFor(row.id),
@@ -217,8 +218,16 @@ export const watchPageState = cache(async function watchPageState(v: string | nu
     video.broadcast ? [] : cardsFor(supabase, row.id, user?.id ?? null),
     videoPaidPromotion(supabase, row.id),
     video.broadcast ? null : playerWatermark(supabase, video.channel, user?.id ?? null),
+    video.broadcast ? [] : endScreenFor(supabase, row.id, user?.id ?? null),
   ]);
-  return { kind: "ready", video: { ...video, broadcast, hdPending, cards, paidPromotion, watermark }, upNext, preview: false, engagement, comments };
+  return {
+    kind: "ready",
+    video: { ...video, broadcast, hdPending, cards, paidPromotion, watermark, endScreen },
+    upNext,
+    preview: false,
+    engagement,
+    comments,
+  };
 });
 
 /** The broadcast with the viewer's reminder and how many are watching (watch_broadcast()). */

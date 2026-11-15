@@ -7,6 +7,7 @@ import { useUpload } from "@/lib/store/upload";
 import { PublishButton } from "./PublishButton";
 import { UploadStatus } from "./UploadStatus";
 import { CardsEditor } from "@/components/cards/CardsEditor";
+import { EndScreenEditor } from "@/components/endscreens/EndScreenEditor";
 import { defaultSchedule, scheduleLabel, scheduleProblem, fromLocalInput } from "@/lib/upload/options-rules";
 import {
   ACCEPT,
@@ -329,6 +330,25 @@ function UploadCards() {
   );
 }
 
+function UploadEndScreen() {
+  const on = useFlag("end_screens");
+  const els = useUpload((s) => s.endScreen);
+  const setEls = useUpload((s) => s.setEndScreen);
+  const phase = useUpload((s) => s.phase);
+  if (!on) return null;
+  return (
+    <section className="mt-6" aria-label="End screen" data-upload-end-screen>
+      <h3 className="text-[16px] font-medium leading-[22px] text-text">End screen</h3>
+      <p className="mt-1 text-[13px] leading-[18px] text-text-2">
+        Over the last 5 to 20 seconds of your video: a subscribe button, one of your videos or another channel. Up to 4; you can change it later in the studio.
+      </p>
+      <div className="mt-3">
+        <EndScreenEditor value={els} onChange={setEls} disabled={phase === "done" || phase === "failed"} />
+      </div>
+    </section>
+  );
+}
+
 function ShortChoice() {
   const on = useFlag("shorts");
   const short = useUpload((s) => s.short);
@@ -543,6 +563,7 @@ function DetailsForm({ step }: { step: 0 | 1 | 2 }) {
             <ThumbnailPicker />
             <ShortChoice />
             <UploadCards />
+            <UploadEndScreen />
           </>
         )}
 
