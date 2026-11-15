@@ -64,7 +64,7 @@ import {
   type Variant,
 } from "@/lib/watch/quality";
 import { menuPosition, watchLink } from "@/lib/watch/nerds";
-import { DOUBLE_TAP_MS, nextTap, tapSide, tapTotal, type TapSide, type TapState } from "@/lib/watch/taps";
+import { DOUBLE_TAP_MS, TAP_CONTINUE_MS, nextTap, tapSide, tapTotal, type TapState } from "@/lib/watch/taps";
 import type { UpNextVideo } from "@/lib/watch/types";
 import { cueAt, parseSpriteVtt, type SpriteCue } from "@/lib/watch/vtt";
 import { ChapterTrack } from "./ChapterTrack";
@@ -81,6 +81,7 @@ import type { PlayerWatermark } from "@/lib/channels/watermark-rules";
 const PAID_PROMOTION_S = 10;
 import { PlayerContextMenu } from "./PlayerContextMenu";
 import { PlayPauseIcon } from "./PlayPauseIcon";
+import { DoubleTapNote, TAP_FADE_MS, type TapNote } from "./DoubleTapNote";
 import { StatsForNerds } from "./StatsForNerds";
 import { useCaptions } from "./useCaptions";
 import { useMenuMotion } from "./useMenuMotion";
@@ -280,9 +281,10 @@ export function Player({
   const [ctxMenu, setCtxMenu] = useState<{ left: number; top: number } | null>(null);
   const [nerds, setNerds] = useState(false);
   const [engine, setEngine] = useState("");
-  const [tapNote, setTapNote] = useState<{ side: TapSide; total: number; key: number } | null>(null);
+  const [tapNote, setTapNote] = useState<TapNote | null>(null);
   const tapRef = useRef<TapState | null>(null);
   const tapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const tapHide = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pointerType = useRef("mouse");
   const menuOpen = useRef(false);
   const setPlayerVideo = useWatch((s) => s.setPlayerVideo);
@@ -696,9 +698,17 @@ export function Player({
   useEffect(
     () => () => {
       if (tapTimer.current) clearTimeout(tapTimer.current);
+      if (tapHide.current) clearTimeout(tapHide.current);
     },
     [],
   );
+
+  /** The double tap note fades out, then goes. */
+  const hideTapNote = useCallback(() => {
+    setTapNote((n) => (n && !n.leaving ? { ...n, leaving: true } : n));
+    if (tapHide.current) clearTimeout(tapHide.current);
+    tapHide.current = setTimeout(() => setTapNote(null), TAP_FADE_MS);
+  }, []);
 
   const closeCtxMenu = useCallback(() => setCtxMenu(null), []);
 
@@ -751,6 +761,8 @@ export function Player({
     tapRef.current = state;
     if (tapTimer.current) clearTimeout(tapTimer.current);
     if (skip === 0) {
+      // Starting over (the other half, or too slow): a note still up fades away.
+      if (tapNote && !tapNote.leaving) hideTapNote();
       tapTimer.current = setTimeout(() => {
         tapRef.current = null;
         if (menuOpen.current) setMenu(null);
@@ -759,12 +771,27 @@ export function Player({
       return;
     }
     seekTo(video.currentTime + skip);
-    setTapNote({ side, total: tapTotal(state.count), key: state.at });
+    // Where the finger was, inside the arc (the 40% of the player on that side), and a ripple big enough to fill it.
+    const arcW = rect.width * 0.4;
+    const x = e.clientX - rect.left - (side === "forward" ? rect.width - arcW : 0);
+    const y = e.clientY - rect.top;
+    const r = Math.hypot(Math.max(x, arcW - x), Math.max(y, rect.height - y));
+    if (tapHide.current) clearTimeout(tapHide.current);
+    setTapNote((n) => ({
+      side,
+      total: tapTotal(state.count),
+      key: state.at,
+      session: n && !n.leaving && n.side === side ? n.session : state.at,
+      x,
+      y,
+      r,
+      leaving: false,
+    }));
     poke();
     tapTimer.current = setTimeout(() => {
       tapRef.current = null;
-      setTapNote(null);
-    }, DOUBLE_TAP_MS + 500);
+      hideTapNote();
+    }, TAP_CONTINUE_MS);
   };
 
   // Close the settings menu on a click anywhere else.
@@ -1427,25 +1454,7 @@ export function Player({
       <div ref={menuCloseRef} aria-hidden className="pointer-events-none absolute inset-0 z-20" />
 
       {/* Double tap to skip (player extras). */}
-      {tapNote && (
-        <div
-          key={tapNote.key}
-          aria-hidden
-          data-tap-skip={tapNote.side}
-          className={`pointer-events-none absolute inset-y-0 flex w-2/5 flex-col items-center justify-center bg-white/10 text-white [text-shadow:0_0_4px_rgba(0,0,0,.75)] ${
-            tapNote.side === "back" ? "left-0 rounded-r-[50%]" : "right-0 rounded-l-[50%]"
-          }`}
-        >
-          <span className={`flex ${tapNote.side === "back" ? "-scale-x-100" : ""}`}>
-            {[0, 1, 2].map((i) => (
-              <svg key={i} viewBox="0 0 24 24" className="-mx-1 h-5 w-5 drop-shadow-[0_0_3px_rgba(0,0,0,.75)]" aria-hidden>
-                <path d="M8 5v14l11-7z" fill="currentColor" />
-              </svg>
-            ))}
-          </span>
-          <span className="mt-1 text-[13px] font-medium">{tapNote.total} seconds</span>
-        </div>
-      )}
+      {tapNote && <DoubleTapNote key={tapNote.session} note={tapNote} />}
 
       {ctxMenu && (
         <PlayerContextMenu
