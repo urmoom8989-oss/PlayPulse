@@ -4,6 +4,7 @@
 import type { WatchCard } from "../cards/rules.ts";
 import type { Broadcast } from "../live/state.ts";
 import type { PlayerWatermark } from "../channels/watermark-rules.ts";
+import type { EndElement } from "../endscreens/rules.ts";
 
 export type WatchChannel = {
   id: string;
@@ -43,6 +44,8 @@ export type WatchVideo = {
   paidPromotion?: boolean;
   /** The channel's watermark in the player's corner (044). */
   watermark?: PlayerWatermark | null;
+  /** End screen elements over the last 5 to 20 seconds (045). */
+  endScreen?: EndElement[];
 };
 
 export type UpNextVideo = {

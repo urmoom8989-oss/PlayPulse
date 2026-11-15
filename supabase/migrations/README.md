@@ -49,6 +49,7 @@ Every change to the database lives in this folder as a numbered SQL file.
 | `042_upload_options.sql` | upload options: `videos.publish_at`, `draft` and `paid_promotion`, `set_upload_options(video_id, visibility, publish_at, paid_promotion, draft)` for the owner (a schedule keeps the video private), `publish_scheduled()` for the worker every minute, `video_paid_promotion(video_id)` for the player, the `upload_options` flag |
 | `043_playlists.sql` | playlists: `playlists` and `playlist_items` (RLS, the owner reads), Watch later made by `my_playlists(video_id)`, `create_playlist`, `update_playlist`, `delete_playlist`, `set_playlist_video`, `move_playlist_video` for the owner, `playlist_header` and `playlist_videos` for anyone who may see the playlist, the `playlists` flag |
 | `044_watermarks.sql` | the channel watermark: `channels.watermark_url`, `watermark_show` (`entire`, `end`, `custom`) and `watermark_start_s`, readable by everyone, set with `set_channel_watermark(url, show, start_s)` on your own channel; the public `watermarks` bucket (1 MB, owner folders); the `watermark` flag |
+| `045_end_screens.sql` | end screens: `end_screen_elements` (subscribe, video or channel, `x` and `y` as a share of the player, `show_s` 5 to 20; RLS, the owner reads their own), `video_end_screen(video_id)` for the player, `set_video_end_screen(video_id, elements)` for the owner (up to 4, one subscribe); the `end_screens` flag |
 
 ## How to apply them
 

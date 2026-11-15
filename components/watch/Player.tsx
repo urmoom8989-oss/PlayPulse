@@ -75,6 +75,8 @@ import { AutoplayCountdown, EndScreenWall } from "./EndScreen";
 import type { WatchCard } from "@/lib/cards/rules";
 import { VideoCards } from "./VideoCards";
 import { Watermark } from "./Watermark";
+import { EndScreenElements } from "./EndScreenElements";
+import { elementsDue, type EndElement } from "@/lib/endscreens/rules";
 import type { PlayerWatermark } from "@/lib/channels/watermark-rules";
 
 /** How long "Includes paid promotion" stays at the start of a video (042), like 2020. */
@@ -123,6 +125,8 @@ type Props = {
   listNext?: string | null;
   /** The channel's watermark in the bottom right corner (044). */
   watermark?: PlayerWatermark | null;
+  /** End screen elements over the last seconds (045). */
+  endScreen?: EndElement[];
 };
 
 type Menu = null | "main" | "quality" | "speed" | "subtitles" | "caption-options" | `caption-${CaptionSetting}`;
@@ -184,6 +188,7 @@ export function Player({
   paidPromotion = false,
   listNext = null,
   watermark = null,
+  endScreen = [],
 }: Props) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -819,6 +824,8 @@ export function Player({
   const playingOpt = options.find((o) => o.level === (chosen === AUTO ? playingLevel : chosen));
   const hd = playingOpt?.hd ?? false;
   const showChrome = !playing || active || menu !== null || scrubbing || volumeDrag;
+  // End screen elements (045): the last seconds of a plain video, until it ends.
+  const endShowing = !embed && !onAir && started && ending === null && !error && elementsDue(endScreen, time, duration).length > 0;
   const shownVolume = muted ? 0 : volume;
   const VolumeIcon = muted || volume === 0 ? VolumeOffIcon : volume < 0.5 ? VolumeDownIcon : VolumeUpIcon;
   const pct = (n: number) => (duration > 0 ? `${Math.min(100, (n / duration) * 100)}%` : "0%");
@@ -991,10 +998,20 @@ export function Player({
       )}
       {ending === "wall" && <EndScreenWall videos={wall} channelName={channelName} />}
 
-      <VideoCards cards={cards} time={time} chrome={showChrome} hidden={ending !== null || Boolean(error)} />
+      {/* Before the cards and the controls, so both stay on top of it. */}
+      <EndScreenElements elements={endScreen} time={time} duration={duration} hidden={!endShowing} />
+
+      {/* While end screen elements are on, they replace the cards and the watermark, like 2020. */}
+      <VideoCards cards={cards} time={time} chrome={showChrome} hidden={ending !== null || Boolean(error) || endShowing} />
 
       {watermark && !embed && (
-        <Watermark watermark={watermark} time={time} duration={duration} raised={showChrome} hidden={ending !== null || Boolean(error) || !started} />
+        <Watermark
+          watermark={watermark}
+          time={time}
+          duration={duration}
+          raised={showChrome}
+          hidden={ending !== null || Boolean(error) || !started || endShowing}
+        />
       )}
 
       {paidPromotion && ending === null && !error && time < PAID_PROMOTION_S && (

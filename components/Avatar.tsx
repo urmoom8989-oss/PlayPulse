@@ -3,7 +3,8 @@ import Image from "next/image";
 // The 2019 default avatar: the first letter on a colored circle.
 const colors = ["#ef6c00", "#5e35b1", "#00897b", "#3949ab", "#c2185b", "#7cb342", "#6d4c41", "#039be5"];
 
-function colorFor(seed: string) {
+/** The default avatar's color for a name (also the end screen's round elements). */
+export function colorFor(seed: string) {
   let hash = 0;
   for (const ch of seed) hash = (hash * 31 + ch.charCodeAt(0)) | 0;
   return colors[Math.abs(hash) % colors.length];

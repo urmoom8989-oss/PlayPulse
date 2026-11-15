@@ -102,6 +102,7 @@ again. See [`supabase/migrations/README.md`](../supabase/migrations/README.md).
 - [ ] `042_upload_options.sql` (Unlisted and Schedule in the uploader, drafts, "Includes paid promotion")
 - [ ] `043_playlists.sql` (playlists: Save, Watch later, the playlist page with Play all, the panel next to the player)
 - [ ] `044_watermarks.sql` (the channel watermark in the player's corner, set in Channel customization)
+- [ ] `045_end_screens.sql` (end screens: up to 4 elements over the last 5 to 20 seconds, set in the uploader and the studio)
 
 Then make yourself an admin (sign up on the site first):
 
